@@ -270,6 +270,118 @@ test("External sources: a schedule entered by hand (A241)", async ({ page }) => 
   await expect(details.getByRole("list", { name: "Changes" })).toContainText("Its schedule read again");
 });
 
+// A248: Attic Channel's schedule from a published Google Sheet: what was read in its details; then
+// in Change, a spreadsheet uploaded instead (checked first: what's read, the first airings), saved,
+// and in its history. A shared link that isn't shared with anyone with the link says so.
+test("External sources: a schedule from a spreadsheet (A248)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await page.goto(`${IE}/listed`);
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Attic Channel/ })).toContainText("Their spreadsheet");
+  await page.getByText("Attic Channel").first().click();
+  const details = page.getByRole("dialog", { name: "Attic Channel" });
+  await expect(details).toContainText("Read 152 shows from a week grid, Monday 9/21 to Sunday 9/27, times in Eastern.");
+  await expect(details).toContainText("Eastern: the sheet says so");
+  await expect(details.getByRole("list", { name: "Skipped" })).toContainText("out of order in its day");
+  await details.getByRole("button", { name: "Change" }).click();
+  const form = page.getByRole("dialog", { name: "Change the listing" });
+  await expect(form.getByRole("radio", { name: "A spreadsheet", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(form.getByLabel("Spreadsheet link")).toHaveValue(/2PACX-1vMockAtticChannelWeek/);
+  // A link for editing that isn't shared: said before anything is saved.
+  await form.getByLabel("Spreadsheet link").fill("https://docs.google.com/spreadsheets/d/1PrivateMadeUpSheet/edit#gid=0");
+  await form.getByRole("button", { name: "Check it" }).click();
+  await expect(form).toContainText("This sheet isn't public");
+  await settled(page);
+  await checkA11y(page, "desk Change, a sheet that isn't public");
+  // A file instead: checked, then saved.
+  await form.getByRole("radio", { name: "Upload a spreadsheet" }).click();
+  await form.locator('input[type="file"]').setInputFiles({ name: "attic-week.csv", mimeType: "text/csv", buffer: Buffer.from("Mon,Tue\nNews 6pm,News 6pm\n") });
+  await form.getByRole("button", { name: "Check it" }).click();
+  await expect(form.getByRole("region", { name: "What was read" })).toContainText("Read 14 shows from a week grid, Mon to Sun, every week, times in Pacific.");
+  await expect(form.getByRole("list", { name: "The first airings" }).getByRole("listitem")).toHaveCount(8);
+  await settled(page);
+  await checkA11y(page, "desk Change, a spreadsheet checked");
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Attic Channel is saved. It's on the dial at 36.1.")).toBeVisible();
+  await expect(details).toContainText("attic-week.csv, CSV file");
+  await expect(details.getByRole("list", { name: "Changes" })).toContainText("Spreadsheet from nothing to attic-week.csv, 14 shows");
+  await details.getByRole("button", { name: "Close" }).last().click();
+
+  // Listing a new source with a Google Sheet's link: it's read as it's saved.
+  await page.getByRole("button", { name: "List a source" }).click();
+  const add = page.getByRole("dialog", { name: "List a source" });
+  await add.getByLabel("Whose stream").fill("Couch Club");
+  await add.getByLabel("Channel").fill("39.1");
+  await add.getByLabel("Call sign").fill("CUCH");
+  await add.getByRole("radio", { name: "Stream link" }).click();
+  await add.getByLabel("Stream address").fill("https://couch.example.org/live/index.m3u8");
+  await add.getByRole("radio", { name: "Clearly public" }).click();
+  await add.getByLabel("The basis").fill("Non-profit channel, stream published for the public");
+  await add.getByRole("radio", { name: "A spreadsheet", exact: true }).click();
+  await add.getByLabel("Spreadsheet link").fill("https://docs.google.com/spreadsheets/d/e/2PACX-1vMadeUpCouchClub/pubhtml");
+  await add.getByRole("button", { name: "List it" }).click();
+  await expect(page.getByText("Couch Club is on the dial at 39.1.")).toBeVisible();
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Couch Club/ })).toContainText("Their spreadsheet");
+});
+
+// A249: Anime x HIDIVE, a free channel whose lineup is in a platform's public guide. "Find this
+// channel's guide" looks its name up in iptv-org's lists (canned on the mocks): the guide files
+// Opencast can read, one checked (its channel, of how many, the first airings), then used as guide
+// data, checked against their published schedule, and listed with what was read.
+test("External sources: find a channel's guide (A249)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await page.goto(`${IE}/listed`);
+  await page.getByRole("button", { name: "List a source" }).click();
+  const add = page.getByRole("dialog", { name: "List a source" });
+  // Without a name, there's nothing to look up.
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  await expect(add.getByRole("alert")).toContainText("Fill in whose stream first");
+  await add.getByLabel("Whose stream").fill("Anime x HIDIVE");
+  await add.getByLabel("Channel").fill("43.1");
+  await add.getByLabel("Call sign").fill("HIDV");
+  await add.getByRole("radio", { name: "Stream link" }).click();
+  await add.getByLabel("Stream address").fill("https://fast.example.org/hidive/index.m3u8");
+  await add.getByRole("radio", { name: "Clearly public" }).click();
+  await add.getByLabel("The basis").fill("Free channel, stream published for the public");
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  const found = add.getByRole("region", { name: "Guides found" });
+  const files = found.getByRole("list", { name: "Guide files" });
+  await expect(files.getByRole("listitem", { name: /via i\.mjh\.nz$/ })).toHaveCount(3);
+  await expect(files.getByRole("listitem").first()).toContainText("Pluto TV (US), via i.mjh.nz");
+  await expect(found).toContainText("3 more guides need a site's pages read, so they aren't offered.");
+  await settled(page);
+  await checkA11y(page, "desk List a source, guides found");
+  await found.getByRole("button", { name: "Check Pluto TV (US), via i.mjh.nz" }).click();
+  const read = found.getByRole("region", { name: "What was read" });
+  await expect(read).toContainText("Read 32 airings to come for ANIME x HIDIVE, one of 427 channels in the guide.");
+  await expect(read).toContainText("965 KB as it downloads (gzipped), 7.4 MB unzipped");
+  await expect(read.getByRole("list", { name: "The first airings" }).getByRole("listitem")).toHaveCount(8);
+  await expect(read.getByRole("list", { name: "The first airings" }).getByRole("listitem").first()).toContainText("Golden Time");
+  await settled(page);
+  await checkA11y(page, "desk List a source, a guide checked");
+  await found.getByRole("button", { name: "Use Pluto TV (US), via i.mjh.nz" }).click();
+  await expect(add.getByLabel("Guide data address")).toHaveValue("https://i.mjh.nz/PlutoTV/us.xml.gz#channel=6793eaa4bc03978b9bc63db1");
+  await expect(add.getByLabel("Format")).toHaveValue("xmltv");
+  await expect(add.getByRole("checkbox", { name: "It's guide data, checked against their published schedule" })).toBeChecked();
+  await expect(found.getByRole("button", { name: "Pluto TV (US), via i.mjh.nz is in use" })).toBeDisabled();
+  await add.getByRole("textbox", { name: "Checked against" }).fill("https://pluto.tv/us/live-tv/6793eaa4bc03978b9bc63db1");
+  await add.getByLabel("Date checked").fill("2026-09-26");
+  await add.getByRole("button", { name: "List it" }).click();
+  await expect(page.getByText("Anime x HIDIVE is on the dial at 43.1.")).toBeVisible();
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Anime x HIDIVE/ })).toContainText("Guide data");
+  await page.getByText("Anime x HIDIVE").first().click();
+  const details = page.getByRole("dialog", { name: "Anime x HIDIVE" });
+  await expect(details).toContainText("ANIME x HIDIVE (6793eaa4bc03978b9bc63db1), one of 427 channels");
+  await expect(details).toContainText("Read every hour (every 30 minutes at most while it runs out), asking first whether it changed.");
+  await details.getByRole("button", { name: "Close" }).last().click();
+
+  // A channel the list names but the file no longer has: said, and not offered as one to use.
+  await page.getByRole("button", { name: "List a source" }).click();
+  await add.getByLabel("Whose stream").fill("WeatherNation");
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  await expect(found).toContainText("Not in the guide right now");
+  await expect(found.getByRole("button", { name: "Use Samsung TV Plus (US), via i.mjh.nz" })).toBeDisabled();
+});
+
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
 // the catalog station's library, its checklist answered with evidence and sent by Dee, and the
 // second check done by Rae, a rights reviewer: never the first checker.
@@ -488,4 +600,125 @@ test("Catalog sponsors: an open slot offered, and the business says yes", async 
   await business.getByRole("button", { name: "They say yes" }).click();
   await expect(list.getByRole("row", { name: /Orange Street Coffee/ })).toContainText("Starts October 1");
   await expect(grid.getByRole("button", { name: /^Cartoons, 1928 to 1936 in Inland Empire: Orange Street Coffee\. Starts October 1/ })).toBeVisible();
+});
+
+test("Analytics (A251): the network's week, then every station sorted and filtered, exported; a market lead's market fixed", async ({ page }) => {
+  // Signed in through storage (not an init script), so the test can sign in as someone else later.
+  await page.goto("/desk");
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
+  await page.goto("/desk");
+  await page.getByRole("navigation").getByRole("link", { name: "Analytics" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/overview$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Analytics" })).toBeVisible();
+  await expect(page.getByText("Hours watched", { exact: true })).toBeVisible();
+  await expect(page.getByText("76,783")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tuned in at once" })).toBeVisible();
+  // 30 days: the span is in the address, and the numbers grow with it.
+  await page.getByRole("group", { name: "Span" }).getByRole("button", { name: "30 days" }).click();
+  await expect(page).toHaveURL(/span=30d/);
+  await expect(page.getByText("76,783")).toBeHidden();
+  await page.getByRole("group", { name: "Span" }).getByRole("button", { name: "7 days" }).click();
+
+  // Every station: sorted by hours, then by peak; External alone; exported.
+  await page.getByRole("button", { name: "All 13 stations" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations/);
+  const table = page.getByRole("table", { name: "Every station's span" });
+  const firstRow = table.getByRole("row").nth(1);
+  await expect(firstRow).toContainText("BEAT");
+  await table.getByRole("button", { name: "Peak" }).click();
+  await expect(firstRow).toContainText("REEL");
+  await page.getByRole("group", { name: "Kind of station" }).getByRole("button", { name: /External/ }).click();
+  await expect(firstRow).toContainText("RDLS");
+  await expect(firstRow).toContainText("Their stream");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^opencast-stations-\d{4}-\d{2}-\d{2}\.csv$/);
+
+  // One station (Ref. 12d 03): BEAT, opened from the table, its span kept.
+  await page.getByRole("group", { name: "Kind of station" }).getByRole("button", { name: /^All/ }).click();
+  await table.getByRole("link", { name: "BEAT" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations\/[0-9a-f-]+\?span=7d/);
+  await expect(page.getByRole("heading", { name: /^BEAT/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Saturday night" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "That night's airings" })).toContainText("Carried from REEL 24.1");
+  await expect(page.getByText("Paid out")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cost to run" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in master control" })).toHaveAttribute("href", "/control/BEAT/audience");
+  await page.getByRole("button", { name: "All stations" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations\?/);
+
+  // Programs and breaks (Ref. 12d 05): pick a program to see who stayed.
+  await page.getByRole("tab", { name: "Programs" }).click();
+  await expect(page.getByRole("heading", { name: "Late Crate, still watching" })).toBeVisible();
+  await page.getByRole("table", { name: "Programs across stations" }).getByRole("button", { name: "Saturday Reel" }).click();
+  await expect(page.getByRole("heading", { name: "Saturday Reel, still watching" })).toBeVisible();
+  await expect(page.getByText(/Breaks that open with a bumper keep/)).toBeVisible();
+
+  // Money (Ref. 12d 06): Opencast's share not set yet, never a guessed $0; the cost to run estimated.
+  await page.getByRole("tab", { name: "Money" }).click();
+  await expect(page.getByText("Opencast’s share: not set yet.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Held for claimable stations" })).toBeVisible();
+
+  // Health (Ref. 12d 07) and Growth: what went wrong, and what people look for.
+  await page.getByRole("tab", { name: "Health" }).click();
+  await expect(page.getByRole("table", { name: "Each station's airtime by kind" })).toContainText("PREP");
+  await expect(page.getByText(/PREP 31\.1: dead air, 47 min/)).toBeVisible();
+  await page.getByRole("tab", { name: "Growth" }).click();
+  await expect(page.getByRole("heading", { name: "Found nothing" })).toBeVisible();
+  await expect(page.getByText("la liga").first()).toBeVisible();
+
+  // Audience (Ref. 12d 04): the week's grid, then narrowed to BEAT.
+  await page.getByRole("tab", { name: "Audience" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/audience/);
+  await expect(page.getByRole("table", { name: "Average tuned in by weekday and hour" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How people tuned in" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Changes between stations" })).toContainText("REEL");
+  await page.getByRole("combobox", { name: "Station" }).selectOption({ label: "12.1 BEAT" });
+  await expect(page).toHaveURL(/station=/);
+  await expect(page.getByText("BEAT 12.1, in the market’s time")).toBeVisible();
+
+  // Lee leads the High Desert: their market, fixed.
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
+  await page.goto("/desk/analytics/overview");
+  await expect(page.getByText("Every station in High Desert", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Market" })).toBeDisabled();
+});
+
+test("A station's file (added 2026-10-07): who made it, then an admin archives an upload and takes the station off the air; a market lead only looks", async ({ page }) => {
+  await page.goto("/desk");
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
+  await page.goto("/desk/analytics/stations/00000000-0000-4000-8000-000000097001");
+  await expect(page.getByText(/Made .* by Kai Morgan/)).toBeVisible();
+
+  // Uploads: archive one, with why.
+  await page.getByRole("tab", { name: "Uploads" }).click();
+  await expect(page).toHaveURL(/view=uploads/);
+  await page.getByRole("button", { name: "Archive Night Tape 2" }).click();
+  const archive = page.getByRole("dialog", { name: "Archive Night Tape 2" });
+  await archive.getByRole("button", { name: "Archive it" }).click();
+  await expect(archive.getByText("Say why: the station's people will read it.")).toBeVisible();
+  await archive.getByRole("textbox", { name: "Why" }).fill("Someone else's show");
+  await archive.getByRole("button", { name: "Archive it" }).click();
+  await expect(archive).toBeHidden();
+  await page.getByRole("button", { name: /Show 2 archived/ }).click();
+  await expect(page.getByText("Archived by Opencast (Dee A.): Someone else's show")).toBeVisible();
+
+  // Off the air and held, then lifted.
+  await page.getByRole("button", { name: "Take off the air" }).click();
+  const hold = page.getByRole("dialog", { name: "Take BEAT off the air" });
+  await hold.getByRole("textbox", { name: "Why" }).fill("Rebroadcasting a channel it doesn't own");
+  await hold.getByRole("button", { name: "Take it off the air" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Off the air, held by Opencast" })).toContainText("Rebroadcasting a channel it doesn't own");
+  await expect(page.getByRole("button", { name: "Take off the air" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Lift the hold" }).click();
+  await expect(page.getByText("Off the air, held by Opencast")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take off the air" })).toBeVisible();
+
+  // Lee leads the High Desert: the file, without the buttons.
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
+  await page.goto("/desk/analytics/stations/00000000-0000-4000-8000-000000097010?view=uploads");
+  await expect(page.getByRole("table", { name: "The station's uploads" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Archive / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take off the air" })).toHaveCount(0);
 });

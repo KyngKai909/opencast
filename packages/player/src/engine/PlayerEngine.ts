@@ -28,11 +28,16 @@
 //   `playback.sourceUrl` is fetched with the device's own networking first (no Origin, cookies or
 //   Referer; http allowed), and falls back to `playback.url` (the relay's, or the same address)
 //   on an error or no first frame in DIRECT_FIRST_FRAME_MS. Stand by is still at 8 s.
+// - The swipe home (A245, the phone and tablet app): channel up and down follow the swipe's order
+//   (setOrder: presets, then the dial), the stations kept warm are its next and previous (and the
+//   dial's first while in the presets), a swipe that showed a ready picture changes channel without
+//   static (swipeTo), and the next picture can be shown beside this one while the finger drags (peek).
 //
 // Surfaces read its state (subscribe/getState) and send it commands (handle).
 
 import type { Channel, Command, CommandSource } from "../types";
 import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../dial";
+import { preloadIds, stepId, type OrderIds } from "../order";
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, SignedOffError, type WarmMode } from "./Deck";
 import { defaultDriver, hlsDriver, nativeDriver, type MediaDriver, type Quality } from "./driver";
@@ -63,6 +68,8 @@ export interface TuneRecord {
   ms: number;
   /** Whether the station was warm when it was asked for. */
   warm: boolean;
+  /** A251: how it was tuned, where known (sent with the station's first heartbeat). */
+  via?: import("@opencast/contracts").TuneVia;
 }
 
 export interface PlayerState {
@@ -185,6 +192,11 @@ export function tuningSoundFrom(w: { tuningSound?: boolean; radioTuningSound?: b
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
 /** A partial option without its undefined keys, so they don't overwrite what's set. */
+/** A251: the source with how it was tuned, unless the app already said (the app knows more). */
+function withVia(source: CommandSource | undefined, via: NonNullable<CommandSource["via"]>): CommandSource {
+  return source?.via ? source : { input: "app", ...source, via };
+}
+
 function definedOnly<T extends object>(o: T | undefined): Partial<T> {
   return o ? (Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>) : {};
 }
@@ -255,6 +267,10 @@ export class PlayerEngine {
   };
   private onScreenKey = "";
   private tuneSeq = 0;
+  /** swipe home 08: the phone and tablet app's order, per band (null: channel order). */
+  private orders: OrderIds[] | null = null;
+  /** swipe home 08: the next tune is a swipe that already showed this station's picture. */
+  private swiped: string | null = null;
   /** A tune asked for before the surface attached: it runs on attach. */
   private queuedTune: { stationId: string; source?: CommandSource } | null = null;
   /**
@@ -290,7 +306,12 @@ export class PlayerEngine {
     this.audio.setEvenOut(this.o.eveningOut);
     this.hiss = new Hiss(() => this.audio.context());
     this.change = new ChannelChange({
-      onChange: (tuning) => this.patch({ tuning }),
+      onChange: (tuning) => {
+        // The tuning sound lasts as long as the cover: it clicks and fades as the picture arrives
+        // (clearing), and only fades on Stand by or when the change ends without one.
+        if (!tuning || tuning.phase === "clearing") this.hiss.stop(tuning?.phase === "clearing");
+        this.patch({ tuning });
+      },
       onStandby: (stationId) => this.standBy(stationId),
       onCleared: (stationId, _look, fromStandby) => {
         // The banner slides in once the static has cleared (or a picture replaced Stand by).
@@ -415,6 +436,91 @@ export class PlayerEngine {
     this.presets = presets;
   }
 
+  /**
+   * swipe home 08, "Order": the phone and tablet app's order, one per band (presets in preset
+   * order, then the rest of the band in channel order). Channel up and down and the warm stations
+   * follow it; with none (the web, TV mode, the Cast receiver) they follow channel order.
+   */
+  setOrder(orders: OrderIds[] | null) {
+    this.orders = orders && orders.length ? orders : null;
+    const id = this.state.currentId;
+    if (id) this.rewarm(id);
+  }
+
+  private orderOf(id: string | null): OrderIds | null {
+    return (id && this.orders?.find((o) => o.ids.includes(id))) || null;
+  }
+
+  /** In the order, the stations this device leaves out (DASH where it can't play it, A226), as in channel order. */
+  private skipInOrder = (id: string): boolean => {
+    const c = this.channel(id);
+    if (!c) return true;
+    const o = this.swipe();
+    return (!!o.skipDash && c.playback?.format === "dash") || (!!o.skipListed && c.playback?.kind === "embed");
+  };
+
+  /** The station one step up (next) or down (previous): along the swipe's order where there is one, else in channel order. */
+  stepFrom(from: string | null, dir: "up" | "down"): Channel | null {
+    const o = this.orderOf(from);
+    if (!o) return neighbour(this.state.channels, from, dir, this.swipe());
+    const id = stepId(o, from, dir === "up" ? "next" : "prev", this.skipInOrder);
+    return id ? (this.channel(id) ?? null) : null;
+  }
+
+  /** The stations to keep warm around this one. */
+  private warmAround(currentId: string): Channel[] {
+    const o = this.orderOf(currentId);
+    if (!o) return neighbours(this.state.channels, currentId, this.swipe());
+    return preloadIds(o, currentId, this.skipInOrder).flatMap((id) => this.channel(id) ?? []);
+  }
+
+  /**
+   * swipe home 08: whether a swipe to this station can show it at once: its warm picture has a
+   * frame, or it's off air (its off-air screen is what shows).
+   */
+  swipeReady(stationId: string): boolean {
+    const c = this.channel(stationId);
+    if (!c) return false;
+    if (!c.onAir || !c.playback) return c.station.kind !== "listed";
+    const d = this.decks.get(stationId);
+    return !!d && d.role === "warm" && (d.state === "ready" || d.state === "playing");
+  }
+
+  /**
+   * swipe home 01: while the finger drags, the next station's warm picture shows beside the one on
+   * screen (the surface places it with --oc-peek-y). Null puts it away. True when there's a picture.
+   */
+  peek(stationId: string | null): boolean {
+    for (const d of this.decks.values()) if (d.stationId !== stationId) d.setPeek(false);
+    if (!stationId || !this.swipeReady(stationId)) return false;
+    const d = this.decks.get(stationId);
+    d?.setPeek(true);
+    return !!d;
+  }
+
+  /**
+   * swipe home 08, "Static on a swipe": a swipe that already showed the station's picture changes
+   * channel without the static and its 300 ms minimum (the 300 ms is for buttons, remotes and
+   * number entry); the banner follows. One that wasn't ready changes channel as usual, the static
+   * staying until its first frame. Reduced motion keeps its crossfade, the radio band its needle.
+   */
+  swipeTo(stationId: string, source?: CommandSource): Promise<void> {
+    source = withVia(source, "swipe");
+    this.swiped = this.swipeReady(stationId) ? stationId : null;
+    return this.tune(stationId, source);
+  }
+
+  /**
+   * swipe home 08, "Sound" (Muted previews): plays on muted, with "Tap for sound", until the first
+   * tap, as when a browser refuses sound.
+   */
+  holdSound() {
+    if (this.state.muted || this.state.mutedByBrowser) return;
+    const d = this.active();
+    if (d) d.video.muted = true;
+    this.patch({ mutedByBrowser: true });
+  }
+
   setOptions(p: Partial<Pick<EngineOptions, "bannerMs" | "numberWaitMs" | "warm" | "neighbours" | "quality" | "eveningOut" | "tuningSound">>) {
     const quality = p.quality !== undefined && p.quality !== this.o.quality;
     const { tuningSound, ...rest } = p;
@@ -522,7 +628,9 @@ export class PlayerEngine {
 
     // Changing channel: the corner number and the static at once (not on first launch, for a
     // station coming back, or going straight to off air).
-    const look = this.lookFor(c, again);
+    const swiped = this.swiped === stationId;
+    this.swiped = null;
+    const look = this.lookFor(c, again, swiped);
     // A press while the static is up: only the channel the viewer lands on loads.
     const repeat = look !== "none" && this.change.covering;
     this.change.press(stationId, look, look === "sweep" ? { from: frequencyOf(this.channel(this.state.currentId)?.station.channel), to: frequencyOf(c.station.channel)!, reduced: this.o.reducedMotion() } : undefined);
@@ -533,6 +641,8 @@ export class PlayerEngine {
       this.playHiss(c);
     } else {
       this.bannerAfterChange = false;
+      // A swipe moved the old picture away: its sound goes with it.
+      if (swiped) this.muteOnScreen();
       this.showBanner(stationId);
     }
 
@@ -592,7 +702,7 @@ export class PlayerEngine {
     this.watchWireless(deck);
     this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
-    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm }, error: null });
+    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm, ...(source?.via ? { via: source.via } : {}) }, error: null });
     this.settle(stationId, previous, "playing");
     // The static rolls away over the new picture; the banner follows.
     this.change.clear();
@@ -607,7 +717,7 @@ export class PlayerEngine {
    * Stand by or a city's player too, where the static runs its minimum and then clears to that
    * screen. Nothing only on first launch and for a station coming back.
    */
-  private lookFor(c: Channel, again: boolean): TuningLook {
+  private lookFor(c: Channel, again: boolean, swiped = false): TuningLook {
     if (again) return "none";
     const covering = this.change.state;
     const s = this.state.status;
@@ -616,7 +726,9 @@ export class PlayerEngine {
     const toRadio = c.station.band === "radio" && frequencyOf(c.station.channel) !== null;
     // The radio band, station to station (from its own screen, not from off air or Stand by).
     if (toRadio && fromRadio && s !== "off_air" && s !== "standby" && (!covering || covering.look === "sweep")) return "sweep";
-    return this.o.reducedMotion() ? "fade" : "static";
+    if (this.o.reducedMotion()) return "fade";
+    // A swipe that showed the picture already: no static (unless a change is still covering).
+    return swiped && !covering ? "none" : "static";
   }
 
   /** Landed with no picture to wait for (off air, a city's player): the static clears, or nothing was drawn. */
@@ -729,11 +841,11 @@ export class PlayerEngine {
     if (d && d.role === "active") d.video.muted = true;
   }
 
-  /** The tuning hiss, when the band's "Tuning sound" is on, someone has interacted, and it isn't muted. */
+  /** The tuning sound, when the band's "Tuning sound" is on, someone has interacted, and it isn't muted. */
   private playHiss(c: Channel) {
     const setting = this.tuningSoundOn(c.station.id);
     if (!hissAllowed({ setting, interacted: this.interacted || pageHasBeenActive(), muted: this.state.muted || this.state.mutedByBrowser })) return;
-    this.hiss.play(this.volume);
+    this.hiss.play(this.volume, c.station.band === "radio" ? "dial" : "set");
   }
 
   /** Hisses played so far (tests, and the recordings). */
@@ -781,7 +893,7 @@ export class PlayerEngine {
     if (this.state.pendingId) keep.add(this.state.pendingId);
     const mode = this.o.warm;
     // A DASH neighbour is never warmed (A227): no dash.js, no manifest, until it's tuned.
-    const warmable = mode === "none" ? [] : neighbours(this.state.channels, currentId, this.swipe()).filter((n) => n.onAir && n.playback?.kind === "hls" && !isDash(n));
+    const warmable = mode === "none" ? [] : this.warmAround(currentId).filter((n) => n.onAir && n.playback?.kind === "hls" && !isDash(n));
     if (mode === "buffer" || mode === "play") {
       for (const n of warmable) {
         keep.add(n.station.id);
@@ -902,12 +1014,12 @@ export class PlayerEngine {
 
   channelStep(dir: "up" | "down", source?: CommandSource) {
     const from = this.state.pendingId ?? this.state.currentId;
-    const next = neighbour(this.state.channels, from, dir, this.swipe());
-    if (next) void this.tune(next.station.id, source);
+    const next = this.stepFrom(from, dir);
+    if (next) void this.tune(next.station.id, withVia(source, "channel"));
   }
 
   last(source?: CommandSource) {
-    if (this.state.lastId) void this.tune(this.state.lastId, source);
+    if (this.state.lastId) void this.tune(this.state.lastId, withVia(source, "last"));
   }
 
   // ---------- Banner ----------
@@ -950,7 +1062,7 @@ export class PlayerEngine {
     const entry = this.state.entry;
     if (!entry) return;
     if (this.timers.entry) clearTimeout(this.timers.entry);
-    if (entry.match) void this.tune(entry.match.station.id, source);
+    if (entry.match) void this.tune(entry.match.station.id, withVia(source, "keypad"));
     else {
       // "No station on 13", with the nearest two, then it goes and the channel stays.
       this.timers.entry = setTimeout(() => this.clearEntry(), this.o.bannerMs);
@@ -1152,6 +1264,8 @@ export class PlayerEngine {
       this.interacted = true;
       this.audio.unlock();
     }
+    // Muted mid-change: the tuning sound goes too.
+    if (muted) this.hiss.stop();
     const d = this.active();
     if (d) d.video.muted = muted;
     this.patch({ muted, mutedByBrowser: false });
@@ -1282,12 +1396,12 @@ export class PlayerEngine {
         return this.o.onCommand?.({ type: "guide" }, source);
       case "tune": {
         const c = findByChannel(this.state.channels, command.channel);
-        if (c) void this.tune(c.station.id, source);
+        if (c) void this.tune(c.station.id, withVia(source, "remote"));
         return;
       }
       case "preset": {
         const id = this.presets[command.key];
-        if (id) void this.tune(id, source);
+        if (id) void this.tune(id, withVia(source, "preset"));
         return;
       }
       case "last":

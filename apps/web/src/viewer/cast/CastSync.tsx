@@ -46,7 +46,7 @@ export function CastSync() {
   // The TV changed (this phone's remote, or another phone): the phone's player follows.
   useEffect(() => {
     if (!casting || !tvId || tvId === phoneIdRef.current) return;
-    void engine.tune(tvId, { input: "cast" });
+    void engine.tune(tvId, { input: "cast", via: "remote" });
   }, [casting, tvId, engine]);
 
   // The phone changed station itself (its guide, a preset, the lock screen): the TV follows.

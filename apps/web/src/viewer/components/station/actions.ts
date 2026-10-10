@@ -1,3 +1,4 @@
+import type { TuneVia } from "@opencast/contracts";
 // What the station page, program page and search do when you act: tune in (and go to the tuned-in
 // page), follow a link without reloading (the player keeps playing), and open an overlay over the
 // page you're on (pledge, share), so Esc and Back return to it.
@@ -20,8 +21,8 @@ export function stationPath(s: Pick<StationIdent, "id" | "callSign" | "handle"> 
 }
 
 /** Tunes the player to a station and opens the tuned-in page. */
-export function useTuneIn() {
-  const tune = useTune();
+export function useTuneIn(via: TuneVia = "dial") {
+  const tune = useTune(via);
   const navigate = useNavigate();
   return useCallback(
     (s: Tunable) => {

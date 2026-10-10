@@ -6,6 +6,9 @@ node_modules
 # The apps' mock-mode settings (no secrets): npm run dev:mock needs them.
 !.env.mock
 dist
+# The Samsung TV app's build (npm run build:tizen -w @opencast/tv) and its packages.
+dist-tizen
+*.wgt
 coverage
 storage/uploads/*
 !storage/uploads/.gitkeep
@@ -22,3 +25,6 @@ storage/slates/
 storage/cache/
 storage/objects/
 storage/pinata-move-*.json
+
+# Claude Code’s local settings and preview configs (never committed).
+.claude/

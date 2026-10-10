@@ -6,6 +6,7 @@ import { ShellAvatar } from "./ShellAvatar";
 
 /** The Network desk's pages, in rail order. */
 export type DeskPage =
+  | "analytics"
   | "market-board"
   | "creator-pipeline"
   | "listed-sources"
@@ -18,6 +19,11 @@ export type DeskPage =
 
 /** The desk's rail (network-desk 01.1). */
 export const DESK_RAIL = [
+  // A251 (2026-10-06): Analytics first, under Network (Ref. 12d).
+  {
+    label: "Network",
+    items: [{ id: "analytics", label: "Analytics" }]
+  },
   {
     label: "Markets",
     items: [

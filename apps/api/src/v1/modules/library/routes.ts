@@ -2,6 +2,7 @@ import { blocksApi, libraryApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { notFound } from "../../errors.js";
+import { FORM_FILE_MAX_BYTES, FORM_FILE_TOO_BIG, LOGO_MAX_BYTES, LOGO_TOO_BIG } from "../../formUploads.js";
 
 export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const { library, accounts } = services;
@@ -26,9 +27,10 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await canEditStation(user, params.stationId);
     return library.blocks.update(params.stationId, params.blockId, body);
   });
-  r.handle(blocksApi.uploadBlockLogo, async ({ user, params, file }) => {
-    await canEditStation(user, params.stationId);
-    return library.blocks.uploadLogo(params.stationId, params.blockId, file);
+  r.handle(blocksApi.uploadBlockLogo, ({ params, file }) => library.blocks.uploadLogo(params.stationId, params.blockId, file), {
+    maxBytes: LOGO_MAX_BYTES,
+    tooBig: LOGO_TOO_BIG,
+    authorize: ({ user, params }) => canEditStation(user, params.stationId)
   });
   r.handle(blocksApi.archiveBlock, async ({ user, params, query }) => {
     await canEditStation(user, params.stationId);
@@ -41,9 +43,14 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     const [view, generatedStationId] = await Promise.all([library.library(params.stationId, query), services.playout.generatedStationId(params.stationId)]);
     return { ...view, generatedStationId };
   });
-  r.handle(api.upload, async ({ user, params, body, file }) => {
-    await canEditStation(user, params.stationId);
-    return library.upload(params.stationId, file!, body);
+  r.handle(api.upload, ({ params, body, file }) => library.upload(params.stationId, file!, body), {
+    maxBytes: FORM_FILE_MAX_BYTES,
+    tooBig: FORM_FILE_TOO_BIG,
+    // The item's fields, its break points one field each, and a caption file's text (up to
+    // 1,048,576 characters: 4 MiB of UTF-8 at most).
+    fields: 100,
+    fieldBytes: 4 * 1024 ** 2,
+    authorize: ({ user, params }) => canEditStation(user, params.stationId)
   });
   r.handle(api.importLinks, async ({ user, params, body }) => {
     await canEditStation(user, params.stationId);
@@ -60,6 +67,11 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.updateItem, async ({ user, params, body }) => {
     await canEditStation(user, await library.stationOfItem(params.itemId));
     return library.updateItem(params.itemId, body);
+  });
+  // Programming Phase 4: a program's suggested break points, used or dismissed.
+  r.handle(api.answerBreakSuggestions, async ({ user, params, body }) => {
+    await canEditStation(user, await library.stationOfItem(params.itemId));
+    return library.answerBreakSuggestions(params.itemId, body.answer);
   });
   r.handle(api.deleteItem, async ({ user, params }) => {
     await canEditStation(user, await library.stationOfItem(params.itemId));
@@ -104,9 +116,10 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return library.history(params.itemId);
   });
   // L6: replace the file.
-  r.handle(api.replaceFile, async ({ user, params, file }) => {
-    await canEditStation(user, await library.stationOfItem(params.itemId));
-    return library.replaceFile(params.itemId, file);
+  r.handle(api.replaceFile, ({ params, file }) => library.replaceFile(params.itemId, file), {
+    maxBytes: FORM_FILE_MAX_BYTES,
+    tooBig: FORM_FILE_TOO_BIG,
+    authorize: async ({ user, params }) => canEditStation(user, await library.stationOfItem(params.itemId))
   });
   // L7: captions on a program, and an item's caption track.
   r.handle(api.updateProgramCaptions, async ({ user, params, body }) => {

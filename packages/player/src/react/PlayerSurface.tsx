@@ -27,6 +27,13 @@ export interface PlayerSurfaceProps {
    * the bug alone, sized for the TV guide's window (tv 03.1); false for none.
    */
   overlays?: boolean | "bug";
+  /**
+   * The swipe home (A245): the picture fills its box instead of keeping 16:9 ("cover" crops to fill
+   * a phone's screen, "contain" letterboxes), and the page draws its own paused mark and Back to live.
+   */
+  fill?: "cover" | "contain";
+  /** The paused tag and Back to live over the picture (default); off where the page draws its own. */
+  pausedControls?: boolean;
   className?: string;
 }
 
@@ -42,7 +49,7 @@ function useClock(clock: () => Date, ms = 1000): Date {
 }
 
 /** The picture and everything drawn over it. Needs a PlayerProvider above it. */
-export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, holdOkHint = false, clock = deviceClock, overlays = true, className }: PlayerSurfaceProps) {
+export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, holdOkHint = false, clock = deviceClock, overlays = true, fill, pausedControls = true, className }: PlayerSurfaceProps) {
   const [s, engine] = usePlayer();
   const stage = useRef<HTMLDivElement>(null);
   const now = useClock(clock);
@@ -140,7 +147,8 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
   return (
     <div
       ref={root}
-      className={cx("oc-player", `oc-player--${size}`, className)}
+      className={cx("oc-player", `oc-player--${size}`, fill && "oc-player--fill", className)}
+      data-fit={fill}
       data-status={s.status}
       data-tv={size === "tv" ? "" : undefined}
       data-tune={tuning?.look}
@@ -204,7 +212,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
 
       {tuning && !sweeping && target && <TuningLayer tuning={tuning} channel={target} size={size} entry={!!s.entry} />}
 
-      {s.status === "paused" && s.paused && (
+      {pausedControls && s.status === "paused" && s.paused && (
         <div className="oc-player__paused" data-side={bugTopLeft ? "right" : undefined}>
           <Tag onPicture>Paused</Tag>
           {/* Always offered; after the 30-minute hold, play goes back to live too. */}

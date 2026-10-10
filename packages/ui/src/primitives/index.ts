@@ -9,6 +9,7 @@ export { Tabs, type TabsProps, type TabItem } from "./Tabs";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { Toast, ToastProvider, useToast, TOAST_TIMEOUT, type ToastProps, type ToastProviderProps, type ShowToast } from "./Toast";
 export { Modal, type ModalProps } from "./Modal";
+export { Drawer, type DrawerProps } from "./Drawer";
 export { Sheet, SHEET_DRAG_CLOSE, SHEET_DRAG_EXPAND, type SheetProps } from "./Sheet";
 export { Notice, type NoticeProps } from "./Notice";
 export { Menu, type MenuProps, type MenuItem } from "./Menu";

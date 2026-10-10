@@ -28,6 +28,8 @@ import type { RelaysService } from "./modules/relays/service.js";
 import type { PlatformDeps, PlatformsService } from "./modules/platforms/service.js";
 import type { StreamRelay } from "./lib/streamRelay.js";
 import type { UploadsService } from "./modules/uploads/service.js";
+import type { IptvService } from "./modules/iptv/service.js";
+import type { LicencesService } from "./modules/licences/service.js";
 import type { PinataAccount } from "./storageMaintenance.js";
 import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
@@ -156,6 +158,10 @@ export interface Services {
   platforms: PlatformsService;
   /** Direct uploads (added 2026-09-30, follow-up Phase 4): presigned multipart uploads, and completing them. */
   uploads: UploadsService;
+  /** The dial in other apps (added 2026-10-10, programming Phase 5): the public channel list (M3U) and guide (XMLTV). */
+  iptv: IptvService;
+  /** Network licences and where things can air (added 2026-10-10, programming Phase 6): clearance, and the licensor's monthly minutes. */
+  licences: LicencesService;
 }
 
 export interface ModuleContext {

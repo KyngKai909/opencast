@@ -356,7 +356,7 @@ export const logHandlers = [
     if (endsAt <= b.startsAt) return fail(400, "bad_request", "It has to end after it starts.");
     const clash = overlaps(id, b.startsAt, endsAt);
     if (clash) return fail(409, "conflict", `That time already has ${clash.title} on the log.`);
-    const e = entry(id, { startsAt: b.startsAt, endsAt, title, episodeTitle: b.episodeTitle ?? o.episodeTitle ?? null, localNote: b.localNote ?? null, ...o, kind: o.kind ?? b.kind });
+    const e = entry(id, { startsAt: b.startsAt, endsAt, title, episodeTitle: b.episodeTitle ?? o.episodeTitle ?? null, localNote: b.localNote ?? null, ...(b.keepTime ? { keepTime: true } : {}), ...o, kind: o.kind ?? b.kind });
     getDb().log.push(e);
     markEdited(id, [e.startsAt]);
     saveDb();
@@ -377,7 +377,7 @@ export const logHandlers = [
     const clash = overlaps(e.stationId, startsAt, endsAt, e.id);
     if (clash) return fail(409, "conflict", `That time already has ${clash.title} on the log.`);
     markEdited(e.stationId, [e.startsAt, startsAt]);
-    Object.assign(e, { startsAt, endsAt }, b.episodeTitle !== undefined ? { episodeTitle: b.episodeTitle } : {}, b.localNote !== undefined ? { localNote: b.localNote } : {});
+    Object.assign(e, { startsAt, endsAt }, b.episodeTitle !== undefined ? { episodeTitle: b.episodeTitle } : {}, b.localNote !== undefined ? { localNote: b.localNote } : {}, b.keepTime !== undefined ? { keepTime: b.keepTime } : {});
     saveDb();
     return reply(logApi.updateEntry.response, e);
   }),

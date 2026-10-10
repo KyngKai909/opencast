@@ -1,5 +1,18 @@
 import { cx } from "../lib/cx";
-import { ICONS, MARKS, type IconName } from "./glyphs";
+import { ICONS, MARKS, type Glyph, type IconName } from "./glyphs";
+
+/**
+ * Each drawing's markup as one object for good: React 19 writes `dangerouslySetInnerHTML` again
+ * whenever the object is new, which would replace the shapes on every render, and a press that
+ * starts on a shape that's replaced before it ends is never a click (the swipe home's first tap,
+ * which turns the sound on and re-renders, found it).
+ */
+const INNER = new WeakMap<Glyph, { __html: string }>();
+function inner(g: Glyph): { __html: string } {
+  let html = INNER.get(g);
+  if (!html) INNER.set(g, (html = { __html: g.body }));
+  return html;
+}
 
 export interface IconProps {
   name: IconName;
@@ -23,7 +36,7 @@ export function Icon({ name, size = 18, label, className }: IconProps) {
       aria-label={label}
       aria-hidden={label ? undefined : true}
       focusable="false"
-      dangerouslySetInnerHTML={{ __html: g.body }}
+      dangerouslySetInnerHTML={inner(g)}
     />
   );
 }
@@ -43,7 +56,7 @@ export function Mark({ variant = "outline", size = 30, label, className }: { var
       aria-label={label}
       aria-hidden={label ? undefined : true}
       focusable="false"
-      dangerouslySetInnerHTML={{ __html: g.body }}
+      dangerouslySetInnerHTML={inner(g)}
     />
   );
 }

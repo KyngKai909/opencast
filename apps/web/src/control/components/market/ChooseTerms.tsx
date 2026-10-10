@@ -23,7 +23,7 @@ export function ChooseTerms({ offer: o, initialTerm, onClose }: { offer: OfferDe
   const firstEpisode = o.episodes.find((e) => e.previewUrl) ?? o.episodes[0];
   const footer = (
     <>
-      <Button variant="primary" disabled={!s.can("programming") || o.status !== "offered"} onClick={() => navigate(`${s.base}/log/place/${o.id}?term=${term}`)}>
+      <Button variant="primary" disabled={!s.can("programming") || o.status !== "offered"} onClick={() => navigate(`${s.base}/schedule/place/${o.id}?term=${term}`)}>
         Choose a slot
       </Button>
       {firstEpisode && <Button onClick={() => navigate(`${s.base}/market/offers/${o.id}/preview/${firstEpisode.id}`)}>Preview an episode</Button>}

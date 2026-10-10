@@ -12,7 +12,8 @@
 import type { BlockSpan, BumperSequences, DayTemplateBlock, LogChange, LogChangesResult, ProgramBlock, StationIdent } from "@opencast/contracts";
 import { clock, snapTime } from "@opencast/ui";
 import { STATION_TZ, now } from "../../lib/clock";
-import { DAY_SHORT, localParts } from "../components/onair/time";
+import { DAY_SHORT, broadcastDay, isoDate, localParts } from "../components/onair/time";
+import { placeOn } from "./fixtures/templates";
 import { dbStation, getDb, stationLog } from "./db";
 import { offAirFor, templatesOf } from "./schedule";
 import { BEAT } from "./fixtures/stations";
@@ -289,6 +290,29 @@ export function templateBlocksOf(templateId: string): DayTemplateBlock[] {
     });
 }
 
+/**
+ * A date made again from a template (the API's generation): the spans the template it was made
+ * from put there come off (from now on), and the one that makes it now puts its own on, skipping
+ * one that would overlap a span already there. `handPlaced`: spans placed on the date by hand come
+ * off instead ("Reset to template").
+ */
+export function spansForDate(stationId: string, date: string, fromTemplateId: string | null, toTemplateId: string | null, opts: { handPlaced?: boolean } = {}) {
+  const s = blocksState();
+  const t0 = now().toISOString();
+  const onDate = (sp: MockSpan) => sp.stationId === stationId && isoDate(broadcastDay(sp.startsAt)) === date && sp.startsAt > t0;
+  const before = s.spans.length;
+  s.spans = s.spans.filter((sp) => !(onDate(sp) && (opts.handPlaced ? sp.templateId === null : !!fromTemplateId && sp.templateId === fromTemplateId)));
+  let added = 0;
+  for (const tb of toTemplateId ? s.templateBlocks.filter((x) => x.templateId === toTemplateId) : []) {
+    if (blockById(tb.blockId)?.archivedAt) continue;
+    const at = placeOn({ startTime: tb.startTime, lengthMs: tb.lengthMs }, date);
+    if (at.startsAt <= t0 || s.spans.some((sp) => sp.stationId === stationId && sp.startsAt < at.endsAt && at.startsAt < sp.endsAt)) continue;
+    s.spans.push({ id: crypto.randomUUID(), stationId, blockId: tb.blockId, startsAt: at.startsAt, endsAt: at.endsAt, templateId: toTemplateId });
+    added++;
+  }
+  if (added || s.spans.length !== before) saveBlocks();
+}
+
 /** The words for a block that would run past 6:00 am in a template. */
 export const BLOCK_CROSSES_DAY = "A block in a day template ends by 6:00 am, when the next broadcast day starts. Make it two blocks, or place it on the date.";
 
@@ -357,7 +381,7 @@ export function checkBlockChanges(stationId: string, changes: LogChange[], o: { 
     const endsAt = c.endsAt ? snapTime(c.endsAt) : cur.endsAt;
     const startMoves = startsAt !== cur.startsAt;
     const endMoves = endsAt !== cur.endsAt;
-    lines.set(index, startMoves && endMoves ? `${name} now runs ${clockOf(startsAt)} to ${clockOf(endsAt)}` : startMoves ? `${name} now starts at ${clockOf(startsAt)}` : `${name} now ends at ${clockOf(endsAt)}`);
+    lines.set(index, startMoves && endMoves ? `${name} now runs ${clockOf(startsAt)} to ${clockOf(endsAt)}` : startMoves ? `${name} now starts at ${clockOf(startsAt)}, was ${clockOf(cur.startsAt)}` : `${name} now ends at ${clockOf(endsAt)}, was ${clockOf(cur.endsAt)}`);
     if (Date.parse(span.endsAt) <= o.t) problems.push({ index, code: "block_locked", message: "It has already aired." });
     else if (onAir && (startMoves || Date.parse(endsAt) < o.boundary)) problems.push({ index, code: "block_locked", message: `${name} is on air. Change it after ${clockOf(span.endsAt)}.` });
     else if (!onAir && Date.parse(startsAt) < o.boundary) problems.push({ index, code: "too_soon", message: o.tooSoon });
@@ -384,6 +408,28 @@ export function checkBlockChanges(stationId: string, changes: LogChange[], o: { 
     lines,
     results,
     times,
+    /**
+     * A246: who joins or leaves each span the batch adds or moves, as the API's line says it
+     * ("… was 9:00 pm. Crate Session 01 is no longer part of it"): the log before the batch and after.
+     */
+    memberWords(before: Array<{ id: string; kind: string; title: string; startsAt: string }>, after: Array<{ id: string; kind: string; title: string; startsAt: string }>): Map<number, string> {
+      const out = new Map<number, string>();
+      const isMember = (span: { startsAt: string; endsAt: string }, e: { kind: string; startsAt: string }) => e.kind !== "off_air" && e.startsAt >= span.startsAt && e.startsAt < span.endsAt;
+      const names = (rows: Array<{ title: string; startsAt: string }>) => {
+        const list = [...rows].sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((r) => r.title);
+        return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0];
+      };
+      for (const d of drafts.values()) {
+        if (!d.next || problems.some((p) => p.index === d.index)) continue;
+        const was = d.span ? before.filter((e) => isMember(d.span!, e)) : [];
+        const now = after.filter((e) => isMember(d.next!, e));
+        const joins = now.filter((e) => !was.some((w) => w.id === e.id));
+        const leaves = was.filter((e) => !now.some((n) => n.id === e.id));
+        const words = [d.span && joins.length ? `${names(joins)} ${joins.length === 1 ? "joins" : "join"} it` : null, leaves.length ? `${names(leaves)} ${leaves.length === 1 ? "is" : "are"} no longer part of it` : null].filter(Boolean);
+        if (words.length) out.set(d.index, `. ${words.join(". ")}`);
+      }
+      return out;
+    },
     publish() {
       for (const [key, d] of drafts) {
         if (!d.span) {

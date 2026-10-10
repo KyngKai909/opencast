@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import type { GuideX } from "../../api/ext";
-import { GUIDE_PHONE_SPAN_MS, findListing, gridRows, guideDate, guideHeading, guideWindow, listingActions, stepWindow } from "./logic";
+import { GUIDE_PHONE_SPAN_MS, findListing, gridRows, guideDate, guideHeading, guideWindow, inSwipeOrder, listingActions, stepWindow } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 2026 at 8:42 pm in Redlands (UTC−7).
@@ -108,5 +108,27 @@ describe("the grid's rows", () => {
   it("finds a listing by its id", () => {
     expect(findListing(guide, "l1")?.station.callSign).toBe("RDLS");
     expect(findListing(guide, "nope")).toBeNull();
+  });
+});
+
+describe("the guide in the swipe's order (A245)", () => {
+  const st = (id: string) => ({ id, channel: id, callSign: id.toUpperCase(), programs: [] });
+  const rows = [st("civc"), st("city"), st("beat"), st("sazn"), st("near")];
+
+  it("puts the presets first under their heading, then the dial under its own", () => {
+    const out = inSwipeOrder(rows, { ids: ["beat", "sazn", "civc", "city"], presets: 2 }, "tv");
+    expect(out.map((r) => r.id)).toEqual(["beat", "sazn", "civc", "city", "near"]);
+    expect(out.map((r) => r.section ?? null)).toEqual(["Your presets", null, "The dial", null, null]);
+  });
+
+  it("with no presets is the dial alone, with no headings", () => {
+    const out = inSwipeOrder(rows, { ids: ["civc", "city", "beat", "sazn"], presets: 0 }, "tv");
+    expect(out.map((r) => r.id)).toEqual(["civc", "city", "beat", "sazn", "near"]);
+    expect(out.some((r) => r.section)).toBe(false);
+  });
+
+  it("calls the radio band's rest the band", () => {
+    const out = inSwipeOrder([st("nite"), st("hall")], { ids: ["hall", "nite"], presets: 1 }, "radio");
+    expect(out.map((r) => r.section ?? null)).toEqual(["Your presets", "The band"]);
   });
 });

@@ -33,4 +33,10 @@ export interface CommandSource {
   input: string;
   /** Who, where the input knows it: the sender's name on Cast ("Kai's phone"). */
   who?: string;
+  /**
+   * A251 (2026-10-06): how the channel was found (`Heartbeat.via`), for the desk's analytics. Set by
+   * the app where it knows (the guide, search, a link); the engine fills in what it knows itself
+   * (channel up and down, a number, a preset, last channel, a swipe, a phone's tune).
+   */
+  via?: import("@opencast/contracts").TuneVia;
 }

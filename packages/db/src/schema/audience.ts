@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, index, integer, jsonb, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id } from "./columns.js";
 import { audience } from "./namespaces.js";
 import { asRun, programs, stations, translators } from "./broadcast.js";
@@ -28,9 +28,38 @@ export const sessions = audience.table(
      * their chosen market when signed in, else a coarse location from the connection (GEOIP_URL),
      * looked up once and forgotten. Null: Opencast can't place them (not billed to local businesses).
      */
-    marketId: uuid("market_id").references(() => markets.id)
+    marketId: uuid("market_id").references(() => markets.id),
+    // ---- A251 (added 2026-10-06, migration 0054): the desk's analytics ----
+    /**
+     * The tab's (or TV app run's) id the player beat with: the session's own id for the first
+     * station, and the same for each station after, whose sessions get ids of their own. Sessions
+     * of one visit one after another are channel changes.
+     */
+    visitId: uuid("visit_id"),
+    /** A hash of the player's device id (never the id itself, never an account): counts of devices only. */
+    deviceHash: text("device_hash"),
+    /** How it was tuned (`Heartbeat.via`), from its first beat. */
+    via: text("via"),
+    /** Ms from the press to the first picture, from its first beat. */
+    tuneMs: integer("tune_ms")
   },
-  (t) => [index("sessions_station_beat").on(t.stationId, t.lastBeatAt)]
+  (t) => [index("sessions_station_beat").on(t.stationId, t.lastBeatAt), index("sessions_visit").on(t.visitId, t.startedAt), index("sessions_device").on(t.deviceHash, t.startedAt)]
+);
+
+/**
+ * A251 (added 2026-10-06, migration 0054): a search a viewer settled on (`POST /search/seen`): its
+ * words, lower-cased, and how many results it had. No account, device or session. Kept 90 days,
+ * then only the desk's totals.
+ */
+export const searches = audience.table(
+  "searches",
+  {
+    id: id(),
+    term: text("term").notNull(),
+    results: integer("results").notNull(),
+    at: at("at").notNull().defaultNow()
+  },
+  (t) => [index("searches_at").on(t.at)]
 );
 
 /** Tuned-in concurrency per station per minute, by platform. Per-thousand billing reads this. */
@@ -173,4 +202,187 @@ export const airingStats = audience.table(
     index("airing_stats_program_time").on(t.programId, t.startedAt),
     check("airing_stats_counts", sql`${t.minutes} > 0 and ${t.watchSeconds} >= 0 and ${t.audienceAtStart} >= 0 and ${t.peakAudience} >= ${t.audienceAtStart} and ${t.peakAudience} >= ${t.audienceAtEnd} and ${t.stayedToEnd} <= ${t.audienceAtStart} and ${t.notForMe} >= 0`)
   ]
+);
+
+// ---- A251 Phase 2 (added 2026-10-06, migration 0055): the desk's analytics totals ----
+// Worked out from the per-session rows (`session_minutes`, `sessions`) every ten minutes, and kept
+// for good: they name no session, device or person. Every station is in them, external ones too
+// (whose minutes `minute_samples` leaves out for billing). Days are the market's (Pacific).
+
+/** Each station's hour: minutes tuned in added up (hours watched × 60), its busiest minute, by platform, sessions started. */
+export const stationHours = audience.table(
+  "station_hours",
+  {
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    hour: at("hour").notNull(),
+    tunedMinutes: integer("tuned_minutes").notNull(),
+    peak: integer("peak").notNull(),
+    phone: integer("phone").notNull().default(0),
+    cast: integer("cast").notNull().default(0),
+    web: integer("web").notNull().default(0),
+    tvApp: integer("tv_app").notNull().default(0),
+    mirror: integer("mirror").notNull().default(0),
+    sessions: integer("sessions").notNull().default(0)
+  },
+  (t) => [primaryKey({ columns: [t.stationId, t.hour] }), index("station_hours_hour").on(t.hour)]
+);
+
+/** Each station's hour by where its viewers are: `market` is a market's id, or "" for viewers Opencast couldn't place. */
+export const stationHourPlaces = audience.table(
+  "station_hour_places",
+  {
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    hour: at("hour").notNull(),
+    market: text("market").notNull(),
+    tunedMinutes: integer("tuned_minutes").notNull()
+  },
+  (t) => [primaryKey({ columns: [t.stationId, t.hour, t.market] })]
+);
+
+/**
+ * The network's hour, for each filter the desk has: `scope` is "<band>|<market>" (band "all", "tv"
+ * or "radio"; market "all" or the stations' market's id). Its busiest minute can't be added up
+ * from stations', so it's kept here.
+ */
+export const networkHours = audience.table(
+  "network_hours",
+  {
+    scope: text("scope").notNull(),
+    hour: at("hour").notNull(),
+    tunedMinutes: integer("tuned_minutes").notNull(),
+    peak: integer("peak").notNull(),
+    /** The busiest minute itself. */
+    peakAt: at("peak_at")
+  },
+  (t) => [primaryKey({ columns: [t.scope, t.hour] })]
+);
+
+/**
+ * A station's day: sessions counted (and how long they lasted, by bucket), sessions filtered as bots
+ * (by reason), how they were tuned, press to picture (median and 90th percentile).
+ */
+export const stationDays = audience.table(
+  "station_days",
+  {
+    day: date("day").notNull(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    sessions: integer("sessions").notNull(),
+    /**
+     * Session lengths, minutes, by band. Since Phase 4 (migration 0056, `version` 2) the reference's:
+     * { "1_2", "2_5", "5_15", "15_30", "30_60", "60_120", "120_plus" } ("1_2" includes the shortest
+     * counted ones); version 1 had { "under_5", … }.
+     */
+    lengths: jsonb("lengths").$type<Record<string, number>>().notNull(),
+    medianMinutes: integer("median_minutes"),
+    /** Phase 4 (migration 0056): every counted session's minutes added up, for the average length. */
+    minutesTotal: integer("minutes_total").notNull().default(0),
+    /** Phase 4 (migration 0056): how this row was worked out; a day kept as an older version is worked out again while its sessions are kept. */
+    version: integer("version").notNull().default(1),
+    bots: integer("bots").notNull().default(0),
+    botReasons: jsonb("bot_reasons").$type<Record<string, number>>().notNull(),
+    via: jsonb("via").$type<Record<string, number>>().notNull(),
+    tuneMsMedian: integer("tune_ms_median"),
+    tuneMsP90: integer("tune_ms_p90"),
+    computedAt: at("computed_at").notNull().defaultNow()
+  },
+  (t) => [primaryKey({ columns: [t.day, t.stationId] })]
+);
+
+/**
+ * Devices, counted once each (from the hash on sessions, before they go at 30 days). `scope` is
+ * "station:<id>", or "<band>|<market>" as on `network_hours`. `devices` that day, `devices7` and
+ * `devices30` the 7 and 30 days to it, `returning` that day's devices seen in the 30 days before.
+ */
+export const deviceDays = audience.table(
+  "device_days",
+  {
+    day: date("day").notNull(),
+    scope: text("scope").notNull(),
+    devices: integer("devices").notNull(),
+    devices7: integer("devices_7").notNull(),
+    devices30: integer("devices_30").notNull(),
+    returning: integer("returning").notNull(),
+    /** Phase 4 (migration 0056): visits (a tab's or TV app run's sessions) that day, for stations per visit. */
+    visits: integer("visits").notNull().default(0),
+    /** Phase 4: those visits' sessions (one per station they tuned). */
+    visitSessions: integer("visit_sessions").notNull().default(0)
+  },
+  (t) => [primaryKey({ columns: [t.day, t.scope] })]
+);
+
+/**
+ * Moving around the dial: changes from one station to another in a day, from a visit's minutes in a
+ * row. `fromStation` "" is a visit starting there ("Started here"), `toStation` "" one ending there ("Stopped").
+ */
+export const stationFlows = audience.table(
+  "station_flows",
+  {
+    day: date("day").notNull(),
+    fromStation: text("from_station").notNull(),
+    toStation: text("to_station").notNull(),
+    changes: integer("changes").notNull()
+  },
+  (t) => [primaryKey({ columns: [t.day, t.fromStation, t.toStation] })]
+);
+
+/**
+ * A251 Phase 5 (added 2026-10-07, migration 0057): break hold, one row per aired break, kept for good
+ * and naming no one: how many were tuned in when it started and how many of them were still there
+ * when it ended (from session minutes, the minute each falls in), its length, where it sat
+ * (`opening` a program's slot, `inside` one, `between` two) and what opened it (`bumper`, `spot`,
+ * `sponsor`, `station_id`, `other`). Worked out once its minutes are counted.
+ */
+export const breakStats = audience.table(
+  "break_stats",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** The break as planned (no foreign key: it may come off the log after it aired). */
+    breakId: uuid("break_id").notNull(),
+    startedAt: at("started_at").notNull(),
+    endedAt: at("ended_at").notNull(),
+    seconds: integer("seconds").notNull(),
+    position: text("position", { enum: ["opening", "inside", "between"] }).notNull(),
+    firstElement: text("first_element", { enum: ["bumper", "spot", "sponsor", "station_id", "other"] }).notNull(),
+    spots: integer("spots").notNull().default(0),
+    tunedAtStart: integer("tuned_at_start").notNull(),
+    stillAtEnd: integer("still_at_end").notNull(),
+    computedAt: at("computed_at").notNull().defaultNow()
+  },
+  (t) => [uniqueIndex("break_stats_aired").on(t.breakId, t.startedAt), index("break_stats_station_time").on(t.stationId, t.startedAt)]
+);
+
+/**
+ * Programming Phase 5 (added 2026-10-10, migration 0065): viewers in other apps (TiviMate,
+ * Jellyfin, Channels DVR, Kodi, VLC), the audience source "Other apps". Those apps send no
+ * heartbeats, so a session is a run of playlist polls carrying `via=iptv` from one connection: a
+ * gap of two minutes ends it, and it counts once its polls span a minute. Placed by market from
+ * the connection, as the viewer's sessions are. The address is never kept: `client_key` is a hash
+ * of it, the app's user agent and the station, salted with the day, and it's cleared once the
+ * session is a day old. Never in `minute_samples` or `minute_markets`, so the pool doesn't read
+ * these; per-thousand spots bill the sessions that watched through them apart, as an airing's
+ * Other apps part (`spots.other_app_charges`, P5.1; docs/open-decisions.md, programming Phase 5).
+ */
+export const otherAppSessions = audience.table(
+  "other_app_sessions",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    marketId: uuid("market_id").references(() => markets.id),
+    clientKey: text("client_key"),
+    startedAt: at("started_at").notNull().defaultNow(),
+    lastPollAt: at("last_poll_at").notNull().defaultNow(),
+    polls: integer("polls").notNull().default(1)
+  },
+  (t) => [index("other_app_sessions_client").on(t.clientKey, t.lastPollAt), index("other_app_sessions_station").on(t.stationId, t.lastPollAt)]
 );

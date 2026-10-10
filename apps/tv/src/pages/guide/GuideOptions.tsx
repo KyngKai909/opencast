@@ -147,7 +147,7 @@ function Options({ cellKey, found }: { cellKey: string; found: NonNullable<Retur
               label={`Tune to ${call} now`}
               detail={tuneDetail(dialRow?.now?.title, dialRow?.onAir, dialRow?.station.kind === "listed" ? dialRow.external?.source : null)}
               onSelect={() => {
-                if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
+                if (station.id !== player.currentId) void engine.tune(station.id, { input: "app", via: "guide" });
                 navigate("/", { replace: true });
               }}
             />

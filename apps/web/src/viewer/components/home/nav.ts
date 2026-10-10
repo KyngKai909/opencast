@@ -31,7 +31,7 @@ export function watchHref(s: Station): string {
 
 /** Tunes in and opens the tuned-in page (a dial row, the hero's Tune in). */
 export function useTuneAndWatch() {
-  const tune = useTune();
+  const tune = useTune("dial");
   const navigate = useNavigate();
   return useCallback(
     (s: Station) => {

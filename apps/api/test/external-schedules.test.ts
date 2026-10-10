@@ -4,7 +4,7 @@
 // airings a feed produces for the next 14 days (on save, and hourly). Nothing is made up: an item
 // without a title or a start is left out, and a page with no event data says so.
 // No network: every fetch here is a fake, and the clock is pinned.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { manualScheduleProblems, weeklyText } from "@opencast/contracts";
@@ -18,6 +18,86 @@ const LA = "America/Los_Angeles";
 const page = (...blocks: string[]) =>
   `<!DOCTYPE html><html><head><title>Schedule</title>${blocks.map((b) => `<script type="application/ld+json">${b}</script>`).join("\n")}</head><body><h1>Schedule</h1></body></html>`;
 const titles = (html: string, tz = LA) => parseJsonLdEvents(html, tz).map((e) => [e.summary, e.start.toISOString(), e.end?.toISOString() ?? null]);
+
+describe("a JSON schedule", () => {
+  const rows = (text: string) => parseSchedule(text, "json").map((e) => [e.uid, e.summary, e.start.toISOString(), e.end?.toISOString() ?? null]);
+
+  it("reads an array, and the lists sources put under a name", () => {
+    const ev = { id: "a", title: "Morning Show", start: "2026-10-04T15:00:00Z", end: "2026-10-04T16:00:00Z" };
+    const row = ["a", "Morning Show", "2026-10-04T15:00:00.000Z", "2026-10-04T16:00:00.000Z"];
+    expect(rows(JSON.stringify([ev]))).toEqual([row]);
+    expect(rows(JSON.stringify({ events: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ items: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ schedule: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ data: { events: [ev] } }))).toEqual([row]);
+    expect(rows(JSON.stringify({ something: [ev] }))).toEqual([]);
+  });
+
+  it("reads a show-schedule plugin's { now, active, upcoming }: what's on now first, a weekly show's repeats as they're listed, once each", () => {
+    const show = (id: string, title: string, start: string, end: string) => ({ id, title, host: "", description: "…", recurrence: "custom", intervalDays: 7, timezone: LA, start, end, sourceId: id });
+    const feed = {
+      now: "2026-10-03T23:10:00.000Z",
+      active: show("show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"),
+      upcoming: [
+        show("show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"),
+        show("show-2", "Late Film", "2026-10-04T00:00:00.000Z", "2026-10-04T02:00:00.000Z"),
+        show("show-2", "Late Film", "2026-10-11T00:00:00.000Z", "2026-10-11T02:00:00.000Z")
+      ]
+    };
+    expect(rows(JSON.stringify(feed))).toEqual([
+      ["show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"],
+      ["show-2", "Late Film", "2026-10-04T00:00:00.000Z", "2026-10-04T02:00:00.000Z"],
+      ["show-2", "Late Film", "2026-10-11T00:00:00.000Z", "2026-10-11T02:00:00.000Z"]
+    ]);
+    // Nothing on now.
+    expect(rows(JSON.stringify({ ...feed, active: null }))).toHaveLength(3);
+  });
+
+  describe("keyed by channel (2026-10-03): one feed for a brand's channels, each value what's on now", () => {
+    const FEED = "https://brand.example.tv/api/schedule.php";
+    const on = (title: string, start: string, stop: string) => ({ title, sub_title: "An episode", desc: "…", start, stop });
+    const feed = JSON.stringify({
+      brand: on("Morning Show", "2026-10-03T04:00:00-04:00", "2026-10-03T04:45:00-04:00"),
+      brandii: on("Sitcom Rerun", "2026-10-03T03:52:16-04:00", "2026-10-03T04:16:58-04:00"),
+      brandcinema: on("Feature Film", "2026-10-03T02:49:31-04:00", "2026-10-03T04:28:16-04:00"),
+      atlas: on("Kitchen Rescue", "2026-10-03T03:40:00-04:00", "2026-10-03T04:35:00-04:00"),
+      windowtv: [on("Old Comedy", "2026-10-03T09:00:00+01:00", "2026-10-03T09:45:00+01:00"), on("Next Comedy", "2026-10-03T09:45:00+01:00", "2026-10-03T10:30:00+01:00")]
+    });
+    const read = (url: string, hints: { name?: string; streamUrl?: string }) => parseSchedule(feed, "json", url, "UTC", hints).map((e) => [e.summary, e.start.toISOString(), e.end?.toISOString() ?? null]);
+
+    it("reads the channel the address's fragment names, whatever the listing is called", () => {
+      expect(read(`${FEED}#channel=brandcinema`, { name: "Brand" })).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
+      expect(read(`${FEED}#channel=${encodeURIComponent("Brand Cinema")}`, {})).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
+      // A fragment that names no channel: nothing, not a guess.
+      expect(read(`${FEED}#channel=brandkids`, { name: "Brand" })).toEqual([]);
+    });
+
+    it("else the listing's name, made plain: a key exactly, else the longest key it ends with; `stop` is the end", () => {
+      expect(read(FEED, { name: "Brand" })).toEqual([["Morning Show", "2026-10-03T08:00:00.000Z", "2026-10-03T08:45:00.000Z"]]);
+      expect(read(FEED, { name: "Brand II" })).toEqual([["Sitcom Rerun", "2026-10-03T07:52:16.000Z", "2026-10-03T08:16:58.000Z"]]);
+      expect(read(FEED, { name: "Window TV" })).toEqual([
+        ["Old Comedy", "2026-10-03T08:00:00.000Z", "2026-10-03T08:45:00.000Z"],
+        ["Next Comedy", "2026-10-03T08:45:00.000Z", "2026-10-03T09:30:00.000Z"]
+      ]);
+      expect(read(FEED, { name: "Brand Atlas" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+      // A trailing "Channel", "TV" and the like that the key leaves off (2026-10-04).
+      expect(read(FEED, { name: "Brand Cinema Channel" })).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
+      expect(read(FEED, { name: "Atlas TV" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+    });
+
+    it("else the stream address's folders, the same way, nearest the file first", () => {
+      expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-cinema/index.m3u8" })).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
+      expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-atlas/index.m3u8" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+      // The player's own folder under the channel's (`…/brand-atlas/tracks-v1a1/mono.m3u8`).
+      expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-atlas/tracks-v1a1/mono.m3u8" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+    });
+
+    it("finds nothing when nothing matches, and never mixes in another channel", () => {
+      expect(read(FEED, { name: "Brand Kids", streamUrl: "https://cdn.brand.example.tv/kids/index.m3u8" })).toEqual([]);
+      expect(read(FEED, {})).toEqual([]);
+    });
+  });
+});
 
 describe("a webpage's event data (JSON-LD)", () => {
   it("is recognised by its type or how it starts, and never mistaken for a feed", () => {
@@ -387,8 +467,9 @@ describe("on the desk, the dial and the guide", () => {
     expect(changed).toMatchObject({ calendarSync: "synced", schedule: { source: "feed", format: "webpage", url: EVENTS }, upcoming: 1 });
     expect((await airings(ids.RVLB)).map((a) => [a.title, a.startsAt.toISOString(), a.endsAt?.toISOString()])).toEqual([["Author talk: Inland Empire stories", "2026-10-31T21:00:00.000Z", "2026-10-31T22:00:00.000Z"]]);
 
-    // The page drops its event data: it says so, and what was listed stays.
+    // The page drops its event data: it says so, and what was listed stays (read an hour on).
     html = page(JSON.stringify({ "@type": "Library", name: "Riverside County Library" }));
+    h.clock.advance(60 * 60_000);
     await h.services.network.syncExternalSchedules({ fetch: fn });
     const none = await listing(ids.RVLB);
     expect(none).toMatchObject({ calendarSync: "no_event_data", upcoming: 1, onDial: true, health: { state: "unchecked" } });
@@ -397,5 +478,170 @@ describe("on the desk, the dial and the guide", () => {
     const plain = await h.services.network.updateListedSource(null, ids.RVLB, { schedule: { source: "feed", calendarUrl: PLAIN } }, fn);
     expect(plain).toMatchObject({ calendarSync: "no_event_data", schedule: { format: "webpage" } });
     expect(await h.db.select().from(schema.listedAirings).where(and(eq(schema.listedAirings.listedSourceId, ids.RVLB), gte(schema.listedAirings.startsAt, h.clock.now())))).toEqual([]);
+  });
+
+  describe("a feed of what's on now, keyed by channel (2026-10-03)", () => {
+    const FEED = "https://brand.example.tv/api/schedule.php";
+    const on = (title: string, start: string, stop: string) => ({ title, sub_title: "", desc: "…", start, stop });
+    // Thursday, November 5, 11:10 am in the Inland Empire.
+    let feed: Record<string, unknown> = {
+      brandtwo: on("Late Movie", "2026-11-05T10:30:00-08:00", "2026-11-05T12:30:00-08:00"),
+      atlas: on("Kitchen Rescue", "2026-11-05T11:00:00-08:00", "2026-11-05T11:45:00-08:00"),
+      brandkids: on("Cartoons", "2026-11-05T11:00:00-08:00", "2026-11-05T12:00:00-08:00")
+    };
+    let reads = 0;
+    const fn = (async (input: RequestInfo | URL) => {
+      if (String(input) !== FEED) throw new TypeError("fetch failed");
+      reads++;
+      return new Response(JSON.stringify(feed), { headers: { "content-type": "text/html; charset=UTF-8" } });
+    }) as Fetch;
+    const shown = async (id: string) => (await airings(id)).map((a) => [a.title, a.startsAt.toISOString(), a.endsAt?.toISOString() ?? null]);
+    const pass = async (at: string) => {
+      h.clock.set(at);
+      const before = reads;
+      await h.services.network.syncExternalSchedules({ fetch: fn });
+      return reads - before;
+    };
+
+    it("keeps the show on now (it started before the read), shows it on now, and a re-read doesn't double it", async () => {
+      h.clock.set("2026-11-05T19:10:00.000Z");
+      for (const [callSign, channel, name, folder] of [["ATLS", "26.1", "Brand Atlas", "atlas"], ["BTWO", "27.1", "Brand Two", "two"]]) {
+        const res = await dee
+          .post("/v1/admin/listed-sources", { marketId, band: "tv", channel, callSign, name, streamUrl: `https://cdn.brand.example.tv/${folder}/index.m3u8`, plays: "stream_link", evidence: { publicBasis: "Free-to-air channel" } })
+          .expect(201);
+        ids[callSign] = res.body.id;
+        expect(await h.services.network.updateListedSource(null, res.body.id, { schedule: { source: "feed", calendarUrl: FEED } }, fn)).toMatchObject({ calendarSync: "synced", schedule: { format: "json" } });
+      }
+      expect(await shown(ids.ATLS)).toEqual([["Kitchen Rescue", "2026-11-05T19:00:00.000Z", "2026-11-05T19:45:00.000Z"]]);
+      expect(await shown(ids.BTWO)).toEqual([["Late Movie", "2026-11-05T18:30:00.000Z", "2026-11-05T20:30:00.000Z"]]);
+      expect((await dialRow("ATLS")).now).toMatchObject({ title: "Kitchen Rescue", kind: "listed", startsAt: "2026-11-05T19:00:00.000Z", endsAt: "2026-11-05T19:45:00.000Z" });
+      const guide = await anon(h).get("/v1/markets/inland-empire/guide?from=2026-11-05T19:00:00.000Z&to=2026-11-05T21:00:00.000Z").expect(200);
+      expect(guide.body.rows.find((r: { station: { callSign: string } }) => r.station.callSign === "BTWO").airings.map((a: { title: string }) => a.title)).toEqual(["Late Movie"]);
+
+      h.clock.set("2026-11-05T19:20:00.000Z");
+      await h.services.network.syncListedSource(ids.ATLS, fn);
+      expect(await shown(ids.ATLS)).toEqual([["Kitchen Rescue", "2026-11-05T19:00:00.000Z", "2026-11-05T19:45:00.000Z"]]);
+    });
+
+    it("is read hourly, and every 2 minutes while nothing stored ends more than 5 minutes from now; one read for listings that share it", async () => {
+      // Both just read, both stocked past the next 5 minutes: nothing to read.
+      expect(await pass("2026-11-05T19:21:00.000Z")).toBe(0);
+      // Kitchen Rescue ends at 11:45: from 11:40 its guide is about to run dry, so it's read again.
+      expect(await pass("2026-11-05T19:41:00.000Z")).toBe(1);
+      expect(await shown(ids.ATLS)).toEqual([["Kitchen Rescue", "2026-11-05T19:00:00.000Z", "2026-11-05T19:45:00.000Z"]]);
+      // Not again within 2 minutes.
+      expect(await pass("2026-11-05T19:42:00.000Z")).toBe(0);
+      // The source moves on: the next show is read in, and what ended stays as it was.
+      feed = { ...feed, atlas: on("Hotel Fixers", "2026-11-05T11:45:00-08:00", "2026-11-05T12:40:00-08:00") };
+      expect(await pass("2026-11-05T19:46:00.000Z")).toBe(1);
+      expect(await shown(ids.ATLS)).toEqual([
+        ["Kitchen Rescue", "2026-11-05T19:00:00.000Z", "2026-11-05T19:45:00.000Z"],
+        ["Hotel Fixers", "2026-11-05T19:45:00.000Z", "2026-11-05T20:40:00.000Z"]
+      ]);
+      expect((await dialRow("ATLS")).now).toMatchObject({ title: "Hotel Fixers" });
+      // Stocked again: hourly.
+      expect(await pass("2026-11-05T19:49:00.000Z")).toBe(0);
+      // An hour after Brand Two's last read (its movie still on past the next 5 minutes).
+      expect(await pass("2026-11-05T20:11:00.000Z")).toBe(1);
+      // Both due at once (Atlas an hour on, Brand Two's movie over): the feed is read once for both.
+      feed = { ...feed, brandtwo: on("Night News", "2026-11-05T12:30:00-08:00", "2026-11-05T13:00:00-08:00") };
+      expect(await pass("2026-11-05T20:47:00.000Z")).toBe(1);
+      expect(await shown(ids.BTWO)).toEqual([
+        ["Late Movie", "2026-11-05T18:30:00.000Z", "2026-11-05T20:30:00.000Z"],
+        ["Night News", "2026-11-05T20:30:00.000Z", "2026-11-05T21:00:00.000Z"]
+      ]);
+      expect((await listing(ids.BTWO)).lastSyncedAt).toBe("2026-11-05T20:47:00.000Z");
+    });
+  });
+
+  describe("viewers' reminders on a feed's airings (2026-10-03)", () => {
+    const CLUB = "https://club.example.org/schedule.json";
+    const PARK = "https://park.example.org/schedule.json";
+    const ev = (title: string, start: string, end: string, id?: string) => ({ ...(id ? { id } : {}), title, start, end });
+    let club: unknown[] = [];
+    let park: unknown[] = [];
+    const fn = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === CLUB) return new Response(JSON.stringify({ events: club }), { headers: { "content-type": "application/json" } });
+      if (url === PARK) return new Response(JSON.stringify({ events: park }), { headers: { "content-type": "application/json" } });
+      throw new TypeError("fetch failed");
+    }) as Fetch;
+    let viewer: User;
+    const reminders = async () => h.db.select().from(schema.reminders).where(eq(schema.reminders.userId, viewer.id));
+    const byTitle = async (id: string) => Object.fromEntries((await airings(id)).map((a) => [a.title, a]));
+
+    beforeAll(async () => {
+      viewer = await h.signIn("Vi");
+    });
+
+    it("keep their airing when a re-read lists the same show, follow a show moved 30 minutes, and go with a show that's gone", async () => {
+      // Friday, November 6, 9:00 am in the Inland Empire.
+      h.clock.set("2026-11-06T17:00:00.000Z");
+      club = [
+        ev("Book Club", "2026-11-06T20:00:00Z", "2026-11-06T21:00:00Z", "bc-1"),
+        ev("Chess Hour", "2026-11-06T22:00:00Z", "2026-11-06T23:00:00Z"),
+        ev("Garden Talk", "2026-11-07T01:00:00Z", "2026-11-07T02:00:00Z")
+      ];
+      const res = await dee
+        .post("/v1/admin/listed-sources", { marketId, band: "tv", channel: "29.1", callSign: "CLUB", name: "Club Channel", streamUrl: "https://club.example.org/live/index.m3u8", plays: "stream_link", evidence: { publicBasis: "Community channel" } })
+        .expect(201);
+      ids.CLUB = res.body.id;
+      await h.services.network.updateListedSource(null, ids.CLUB, { schedule: { source: "feed", calendarUrl: CLUB } }, fn);
+      const first = await byTitle(ids.CLUB);
+      for (const title of ["Book Club", "Chess Hour", "Garden Talk"]) await viewer.post("/v1/me/reminders", { listedAiringId: first[title].id }).expect(200);
+
+      // Read again, the same: the same airings, the reminders untouched.
+      await h.services.network.syncListedSource(ids.CLUB, fn);
+      expect((await airings(ids.CLUB)).map((a) => a.id)).toEqual([first["Book Club"].id, first["Chess Hour"].id, first["Garden Talk"].id]);
+      expect((await reminders()).map((r) => r.listedAiringId).sort()).toEqual([first["Book Club"].id, first["Chess Hour"].id, first["Garden Talk"].id].sort());
+
+      // The Book Club renamed (its id the same), Chess Hour moved 30 minutes, Garden Talk gone.
+      club = [ev("Book Club: November", "2026-11-06T20:00:00Z", "2026-11-06T21:15:00Z", "bc-1"), ev("Chess Hour", "2026-11-06T22:30:00Z", "2026-11-06T23:30:00Z")];
+      h.clock.set("2026-11-06T17:05:00.000Z");
+      expect(await h.services.network.syncListedSource(ids.CLUB, fn)).toMatchObject({ calendarSync: "synced", upcoming: 2 });
+      const next = await byTitle(ids.CLUB);
+      expect(next["Book Club: November"]).toMatchObject({ id: first["Book Club"].id, endsAt: new Date("2026-11-06T21:15:00Z") });
+      expect(next["Chess Hour"].id).not.toBe(first["Chess Hour"].id);
+      expect(next["Chess Hour"].startsAt).toEqual(new Date("2026-11-06T22:30:00Z"));
+      expect((await reminders()).map((r) => [r.listedAiringId, r.notifiedAt]).sort()).toEqual([[first["Book Club"].id, null], [next["Chess Hour"].id, null]].sort());
+      const mine = (await viewer.get("/v1/me/reminders").expect(200)).body;
+      expect(mine.map((r: { airing: { title: string; startsAt: string } }) => [r.airing.title, r.airing.startsAt])).toEqual([
+        ["Book Club: November", "2026-11-06T20:00:00.000Z"],
+        ["Chess Hour", "2026-11-06T22:30:00.000Z"]
+      ]);
+    });
+
+    it("one listing whose read throws doesn't stop the pass: it's counted and logged, and the others are read", async () => {
+      park = [ev("Park Walk", "2026-11-06T19:00:00Z", "2026-11-06T20:00:00Z")];
+      const res = await dee
+        .post("/v1/admin/listed-sources", { marketId, band: "tv", channel: "30.1", callSign: "PARK", name: "Park Channel", streamUrl: "https://park.example.org/live/index.m3u8", plays: "stream_link", evidence: { publicBasis: "Community channel" } })
+        .expect(201);
+      ids.PARK = res.body.id;
+      await h.services.network.updateListedSource(null, ids.PARK, { schedule: { source: "feed", calendarUrl: PARK } }, fn);
+
+      // An hour on, both are read: the club drops the Book Club (a reminder on it), the park adds a show.
+      club = [ev("Chess Hour", "2026-11-06T22:30:00Z", "2026-11-06T23:30:00Z")];
+      park = [...park, ev("Park Cleanup", "2026-11-06T21:00:00Z", "2026-11-06T22:00:00Z")];
+      h.clock.set("2026-11-06T18:10:00.000Z");
+      const boom = vi.spyOn(h.services.accounts, "moveListedReminders").mockRejectedValueOnce(new Error("reminders unavailable"));
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        const pass = await h.services.network.syncExternalSchedules({ fetch: fn });
+        expect(pass.failed).toBeGreaterThanOrEqual(1);
+        expect(logged.mock.calls.filter(([line]) => String(line).includes("Club Channel"))).toHaveLength(1);
+      } finally {
+        boom.mockRestore();
+        logged.mockRestore();
+      }
+      // The club's read rolled back whole; the park's went in.
+      expect((await airings(ids.CLUB)).map((a) => a.title)).toEqual(["Book Club: November", "Chess Hour"]);
+      expect((await airings(ids.PARK)).map((a) => a.title)).toEqual(["Park Walk", "Park Cleanup"]);
+
+      // Read again: the Book Club is gone from the source's schedule, and its reminder with it.
+      await h.services.network.syncListedSource(ids.CLUB, fn);
+      expect((await airings(ids.CLUB)).map((a) => a.title)).toEqual(["Chess Hour"]);
+      expect((await reminders()).map((r) => r.listedAiringId)).toEqual([(await airings(ids.CLUB))[0].id]);
+      expect(await listing(ids.CLUB)).toMatchObject({ calendarSync: "synced" });
+    });
   });
 });

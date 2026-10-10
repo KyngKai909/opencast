@@ -1,10 +1,11 @@
 // TV mode: one tree for the TV app (Android TV, Google TV, Fire TV, TV browsers), the Cast Web
 // Receiver and the iPhone's external display. They differ only in their input (the remote's keys,
 // Cast messages from phones, the bridge from the iPhone app), their router (the TV app has
-// history; the receiver and mirror run in memory) and where they count as tuned in.
+// history, in the hash in the Samsung TV app; the receiver and mirror run in memory) and where
+// they count as tuned in.
 
 import { createContext, useContext, useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
-import { BrowserRouter, MemoryRouter, Outlet, useLocation, useNavigate } from "react-router";
+import { BrowserRouter, HashRouter, MemoryRouter, Outlet, useLocation, useNavigate } from "react-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { audienceApi } from "@opencast/contracts";
 import { PlayerProvider, PlayerSurface, startHeartbeat, startInputs, usePlayer, type Command, type CommandSource, type EngineOptions, type InputAdapter } from "@opencast/player";
@@ -102,7 +103,7 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
     window.addEventListener("oc-mock-changed", again);
     return () => window.removeEventListener("oc-mock-changed", again);
   }, []);
-  const Router = mode === "tv" ? BrowserRouter : MemoryRouter;
+  const Router = mode !== "tv" ? MemoryRouter : config.hashRoutes ? HashRouter : BrowserRouter;
   return (
     <QueryClientProvider client={queryClient}>
       <GroundProvider>
@@ -168,7 +169,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand, skipDash: mode === "cast" }, quality, eveningOut }),
     [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut, mode]
   );
-  // "Tuning sound", per band: the soft hiss when changing channel (the player plays it).
+  // "Tuning sound", per band: the static and click when changing channel (the player plays them).
   useEffect(() => engine.setOptions({ tuningSound: { video: tuningSound, radio: radioTuningSound } }), [engine, tuningSound, radioTuningSound]);
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);
@@ -192,7 +193,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     // The last station's id (or, on the mirror, the address's `station`, which may be a slug: "rivc-15-2").
     const lastRef = getDevice().lastStationId;
     const last = getDevice().settings.startOn === "last_channel" && lastRef ? findByRef(channels, lastRef, (c) => c.station) : null;
-    void engine.tune((last ?? channels[0]).station.id, { input: "app" });
+    void engine.tune((last ?? channels[0]).station.id, { input: "app", via: "resume" });
   }, [channels, engine, state.currentId, state.pendingId, loc.pathname]);
   useEffect(() => {
     if (state.currentId && state.currentId !== getDevice().lastStationId) setDevice({ lastStationId: state.currentId });
@@ -207,7 +208,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     const held = engine.getState().channels.find((c) => c.station.id === state.currentId);
     if (held?.station.kind === "listed" && held.station.marketSlug === channels[0]?.station.marketSlug) return;
     const first = channels.find((c) => c.station.band === "tv") ?? channels[0];
-    void engine.tune(first.station.id, { input: "app" });
+    void engine.tune(first.station.id, { input: "app", via: "resume" });
   }, [channels, engine, state.currentId]);
 
   // First launch on the TV app: sign in on your phone, or watch without signing in.

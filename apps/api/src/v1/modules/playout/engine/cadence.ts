@@ -34,6 +34,13 @@ export interface BreakCadence {
   underwriting: Cadence;
   /** The station's spots (added later on 2026-09-29). The maker's barter time isn't the station's: it stays. */
   spots: Cadence;
+  /**
+   * S20 (2026-10-03, A246): Up next's own cadence. Left out (a station that never set it), Up next
+   * airs as often as the bumper position holding its role, as before. Not one of `CADENCE_PARTS`:
+   * it never decides a break's length or whether it airs, only whether Up next is in it (the log's
+   * walk, `UpNextDecider` in sequence.ts).
+   */
+  upNext?: Cadence;
 }
 /**
  * What's decided per break. A243 (2026-10-02): the bumpers are two parts, the sequence opening the
@@ -98,7 +105,9 @@ export function cadenceOf(stored: Partial<Record<keyof BreakCadence, Partial<Cad
     stationId: stationId.every === "never" ? { every: "break" } : (stationId as BreakCadence["stationId"]),
     bumpers: one(stored?.bumpers),
     underwriting: one(stored?.underwriting),
-    spots: one(stored?.spots)
+    spots: one(stored?.spots),
+    // S20: only when set; left out, Up next follows its position (as before).
+    ...(stored?.upNext?.every ? { upNext: one(stored.upNext) } : {})
   };
 }
 

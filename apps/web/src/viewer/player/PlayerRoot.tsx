@@ -2,7 +2,7 @@
 // or the mini player shows it, with the tally lit), and the tuned-in page shows its picture.
 
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { audienceApi } from "@opencast/contracts";
+import { audienceApi, type TuneVia } from "@opencast/contracts";
 import { PlayerProvider, startHeartbeat, tuningSoundFrom, usePlayer, type EngineOptions, type InputAdapter } from "@opencast/player";
 import { call } from "../../api/client";
 import { setDevice } from "../device/store";
@@ -37,7 +37,7 @@ function PlayerSync() {
     // The account's, or this device's when signed out.
     const w = settings?.watching;
     if (w?.captions) engine.setCaptions(w.captions, w.captionSize);
-    // "Tuning sound", per band (on for both unless turned off): the hiss when changing channel.
+    // "Tuning sound", per band (on for both unless turned off): the static and click when changing channel.
     engine.setOptions({ tuningSound: tuningSoundFrom(w) });
   }, [engine, settings?.watching]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), isPhone() ? "phone" : "web"), [engine]);
@@ -69,15 +69,18 @@ export function PlayerRoot({ children }: { children: ReactNode }) {
   );
 }
 
-/** Tunes the player (and remembers the channel on this device for "Start on: Last channel"). */
-export function useTune() {
+/**
+ * Tunes the player (and remembers the channel on this device for "Start on: Last channel"). A251:
+ * `via` says how the channel was found (the guide, search, a preset…), for the desk's analytics.
+ */
+export function useTune(via?: TuneVia) {
   const [, engine] = usePlayer();
   return useCallback(
-    (stationId: string) => {
+    (stationId: string, how: TuneVia | undefined = via) => {
       setDevice({ lastStationId: stationId });
-      return engine.tune(stationId, { input: "app" });
+      return engine.tune(stationId, { input: "app", ...(how ? { via: how } : {}) });
     },
-    [engine]
+    [engine, via]
   );
 }
 

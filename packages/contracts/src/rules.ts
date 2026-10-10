@@ -34,7 +34,7 @@ const def = <S extends z.ZodType>(d: RuleDef<S>) => d;
 
 const dollars = (micros: number) => {
   const d = micros / 1_000_000;
-  return `$${d < 1 ? d.toFixed(d < 0.1 ? 3 : 2) : d.toFixed(2)}`.replace(/(\.\d*?[1-9])0+$/, "$1");
+  return `$${d < 1 ? d.toFixed(d < 0.01 ? 4 : d < 0.1 ? 3 : 2) : d.toFixed(2)}`.replace(/(\.\d*?[1-9])0+$/, "$1");
 };
 const pct = (bps: number) => `${bps % 100 ? (bps / 100).toFixed(2).replace(/0+$/, "") : String(bps / 100)}%`;
 
@@ -289,6 +289,71 @@ export const RULES = {
     fallback: { opencastBps: 0, poolBps: 0, fundBps: 0 },
     display: (v) => (!v.opencastBps && !v.poolBps && !v.fundBps ? "Not set yet" : `${pct(v.opencastBps)} Opencast, ${pct(v.poolBps)} the pool, ${pct(v.fundBps)} the creator fund`),
     isSet: (v) => !!(v.opencastBps || v.poolBps || v.fundBps)
+  }),
+  // Sign-ups (added 2026-10-07, the user's request): invite-only, like Clubhouse while it grew.
+  "signups.invite_only": def({
+    group: "signups",
+    title: "Invite only",
+    detail: "New accounts need an invite code (or a team invite) before they can do anything; people already in stay in",
+    schema: z.object({ on: z.boolean() }),
+    fallback: { on: false },
+    display: (v) => (v.on ? "On: new accounts need an invite code" : "Off: anyone can sign up")
+  }),
+  "signups.codes_per_person": def({
+    group: "signups",
+    title: "Invite codes each",
+    detail: "How many invite codes each person who's in can make and send, one person each",
+    schema: z.object({ codes: z.number().int().min(0).max(100) }),
+    fallback: { codes: 10 },
+    display: (v) => `${v.codes} ${v.codes === 1 ? "code" : "codes"} each`
+  }),
+  // Costs (added 2026-10-07, A251 Phase 6; no first version): what running Opencast costs, for the
+  // desk's "Cost to run, estimated". Prices Opencast pays its own suppliers, not what stations pay;
+  // each is "Not set yet" until someone sets it, and the estimate leaves it out until then.
+  "costs.storage": def({
+    group: "costs",
+    title: "Storage",
+    detail: "What a GB stored costs Opencast a month, originals and prepared together",
+    schema: z.object({ costPerGbMonthMicros: PriceOrUnset }),
+    fallback: { costPerGbMonthMicros: null },
+    display: (v) => (v.costPerGbMonthMicros === null ? "Not set yet" : `${dollars(v.costPerGbMonthMicros)} a GB a month`),
+    isSet: (v) => v.costPerGbMonthMicros !== null
+  }),
+  "costs.preparing": def({
+    group: "costs",
+    title: "Preparing",
+    detail: "What a minute spent preparing uploads costs Opencast",
+    schema: z.object({ costPerMinuteMicros: PriceOrUnset }),
+    fallback: { costPerMinuteMicros: null },
+    display: (v) => (v.costPerMinuteMicros === null ? "Not set yet" : `${dollars(v.costPerMinuteMicros)} a minute`),
+    isSet: (v) => v.costPerMinuteMicros !== null
+  }),
+  "costs.relays": def({
+    group: "costs",
+    title: "Relays",
+    detail: "What an hour relayed to YouTube or Twitch costs Opencast",
+    schema: z.object({ costPerHourMicros: PriceOrUnset }),
+    fallback: { costPerHourMicros: null },
+    display: (v) => (v.costPerHourMicros === null ? "Not set yet" : `${dollars(v.costPerHourMicros)} an hour`),
+    isSet: (v) => v.costPerHourMicros !== null
+  }),
+  "costs.live": def({
+    group: "costs",
+    title: "Live (Livepeer)",
+    detail: "What an hour live costs Opencast",
+    schema: z.object({ costPerHourMicros: PriceOrUnset }),
+    fallback: { costPerHourMicros: null },
+    display: (v) => (v.costPerHourMicros === null ? "Not set yet" : `${dollars(v.costPerHourMicros)} an hour`),
+    isSet: (v) => v.costPerHourMicros !== null
+  }),
+  "costs.platform": def({
+    group: "costs",
+    title: "API, database and worker",
+    detail: "What running Opencast's own servers costs a week, whatever the stations do",
+    schema: z.object({ costPerWeekMicros: PriceOrUnset }),
+    fallback: { costPerWeekMicros: null },
+    display: (v) => (v.costPerWeekMicros === null ? "Not set yet" : `${dollars(v.costPerWeekMicros)} a week`),
+    isSet: (v) => v.costPerWeekMicros !== null
   }),
   // Watch data (added 2026-09-29, follow-up Phase 1; no first version: the fallback is the value until one is set).
   "watch_data.retention": def({

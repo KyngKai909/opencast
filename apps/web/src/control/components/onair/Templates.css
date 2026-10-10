@@ -1,0 +1,52 @@
+/* A246 (Phase 4): the Templates tab (opencast-schedule 06: .tpls, .tcard, .dots, .applies). */
+.cc-tpls { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; align-items: start; border-top: 1px solid var(--line); padding-top: 14px; }
+.cc-tcards { display: grid; gap: 10px; align-content: start; }
+.cc-tcards__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cc-tcards__new { justify-self: start; margin-top: 6px; }
+.cc-tcard {
+  display: block; padding: 12px 14px; border-radius: 12px; color: var(--ink); text-decoration: none;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+a.cc-tcard:hover { background: var(--raised); }
+a.cc-tcard:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-tcard--on { box-shadow: inset 0 0 0 1.5px var(--signal); background: var(--raised); }
+.cc-tcard--every { box-shadow: none; border: 1.5px dashed var(--line); }
+.cc-tcard__h { display: block; margin: 0; font: 700 15px var(--font-display); }
+.cc-tcard__line { display: block; font-size: 12px; color: var(--ink-70); margin-top: 2px; line-height: 1.4; }
+.cc-tcard__btn { margin-top: 8px; }
+/* A square per date ahead: plain where generated, amber where edited by hand. */
+.cc-tdots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.cc-tdots i { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font: 600 9px var(--font-mono); font-style: normal; }
+.cc-tdots__g { background: color-mix(in srgb, var(--signal) 22%, transparent); color: var(--ink); }
+.cc-tdots__e { background: var(--standby-fill); color: var(--on-standby); }
+
+/* The template open: its head, what saving does, its rundown. */
+.cc-tpl { min-width: 0; }
+.cc-tpl__head { border-top: 0; padding-top: 0; }
+.cc-tpl__head .cc-daynav__day { margin: 0; }
+.cc-tpl__end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cc-applies { margin: 10px 0 8px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; color: var(--ink-70); box-shadow: inset 0 0 0 1px var(--line); line-height: 1.45; }
+.cc-tpl__edited { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.cc-tpl__edited li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cc-tpl__foot { display: flex; gap: 12px; margin-top: 14px; }
+.cc-tpl__going { font-size: 13.5px; }
+.cc-tpl__going ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink-70); }
+.cc-tplpage .cc-tray { margin-top: 16px; }
+
+/* The phone: desk work says so. */
+.cc-deskonly { padding: 18px 16px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); display: grid; gap: 10px; justify-items: start; }
+.cc-deskonly__h { margin: 0; font: 700 18px var(--font-display); }
+.cc-deskonly__p { margin: 0; font-size: 14px; color: var(--ink-70); line-height: 1.45; }
+
+@media (max-width: 1100px) {
+  .cc-tpls { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; }
+}
+
+/* Programming Phase 3: What airs, under a template's program (the pane, and the Add drawer's template mode). */
+.cc-whatairs { display: grid; gap: 10px; }
+.cc-whatairs__h { margin: 0; font: 600 13px var(--font-text); color: var(--ink); }
+.cc-whatairs__seg { max-width: 100%; overflow-x: auto; }
+.cc-whatairs__progs { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
+.cc-whatairs__progs legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--ink-70); }
+.cc-whatairs__end { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; color: var(--ink-70); }
+.cc-whatairs__preview { margin: 0; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { asLogCode, type BlockBand } from "@opencast/contracts";
+import { asLogCode, type BlockBand, type Outlet } from "@opencast/contracts";
+import type { Clearance } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
@@ -9,17 +10,19 @@ import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
 import { isContentId, objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, REFERENCE, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
-import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
+import { masterWithQuery, renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
 import { captionSources } from "./engine/captions.js";
 import { liveObjectPrefixes } from "./engine/assemble.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
-import { queuePreparation, refKey, wantRow } from "./engine/prepare.js";
+import { baseKey, queuePreparation, refKey, syncPreparedVersions, versionedKey, wantRow } from "./engine/prepare.js";
 import { isEveryBreak, partsOf } from "./engine/cadence.js";
-import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
+import { ELSEWHERE_SECONDS, elsewhereSeconds, elsewhereSlateKey, GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
+import { shiftSegment } from "./engine/tsretime.js";
+import { countryOf } from "../../geo.js";
 import { STATION_ID_MS } from "./engine/fill.js";
 
-type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared";
+type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared" | "held_by_opencast";
 
 export interface SignOnCheck {
   key: CheckKey;
@@ -100,6 +103,30 @@ export interface PlayoutService {
   /** Whether each station is on air, and where to play it. */
   /** `standingBy`: a live block is on the stand-by slate, waiting for its signal (S13). */
   statusFor(stationIds: string[]): Promise<Map<string, { onAir: boolean; playbackUrl: string | null; standingBy: boolean }>>;
+  /** A251: minutes of dead-air fill and slate per station in a span (time nobody scheduled, or something not ready). */
+  fillMinutes(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /** A251: how a station's airtime was filled, minutes from the as-run log: programs, breaks (and what aired between), live, dead air (fill and slate). */
+  airtimeMinutes(stationId: string, from: Date, to: Date): Promise<{ programs: number; breaks: number; live: number; deadAir: number }>;
+  /** A251: a station's breaks as they aired in a window, touching ones joined. */
+  breakSpans(stationId: string, from: Date, to: Date): Promise<Array<{ start: Date; end: Date }>>;
+  /**
+   * A251 Phase 5: breaks as they aired, ending in a window, every station: when, how long, where they
+   * sat (`opening` a program's slot when no program aired just before it, `inside` one when the same
+   * log entry's program aired either side, `between` two otherwise), what opened them and how many spots.
+   */
+  airedBreaks(from: Date, to: Date): Promise<Array<{ breakId: string; stationId: string; start: Date; end: Date; position: "opening" | "inside" | "between"; firstElement: "bumper" | "spot" | "sponsor" | "station_id" | "other"; spots: number }>>;
+  /** A251 Phase 7: each station's airtime by kind (programs, breaks, live, planned off air, dead-air fill, slate), minutes from the as-run log. */
+  airtimeByStation(stationIds: string[], from: Date, to: Date): Promise<Map<string, { programs: number; breaks: number; live: number; offAir: number; deadAirFill: number; slate: number }>>;
+  /** A251 Phase 7: dead-air fills and slates as they ran, back-to-back rows joined. */
+  fillRuns(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; kind: "dead_air_fill" | "slate"; start: Date; end: Date }>>;
+  /** A251 Phase 7: relay sessions in a span: stations relaying, hours, sessions that ended with an error (drops). */
+  relayHealth(stationIds: string[], from: Date, to: Date): Promise<{ stations: number; hours: number; sessions: number; drops: Array<{ stationId: string; at: Date; error: string | null }> }>;
+  /** A251 Phase 6: minutes spent preparing uploads in a span (each item's last preparation). */
+  prepareMinutes(from: Date, to: Date): Promise<number>;
+  /** A251 Phase 6: the placements (spot airings) that aired on these stations in a span. */
+  spotsAired(stationIds: string[], from: Date, to: Date): Promise<string[]>;
+  /** A251: why each of these as-run rows aired (planned, live, a fill…). */
+  asRunReasons(ids: string[]): Promise<Map<string, string>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
   signOn(stationId: string): Promise<PlayoutStatusView>;
   signOff(stationId: string, permanently: boolean): Promise<PlayoutStatusView>;
@@ -122,7 +149,14 @@ export interface PlayoutService {
    * when there's no such playlist (or nothing published yet). `maxAge` is the cache time. On the
    * TV band, `subs.m3u8` is the subtitle rendition (X2), and `empty.vtt` its empty segment.
    */
-  playlist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
+  playlist(stationId: string, file: string, request?: PlaylistRequest): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
+  /**
+   * Programming Phase 6: a segment of the other apps' "Airing on Opencast" slate (or, while it isn't
+   * prepared, the generated station ID), as the `index`th in a row of them `offsetMs` in
+   * (`/hls/elsewhere/<key>/<rendition>/<index>-<offsetMs>.ts`): its timestamps moved on, so the
+   * slate plays as one stretch. Null for anything else, or when it isn't prepared.
+   */
+  elsewhereSegment(key: string, rendition: string, index: number, offsetMs: number): Promise<Buffer | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** Stations that aired anything in a window (from the as-run log). */
@@ -142,14 +176,18 @@ export interface PlayoutService {
   airedItem(itemId: string, limit: number): Promise<Array<{ stationId: string; startedAt: Date; reason: AsRunView["reason"]; carriageAgreementId: string | null }>>;
   /** C5: when each item first aired anywhere, and where. */
   firstAired(itemIds: string[]): Promise<Map<string, { stationId: string; startedAt: Date }>>;
+  /** Programming Phase 2: a station's airings of these items, newest first, as item ids (up to `limit`): where each program's walk is. */
+  airedHistory(stationId: string, itemIds: string[], limit: number): Promise<string[]>;
+  /** Programming Phase 2: when each of these items last aired on a station (left out: never). */
+  lastAired(stationId: string, itemIds: string[]): Promise<Map<string, Date>>;
   /** G3: a live block ended early: playout hands back to the log now. */
   endLive(stationId: string, userId: string): Promise<void>;
   /** G2: when each station last signed on (while on air). */
   onAirSince(stationIds: string[]): Promise<Map<string, Date>>;
   /** The log or off air hours changed: playout reads them again now. */
   replan(stationId: string): Promise<void>;
-  /** Where an item's preparation for air stands, for a band (the library's item history). */
-  preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null }>;
+  /** Where an item's preparation for air stands, for a band, and what it did to the picture (the library's item history). */
+  preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null; converted: Array<"from_hdr" | "deinterlaced"> }>;
   /**
    * Added 2026-09-29: the station's generated station ID, for the library: null once a station ID
    * of its own can air (it wins).
@@ -178,9 +216,11 @@ export interface PlayoutService {
    * `prepared_renditions` and `prepared_captions` rows, and any caption track made from one of
    * them (a WebVTT's content ID) on other items. The as-run log keeps what aired (it never pointed
    * at these rows). Without `evenIfAiring`, a key a channel's playlist pointed at in the last two
-   * hours is left for the storage sweep (players may still be fetching its segments).
+   * hours is left for the storage sweep (players may still be fetching its segments). A file's
+   * newer copy (`<key>-p2`, cleaner pictures) goes with it, unless `alone` (the first copy dropped
+   * once the newer one has taken over, `sweepFirstCopies`).
    */
-  dropPrepared(keys: string[], options: { evenIfAiring: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
+  dropPrepared(keys: string[], options: { evenIfAiring: boolean; alone?: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
   /**
    * Added 2026-09-30: deletes the live segments stored for a live source's blocks (TV ones copied
    * from Livepeer, radio ones packaged by the worker; `prepared/live-<source>-<session>/`), for a
@@ -191,6 +231,19 @@ export interface PlayoutService {
   dropLiveCopies(liveSourceId: string): Promise<{ sessions: string[] }>;
   /** The storage sweep: what was prepared from files that are gone, left while it aired (or from before). */
   sweepPrepared(): Promise<{ dropped: number; deferred: number }>;
+  /**
+   * The storage sweep (programming Phase 4, 2026-10-10, open decision P1.3): a file's first
+   * prepared copy, a week after its newer copy (`<key>-p2`, cleaner pictures) took over, unless a
+   * channel's playlist still points at it (it's tried again on the next sweep). The newer copy airs
+   * on alone.
+   */
+  sweepFirstCopies(): Promise<{ dropped: number; deferred: number }>;
+  /**
+   * Programming Phase 4 (2026-10-10): the break points suggested for these files, found as each was
+   * prepared (chapter marks, or fades to black and silence). Files with none, or not looked at yet,
+   * aren't in it.
+   */
+  breakSuggestions(contentIds: string[]): Promise<Map<string, { source: "chapter" | "fade"; offsetsMs: number[] }>>;
 
   // ---- Pay-as-you-go metering (added 2026-09-29, follow-up Phase 2) ----
   /** Translator sessions overlapping [from, to), each clipped to it; a running one counts to its last update. */
@@ -200,6 +253,49 @@ export interface PlayoutService {
   liveAired(from: Date, to: Date): Promise<Array<{ stationId: string; startedAt: Date; endedAt: Date }>>;
   /** The bytes stored for each content ID's prepared segments (every band's renditions, ready or not yet swept). */
   preparedBytes(contentIds: string[]): Promise<Map<string, number>>;
+
+  // ---- Where it can air (added 2026-10-10, programming Phase 6) ----
+  /**
+   * What aired of these items, or of any episode of these programs, starting in [from, to), from
+   * the as-run log: program rows only (no breaks, slates or fills of station IDs), each clipped to
+   * nothing (a row is counted whole where it started). For the licensor's minutes.
+   */
+  airedOf(input: { itemIds: string[]; programIds: string[]; from: Date; to: Date }): Promise<AiredRow[]>;
+  /**
+   * The channel's rows in [from, to) that aren't cleared for `outlet` for a viewer in `country`
+   * (null: unknown, as on a relay): each prepared row carrying an item outside a break (breaks
+   * follow the relay's break setting), with its sequence
+   * numbers (`firstSeq` to `firstSeq + segments - 1`, as the playlist numbers them) and the reason.
+   * What a relay and (Programming Phase 5) the other-apps playlist swap for the station's
+   * "Airing on Opencast" slate.
+   */
+  notCleared(stationId: string, input: { from: Date; to: Date; outlet: Outlet; country: string | null }): Promise<NotClearedRow[]>;
+}
+
+/** Programming Phase 6: an as-run program row of a licensed item. */
+export interface AiredRow {
+  id: string;
+  stationId: string;
+  assetId: string | null;
+  programId: string | null;
+  logEntryId: string | null;
+  agreementId: string | null;
+  startedAt: Date;
+  endedAt: Date;
+}
+
+/** Programming Phase 6: a channel row not cleared for an outlet. */
+export interface NotClearedRow {
+  channelItemId: string;
+  run: number;
+  firstSeq: number;
+  segments: number;
+  startsAt: Date;
+  endsAt: Date;
+  logEntryId: string | null;
+  assetId: string;
+  agreementId: string | null;
+  reason: Clearance["reason"];
 }
 
 export interface PreviewRef {
@@ -221,6 +317,8 @@ export const PREVIEW_RENDITION: Record<Band, RenditionName> = { tv: "v360", radi
 const PREVIEW_NEEDED_IN_MS = 3_600_000;
 /** How long after a channel last pointed at a prepared item its segments may still be fetched. */
 const AIRED_GRACE_MS = 2 * 3_600_000;
+/** A file's first prepared copy is kept this long after its newer copy takes over (open decision P1.3). */
+export const FIRST_COPY_KEPT_MS = 7 * 86_400_000;
 
 const HOUR = 3_600_000;
 
@@ -244,6 +342,19 @@ export function preparedTail(failed: number, preparing: number): string {
   return preparing ? `. ${broken} and ${preparing} ${preparing === 1 ? "is" : "are"} being prepared; ${fallback}` : `. ${broken}; ${fallback}`;
 }
 
+/**
+ * Programming Phase 5: who asked for a channel's playlist, from `/hls/:stationId/:file` (the API's
+ * and the worker's). `via` is the request's `?via=` (`iptv` from the channel list); the address
+ * and user agent tell one other app's polls from another's, and are never kept. `counted` hears of
+ * the count's promise (tests wait on it; serving doesn't).
+ */
+export interface PlaylistRequest {
+  via?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  counted?: (done: Promise<void>) => void;
+}
+
 export function createPlayoutService({ deps, services }: ModuleContext): PlayoutService {
   const { db } = deps;
   const P = schema.playoutState;
@@ -255,8 +366,12 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
   const channelUrl = (stationId: string) => publicUrl(deps, `/hls/${stationId}/master.m3u8`);
   /** Segment lengths per prepared key and rendition (they never change once prepared). */
   const lengths = new Map<string, number[]>();
-  /** Rendered playlists, for a second (a burst of viewers costs one render). */
+  /** Rendered playlists, for a second (a burst of viewers costs one render). Other apps' variants apart, by viewer country. */
   const rendered = new Map<string, { at: number; value: { body: string; maxAge: number } | null }>();
+  /** Programming Phase 6: swapped rows whose slate wasn't ready, told once each. */
+  const toldNotReady = new Set<string>();
+  /** Programming Phase 6: the slates' segment bytes (a few kilobytes each, never changed), by key and rendition. */
+  const slateBytes = new Map<string, Buffer>();
   const bandOf = async (stationId: string): Promise<Band> => (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
 
   function segmentUrl(key: string, rendition: string, index: number) {
@@ -279,7 +394,67 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     return (await services.library.stationCaptionLanguage(stationId)) ?? "en";
   }
 
-  async function renderPlaylist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null> {
+  /**
+   * Programming Phase 6: the rows of a playlist not cleared for other apps for a viewer in `country`
+   * (null: unknown, so only a worldwide licence clears them), as the other apps' variant swaps them.
+   */
+  async function swappedFor(stationId: string, rows: ChannelRow[], country: string | null, now: Date): Promise<Set<string>> {
+    const programs = rows.filter((r) => r.kind === "prepared");
+    if (!programs.length) return new Set();
+    const from = new Date(Math.min(...programs.map((r) => r.startsAt.getTime())));
+    const blocked = await service.notCleared(stationId, { from, to: new Date(now.getTime() + 1), outlet: "other_apps", country });
+    const ids = new Set(rows.map((r) => r.id));
+    return new Set(blocked.map((b) => b.channelItemId).filter((id) => ids.has(id)));
+  }
+
+  /**
+   * Programming Phase 6: what a swapped row's segments are in the other apps' variant. The station's
+   * "Airing on Opencast" slate of the segment's length (1 to 4 s, prepared ahead by the engine);
+   * while that isn't prepared, the generated station ID's first segment (and it's logged); with
+   * neither, null (the playlist holds before it, and it's logged). Each slate segment's URL says
+   * how far into the row it is, so it's served with its timestamps moved on (`elsewhereSegment`).
+   */
+  function slateSegments(stationId: string, look: { callSign: string | null; channel: string | null; name: string; colour: string | null; homeCity: string | null }, band: Band, rendition: string) {
+    const lengthOf = (key: string) => lengths.get(`${key}/${rendition}`)?.[0] ?? null;
+    const sid = generatedStationIdKey(look, band);
+    const offsets = new Map<string, number[]>();
+    const tell = (row: ChannelRow, what: string) => {
+      const id = `${row.id}/${what}`;
+      if (toldNotReady.has(id)) return;
+      if (toldNotReady.size > 5_000) toldNotReady.clear();
+      toldNotReady.add(id);
+      console.warn(`[playout] ${look.callSign ?? stationId}: the other apps' "Airing on Opencast" slate isn't prepared yet, so ${(row as ChannelRow & { label?: string }).label ?? "a program"} (not cleared for them) ${what}`);
+    };
+    const pick = (row: ChannelRow, ms: number): { key: string; ms: number } | null => {
+      const key = elsewhereSlateKey(look, band, elsewhereSeconds(ms));
+      const own = lengthOf(key);
+      if (own) return { key, ms: own };
+      const fallback = lengthOf(sid);
+      if (fallback) {
+        tell(row, "shows the station ID in its place");
+        return { key: sid, ms: fallback };
+      }
+      tell(row, "holds the playlist until it is");
+      return null;
+    };
+    return {
+      keys: [...ELSEWHERE_SECONDS.map((seconds) => elsewhereSlateKey(look, band, seconds)), sid],
+      segment(row: ChannelRow, index: number): { uri: string; ms: number } | null {
+        const chosen = pick(row, row.segmentMs[index]);
+        if (!chosen) return null;
+        // Where each of the row's slate segments starts, from the slate lengths before it.
+        let starts = offsets.get(row.id);
+        if (!starts) {
+          starts = [0];
+          for (const ms of row.segmentMs) starts.push(starts[starts.length - 1] + (pick(row, ms)?.ms ?? ms));
+          offsets.set(row.id, starts);
+        }
+        return { uri: publicUrl(deps, `/hls/elsewhere/${chosen.key}/${rendition}/${index}-${Math.round(starts[index])}.ts`), ms: chosen.ms };
+      }
+    };
+  }
+
+  async function renderPlaylist(stationId: string, file: string, otherApps?: { country: string | null }): Promise<{ body: string; maxAge: number; contentType?: string } | null> {
     const band = await bandOf(stationId);
     // The empty caption segment: the same bytes for every station, kept a long time.
     if (file === SUBTITLES.empty) return band === "tv" ? { body: EMPTY_VTT, maxAge: 86_400, contentType: "text/vtt" } : null;
@@ -308,12 +483,15 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       .orderBy(asc(C.seq), asc(C.startsAt))) as ChannelRow[];
     const [end] = latest.kind === "end" ? [] : await db.select().from(C).where(and(eq(C.stationId, stationId), eq(C.run, latest.run), eq(C.kind, "end"), lte(C.startsAt, now))).limit(1);
     if (end) rows.push(end as ChannelRow);
+    // Programming Phase 6: other apps' variant, with what isn't cleared for them swapped for the slate.
+    const swapped = otherApps ? await swappedFor(stationId, rows, otherApps.country, now) : new Set<string>();
     if (subtitles) {
       const sources = await captionSources(db, (ids) => services.library.captionTrackIds(ids), rows as Array<ChannelRow & { assetId: string | null }>);
       const body = renderSubtitles({
         rows,
         now: now.getTime(),
         empty: SUBTITLES.empty,
+        swapped,
         uri: (row, index) => {
           const source = sources.get(row.id);
           return source && index < source.segments ? captionUrl(source.key, source.rendition, index) : null;
@@ -321,7 +499,12 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       });
       return body ? { body, maxAge: 1 } : null;
     }
-    const keys = [...new Set(rows.map((r) => r.preparedKey).filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
+    let slate: ReturnType<typeof slateSegments> | null = null;
+    if (swapped.size) {
+      const ident = (await services.stations.idents([stationId])).get(stationId);
+      if (ident) slate = slateSegments(stationId, { callSign: ident.callSign, channel: ident.channel, name: ident.name, colour: ident.colour ?? null, homeCity: ident.homeCity ?? null }, band, rendition);
+    }
+    const keys = [...new Set([...rows.map((r) => r.preparedKey), ...(slate?.keys ?? [])].filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
     if (keys.length) {
       const found = await db
         .select({ key: schema.preparedRenditions.key, segmentMs: schema.preparedRenditions.segmentMs })
@@ -329,11 +512,187 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .where(and(eq(schema.preparedRenditions.rendition, rendition), inArray(schema.preparedRenditions.key, keys)));
       for (const f of found) lengths.set(`${f.key}/${rendition}`, f.segmentMs);
     }
-    const body = renderMedia({ rows, rendition, now: now.getTime(), lengths: (key) => lengths.get(`${key}/${rendition}`) ?? null, uri: (key, index) => segmentUrl(key, rendition, index) });
+    const body = renderMedia({
+      rows,
+      rendition,
+      now: now.getTime(),
+      lengths: (key) => lengths.get(`${key}/${rendition}`) ?? null,
+      uri: (key, index) => segmentUrl(key, rendition, index),
+      swapped,
+      slate: (row, index) => slate?.segment(row, index) ?? null
+    });
     return body ? { body, maxAge: 1 } : null;
   }
 
   const service: PlayoutService = {
+    async airtimeMinutes(stationId, from, to) {
+      const A = schema.asRun;
+      const rows = await db
+        .select({ code: A.code, reason: A.reason, breakId: A.breakId, seconds: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))), 0)::float` })
+        .from(A)
+        .where(and(eq(A.stationId, stationId), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.code, A.reason, A.breakId);
+      const out = { programs: 0, breaks: 0, live: 0, deadAir: 0 };
+      for (const r of rows) {
+        const m = r.seconds / 60;
+        if (r.reason === "dead_air_fill" || r.reason === "slate") out.deadAir += m;
+        else if (r.reason === "live") out.live += m;
+        else if (r.code === "PGM" && !r.breakId) out.programs += m;
+        else out.breaks += m;
+      }
+      return { programs: Math.round(out.programs), breaks: Math.round(out.breaks), live: Math.round(out.live), deadAir: Math.round(out.deadAir) };
+    },
+
+    async breakSpans(stationId, from, to) {
+      const A = schema.asRun;
+      const rows = await db
+        .select({ start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(eq(A.stationId, stationId), sql`${A.breakId} is not null`, lt(A.startedAt, to), gt(A.endedAt, from)))
+        .orderBy(asc(A.startedAt));
+      const out: Array<{ start: Date; end: Date }> = [];
+      for (const r of rows) {
+        const last = out[out.length - 1];
+        if (last && r.start.getTime() - last.end.getTime() <= 1000) last.end = new Date(Math.max(last.end.getTime(), r.end.getTime()));
+        else out.push({ start: r.start, end: r.end });
+      }
+      return out;
+    },
+
+    async airedBreaks(from, to) {
+      const A = schema.asRun;
+      // Every row of the breaks that ended in the window (one break may have aired in several rows).
+      const rows = await db
+        .select({ breakId: A.breakId, stationId: A.stationId, code: A.code, start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(sql`${A.breakId} is not null`, gte(A.endedAt, new Date(from.getTime() - 3 * 3_600_000)), lt(A.startedAt, to)))
+        .orderBy(asc(A.startedAt));
+      type Aired = { breakId: string; stationId: string; start: Date; end: Date; first: string; spots: number };
+      const byBreak = new Map<string, Aired>();
+      for (const r of rows) {
+        // The same break airing again later (a replay) is another airing: keyed by its start too.
+        const open = byBreak.get(r.breakId!);
+        if (open && r.start.getTime() - open.end.getTime() <= 5_000) {
+          open.end = new Date(Math.max(open.end.getTime(), r.end.getTime()));
+          if (r.code === "SPT") open.spots++;
+          continue;
+        }
+        if (open) byBreak.set(`${r.breakId}@${open.start.getTime()}`, open);
+        byBreak.set(r.breakId!, { breakId: r.breakId!, stationId: r.stationId, start: r.start, end: r.end, first: r.code, spots: r.code === "SPT" ? 1 : 0 });
+      }
+      const aired = [...byBreak.values()].filter((b) => b.end >= from && b.end < to);
+      const out: Awaited<ReturnType<PlayoutService["airedBreaks"]>> = [];
+      for (const b of aired) {
+        // The programs either side, within a few seconds.
+        const [before] = await db
+          .select({ entry: A.logEntryId })
+          .from(A)
+          .where(and(eq(A.stationId, b.stationId), eq(A.code, "PGM"), sql`${A.breakId} is null`, lte(A.endedAt, new Date(b.start.getTime() + 5_000)), gte(A.endedAt, new Date(b.start.getTime() - 60_000))))
+          .orderBy(desc(A.endedAt))
+          .limit(1);
+        const [after] = await db
+          .select({ entry: A.logEntryId })
+          .from(A)
+          .where(and(eq(A.stationId, b.stationId), eq(A.code, "PGM"), sql`${A.breakId} is null`, gte(A.startedAt, new Date(b.end.getTime() - 5_000)), lte(A.startedAt, new Date(b.end.getTime() + 60_000))))
+          .orderBy(asc(A.startedAt))
+          .limit(1);
+        const position = !before ? "opening" : after && before.entry && before.entry === after.entry ? "inside" : "between";
+        const firstElement = b.first === "BMP" ? "bumper" : b.first === "SPT" ? "spot" : b.first === "UND" ? "sponsor" : b.first === "SID" ? "station_id" : "other";
+        out.push({ breakId: b.breakId, stationId: b.stationId, start: b.start, end: b.end, position, firstElement, spots: b.spots });
+      }
+      return out;
+    },
+
+    async airtimeByStation(stationIds, from, to) {
+      const out = new Map<string, { programs: number; breaks: number; live: number; offAir: number; deadAirFill: number; slate: number }>();
+      if (!stationIds.length) return out;
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, code: A.code, reason: A.reason, breakId: A.breakId, seconds: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))), 0)::float` })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.stationId, A.code, A.reason, A.breakId);
+      for (const r of rows) {
+        const o = out.get(r.stationId) ?? { programs: 0, breaks: 0, live: 0, offAir: 0, deadAirFill: 0, slate: 0 };
+        const m = r.seconds / 60;
+        if (r.reason === "dead_air_fill") o.deadAirFill += m;
+        else if (r.reason === "slate") o.slate += m;
+        else if (r.code === "OFF") o.offAir += m;
+        else if (r.reason === "live") o.live += m;
+        else if (r.code === "PGM" && !r.breakId) o.programs += m;
+        else o.breaks += m;
+        out.set(r.stationId, o);
+      }
+      for (const [k, o] of out) out.set(k, { programs: Math.round(o.programs), breaks: Math.round(o.breaks), live: Math.round(o.live), offAir: Math.round(o.offAir), deadAirFill: Math.round(o.deadAirFill), slate: Math.round(o.slate) });
+      return out;
+    },
+
+    async fillRuns(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, reason: A.reason, start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), inArray(A.reason, ["dead_air_fill", "slate"]), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .orderBy(asc(A.stationId), asc(A.startedAt));
+      const out: Array<{ stationId: string; kind: "dead_air_fill" | "slate"; start: Date; end: Date }> = [];
+      for (const r of rows) {
+        const last = out[out.length - 1];
+        if (last && last.stationId === r.stationId && last.kind === r.reason && r.start.getTime() - last.end.getTime() <= 5_000) last.end = r.end;
+        else out.push({ stationId: r.stationId, kind: r.reason as "dead_air_fill" | "slate", start: r.start, end: r.end });
+      }
+      return out;
+    },
+
+    async relayHealth(stationIds, from, to) {
+      if (!stationIds.length) return { stations: 0, hours: 0, sessions: 0, drops: [] };
+      const T = schema.translatorSessions;
+      const rows = await db
+        .select({ stationId: T.stationId, start: T.startedAt, end: T.endedAt, error: T.lastError })
+        .from(T)
+        .where(and(inArray(T.stationId, stationIds), lt(T.startedAt, to), sql`coalesce(${T.endedAt}, now()) > ${from}`));
+      const now = deps.clock.now();
+      let ms = 0;
+      for (const r of rows) ms += Math.max(0, Math.min((r.end ?? now).getTime(), to.getTime()) - Math.max(r.start.getTime(), from.getTime()));
+      const drops = rows.filter((r) => r.end && r.error && r.end >= from && r.end < to).map((r) => ({ stationId: r.stationId, at: r.end!, error: r.error }));
+      return { stations: new Set(rows.map((r) => r.stationId)).size, hours: Math.round((ms / 3_600_000) * 10) / 10, sessions: rows.length, drops };
+    },
+
+    async prepareMinutes(from, to) {
+      const [r] = await db
+        .select({ ms: sql<number>`coalesce(sum(${schema.preparedItems.prepMs}), 0)::float` })
+        .from(schema.preparedItems)
+        .where(and(gte(schema.preparedItems.preparedAt, from), lt(schema.preparedItems.preparedAt, to)));
+      return Math.round((r?.ms ?? 0) / 60_000);
+    },
+
+    async spotsAired(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .selectDistinct({ airingId: A.airingId })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), sql`${A.airingId} is not null`, gte(A.startedAt, from), lt(A.startedAt, to)));
+      return rows.map((r) => r.airingId!);
+    },
+
+    async asRunReasons(ids) {
+      if (!ids.length) return new Map();
+      const rows = await db.select({ id: schema.asRun.id, reason: schema.asRun.reason }).from(schema.asRun).where(inArray(schema.asRun.id, ids));
+      return new Map(rows.map((r) => [r.id, r.reason]));
+    },
+
+    async fillMinutes(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, minutes: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))) / 60, 0)::float` })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), inArray(A.reason, ["dead_air_fill", "slate"]), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.stationId);
+      return new Map(rows.map((r) => [r.stationId, Math.round(r.minutes)]));
+    },
+
     async statusFor(stationIds) {
       if (!stationIds.length) return new Map();
       const states = await db.select().from(P).where(inArray(P.stationId, stationIds));
@@ -369,6 +728,18 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       // come often enough but the cadence leaves more than an hour, it's a warning, not a block.
       // Planned off air time doesn't count against it: the station signs off and back on with its ID.
       const sidEntries = entries.filter((e) => e.code === "SID").map((e) => e.startsAt.getTime());
+      // A247, after every N programs: between the others, the time a program leaves of its slot airs
+      // as open time, with the station ID (where there's room for it, and no break there).
+      if (rule.everyPrograms) {
+        const items = await services.library.itemsByIds(entries.filter((e) => e.kind === "program" && e.assetId).map((e) => e.assetId!));
+        const breakAt = new Set(breaks.map((b) => Date.parse(b.startsAt)));
+        for (const e of entries) {
+          const ms = e.kind === "program" && e.assetId ? items.get(e.assetId)?.durationMs : undefined;
+          if (!ms) continue;
+          const end = e.startsAt.getTime() + ms;
+          if (e.endsAt.getTime() - end >= STATION_ID_MS && !breakAt.has(end)) sidEntries.push(end);
+        }
+      }
       const offAirMarks = offAir.flatMap((o) => [Math.max(now.getTime(), Date.parse(o.startsAt)), Math.min(day.getTime(), Date.parse(o.endsAt))]);
       const inOffAir = (a: number, b: number) => offAir.some((o) => Date.parse(o.startsAt) <= a && Date.parse(o.endsAt) >= b);
       const longestWithout = (breakTimes: number[]) => {
@@ -395,7 +766,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const liveEntries = entries.filter((e) => e.kind === "live");
       // By item, not by entry (G13); failed told apart from on its way (G14).
       const prep = summariseReadiness(prepared);
+      const hold = await services.stations.holdOf(stationId);
       const checks: SignOnCheck[] = [
+        // Added 2026-10-07: taken off the air from the desk; only Opencast lifts it.
+        ...(hold ? [{ key: "held_by_opencast" as const, label: "Opencast took this station off the air", passed: false, blocking: true, detail: hold.reason }] : []),
         { key: "call_sign_chosen", label: "Call sign chosen", passed: identity.callSign, blocking: true, detail: null },
         { key: "channel_chosen", label: "Channel chosen", passed: identity.channel, blocking: true, detail: null },
         {
@@ -474,6 +848,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async signOn(stationId) {
+      const hold = await services.stations.holdOf(stationId);
+      if (hold) throw refused("held_by_opencast", `Opencast took this station off the air: ${hold.reason.replace(/[.!?]?$/, ".")} It can sign on again once Opencast lifts that.`);
       const { ready, checks } = await service.checks(stationId);
       if (!ready) {
         const failing = checks.filter((c) => c.blocking && !c.passed).map((c) => c.label.toLowerCase());
@@ -658,15 +1034,51 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return new Map(rows.map((r) => [r.airingId!, r]));
     },
 
-    async playlist(stationId, file) {
-      const id = `${stationId}/${file}`;
+    async playlist(stationId, file, request) {
+      // Programming Phase 6: other apps' media playlists are a variant of their own (what isn't
+      // cleared for them swapped for the slate), by the viewer's country, never the plain one's cache.
+      const otherApps = request?.via === "iptv" && file.endsWith(".m3u8") && file !== "master.m3u8" && file !== "index.m3u8" ? { country: await countryOf(deps.geo, request.ip ?? null) } : undefined;
+      const id = otherApps ? `${stationId}/${file}|other_apps|${otherApps.country ?? ""}` : `${stationId}/${file}`;
       const hit = rendered.get(id);
       const at = deps.clock.now().getTime();
-      if (hit && Math.abs(at - hit.at) < 1_000) return hit.value;
-      const value = await renderPlaylist(stationId, file);
-      rendered.set(id, { at, value });
-      if (rendered.size > 5_000) rendered.clear();
+      let value: { body: string; maxAge: number; contentType?: string } | null;
+      if (hit && Math.abs(at - hit.at) < 1_000) value = hit.value;
+      else {
+        value = await renderPlaylist(stationId, file, otherApps);
+        rendered.set(id, { at, value });
+        if (rendered.size > 5_000) rendered.clear();
+      }
+      // Programming Phase 5: other apps tune with `?via=iptv`. Their polls are the audience source
+      // "Other apps" (counted apart, never billed; not waited for), and the master hands the query on.
+      if (value && request?.via === "iptv" && file.endsWith(".m3u8")) {
+        const poll = services.audience.otherApps.poll({ stationId, ip: request.ip ?? null, userAgent: request.userAgent ?? null }).catch(() => undefined);
+        request.counted?.(poll);
+        if (file === "master.m3u8" || file === "index.m3u8") value = { ...value, body: masterWithQuery(value.body, "via=iptv") };
+      }
       return value;
+    },
+
+    async elsewhereSegment(key, rendition, index, offsetMs) {
+      // Only the slates other apps are given (never a way to re-time anything else).
+      if (!/^(slate-aoo|sid)-[0-9a-f]{40}$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !deps.storage.objects.open) return null;
+      if (!Number.isInteger(index) || index < 0 || !Number.isFinite(offsetMs) || offsetMs < 0 || offsetMs > 7 * 86_400_000) return null;
+      const id = `${key}/${rendition}`;
+      let bytes = slateBytes.get(id);
+      if (!bytes) {
+        const stream = await deps.storage.objects.open(`${objectKey.prepared(key, rendition)}/seg_00000.ts`).catch(() => null);
+        if (!stream) return null;
+        const chunks: Buffer[] = [];
+        try {
+          for await (const chunk of stream) chunks.push(chunk as Buffer);
+        } catch {
+          return null;
+        }
+        bytes = Buffer.concat(chunks);
+        if (!bytes.length) return null;
+        if (slateBytes.size > 256) slateBytes.clear();
+        slateBytes.set(id, bytes);
+      }
+      return shiftSegment(bytes, offsetMs, index);
     },
 
     async stationsThatAired(from, to) {
@@ -723,6 +1135,41 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (r.contentId && bytes > 0) out.set(r.contentId, (out.get(r.contentId) ?? 0) + bytes);
       }
       return out;
+    },
+
+    async airedOf({ itemIds, programIds, from, to }) {
+      if (!itemIds.length && !programIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .select({ id: A.id, stationId: A.stationId, assetId: A.assetId, programId: A.programId, logEntryId: A.logEntryId, agreementId: A.carriageAgreementId, startedAt: A.startedAt, endedAt: A.endedAt })
+        .from(A)
+        .where(
+          and(
+            gte(A.startedAt, from),
+            lt(A.startedAt, to),
+            eq(A.code, "PGM"),
+            isNull(A.breakId),
+            inArray(A.reason, ["planned", "rotation", "backup_rotation", "dead_air_fill"]),
+            or(...(itemIds.length ? [inArray(A.assetId, itemIds)] : []), ...(programIds.length ? [inArray(A.programId, programIds)] : []))
+          )
+        )
+        .orderBy(asc(A.startedAt));
+      return rows.filter((r) => r.endedAt > r.startedAt);
+    },
+
+    async notCleared(stationId, { from, to, outlet, country }) {
+      const CI = schema.channelItems;
+      const rows = await db
+        .select()
+        .from(CI)
+        .where(and(eq(CI.stationId, stationId), lt(CI.startsAt, to), gt(CI.endsAt, from), eq(CI.kind, "prepared"), eq(CI.inBreak, false), sql`${CI.assetId} is not null`))
+        .orderBy(asc(CI.seq));
+      if (!rows.length) return [];
+      const timeZone = await services.stations.timezoneOf(stationId);
+      const answers = await services.licences.clearance(rows.map((r) => ({ assetId: r.assetId!, agreementId: r.agreementId, at: r.startsAt })), outlet, country, { at: from, timeZone });
+      return rows.flatMap((r, i) =>
+        answers[i].cleared ? [] : [{ channelItemId: r.id, run: r.run, firstSeq: r.seq, segments: r.segments, startsAt: r.startsAt, endsAt: r.endsAt, logEntryId: r.logEntryId, assetId: r.assetId!, agreementId: r.agreementId, reason: answers[i].reason }]
+      );
     },
 
     async scheduleSignOn(stationId, at) {
@@ -799,6 +1246,27 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return new Map(rows.map((r) => [r.itemId!, { stationId: r.stationId, startedAt: r.startedAt }]));
     },
 
+    async airedHistory(stationId, itemIds, limit) {
+      if (!itemIds.length) return [];
+      const rows = await db
+        .select({ assetId: schema.asRun.assetId })
+        .from(schema.asRun)
+        .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, itemIds)))
+        .orderBy(desc(schema.asRun.startedAt), desc(schema.asRun.id))
+        .limit(limit);
+      return rows.map((r) => r.assetId!);
+    },
+
+    async lastAired(stationId, itemIds) {
+      if (!itemIds.length) return new Map();
+      const rows = await db
+        .select({ assetId: schema.asRun.assetId, at: sql<Date>`max(${schema.asRun.startedAt})` })
+        .from(schema.asRun)
+        .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, itemIds)))
+        .groupBy(schema.asRun.assetId);
+      return new Map(rows.map((r) => [r.assetId!, new Date(r.at)]));
+    },
+
     async endLive(stationId, userId) {
       await db.insert(schema.commands).values({ stationId, action: "end_live", issuedBy: userId });
     },
@@ -819,18 +1287,22 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async preparation(ref, band) {
+      await syncPreparedVersions(db);
       const key = refKey(ref);
-      if (!key) return { status: "not_asked", renditions: [], preparedAt: null };
+      if (!key) return { status: "not_asked", renditions: [], preparedAt: null, converted: [] };
       const [[item], renditions] = await Promise.all([
         db.select().from(schema.preparedItems).where(eq(schema.preparedItems.key, key)),
         db.select({ rendition: schema.preparedRenditions.rendition }).from(schema.preparedRenditions).where(eq(schema.preparedRenditions.key, key))
       ]);
       const done = renditions.map((r) => r.rendition).sort();
       const ready = BAND_RENDITIONS[band].every((r) => done.includes(r));
+      // Cleaner pictures (programming Phase 1): what preparing did to the picture, when it was this pipeline's.
+      const picture = item && item.pipeline >= 2 ? item.picture : null;
       return {
         status: ready ? "ready" : ((item?.status === "ready" ? "queued" : item?.status) ?? "not_asked"),
         renditions: done,
-        preparedAt: item?.preparedAt?.toISOString() ?? null
+        preparedAt: item?.preparedAt?.toISOString() ?? null,
+        converted: [...(picture?.hdr ? (["from_hdr"] as const) : []), ...(picture?.interlaced ? (["deinterlaced"] as const) : [])]
       };
     },
 
@@ -874,16 +1346,20 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const out = new Map<string, PreviewView>();
       if (!wanted.length) return out;
       const keys = [...new Set(wanted.map((r) => r.contentId))];
+      // The newer copy, once it's ready (its first copy may be gone); keyed back by content ID.
+      await syncPreparedVersions(db);
+      const prepared = new Map(keys.map((k) => [refKey({ contentId: k })!, k]));
       const [info, renditions, items] = await Promise.all([
         services.library.content.info(keys),
-        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, keys)),
-        db.select({ key: PI.key, status: PI.status, mediaKind: PI.mediaKind }).from(PI).where(inArray(PI.key, keys))
+        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, [...prepared.keys()])),
+        db.select({ key: PI.key, status: PI.status, mediaKind: PI.mediaKind }).from(PI).where(inArray(PI.key, [...prepared.keys()]))
       ]);
+      const cidOf = (key: string) => prepared.get(key) ?? key;
       // Sound only, as it was asked for before (an order's delivery, a spot with no picture): the radio band's preview.
-      const soundOnly = new Set(items.filter((i) => i.mediaKind === "audio").map((i) => i.key));
+      const soundOnly = new Set(items.filter((i) => i.mediaKind === "audio").map((i) => cidOf(i.key)));
       const have = new Map<string, Set<string>>();
-      for (const r of renditions) have.set(r.key, (have.get(r.key) ?? new Set()).add(r.rendition));
-      const status = new Map(items.map((i) => [i.key, i.status]));
+      for (const r of renditions) have.set(cidOf(r.key), (have.get(cidOf(r.key)) ?? new Set()).add(r.rendition));
+      const status = new Map(items.map((i) => [cidOf(i.key), i.status]));
       const queue = new Map<string, typeof PI.$inferInsert>();
       for (const asked of wanted) {
         const key = asked.contentId;
@@ -906,7 +1382,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (options.prepare || now === "queued" || now === "preparing") out.set(key, { status: "preparing", url: null });
         // Asked for: queued (or this band's renditions added to what's queued), after what airs within the hour.
         if (options.prepare) {
-          queue.set(key, wantRow({ contentId: key, mediaKind: ref.mediaKind, band: ref.band, durationMs: ref.durationMs ?? null, neededAt: new Date(deps.clock.now().getTime() + PREVIEW_NEEDED_IN_MS) }, key, queue.get(key)));
+          queue.set(key, wantRow({ contentId: key, mediaKind: ref.mediaKind, band: ref.band, durationMs: ref.durationMs ?? null, neededAt: new Date(deps.clock.now().getTime() + PREVIEW_NEEDED_IN_MS) }, refKey({ contentId: key })!, queue.get(key)));
         }
       }
       if (queue.size) await queuePreparation(db, [...queue.values()]);
@@ -917,7 +1393,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       if (!isContentId(key) || !Object.values(PREVIEW_RENDITION).includes(rendition as RenditionName)) return null;
       const file = (await services.library.content.info([key])).get(key);
       if (!file || file.locked || file.deleted) return null;
-      const [row] = await db.select({ segmentMs: PR.segmentMs }).from(PR).where(and(eq(PR.key, key), eq(PR.rendition, rendition)));
+      // The newer copy, once it's ready (it has every rendition the first one has).
+      await syncPreparedVersions(db);
+      const prepared = refKey({ contentId: key })!;
+      const [row] = await db.select({ segmentMs: PR.segmentMs }).from(PR).where(and(eq(PR.key, prepared), eq(PR.rendition, rendition)));
       if (!row?.segmentMs.length) return null;
       const target = Math.max(1, ...row.segmentMs.map((ms) => Math.ceil(ms / 1000)));
       const body = [
@@ -927,7 +1406,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         "#EXT-X-MEDIA-SEQUENCE:0",
         "#EXT-X-PLAYLIST-TYPE:VOD",
         "#EXT-X-INDEPENDENT-SEGMENTS",
-        ...row.segmentMs.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, segmentUrl(key, rendition, i)]),
+        ...row.segmentMs.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, segmentUrl(prepared, rendition, i)]),
         "#EXT-X-ENDLIST",
         ""
       ].join("\n");
@@ -935,8 +1414,11 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return { body, maxAge: 60 };
     },
 
-    async dropPrepared(keys, { evenIfAiring }) {
-      const unique = [...new Set(keys.filter(Boolean))];
+    async dropPrepared(keys, { evenIfAiring, alone }) {
+      // A file's newer copy (`<key>-p2`, cleaner pictures) goes with it.
+      const given = keys.filter(Boolean);
+      const newer = given.length && !alone ?(await db.select({ key: PI.key }).from(PI).where(inArray(PI.key, given.map(versionedKey)))).map((r) => r.key) : [];
+      const unique = [...new Set([...given, ...newer])];
       const dropped: string[] = [];
       const deferred: string[] = [];
       if (!unique.length) return { dropped, deferred };
@@ -987,7 +1469,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         db.selectDistinct({ key: PI.key }).from(PI).where(sql`${PI.contentId} is not null`),
         db.selectDistinct({ key: PC.contentId }).from(PC)
       ]);
-      const keys = [...new Set([...items.map((r) => r.key), ...captions.map((r) => r.key)])].filter(isContentId);
+      // A newer copy by its file's content ID (its first copy may have been dropped already).
+      const keys = [...new Set([...items.map((r) => baseKey(r.key)), ...captions.map((r) => r.key)])].filter(isContentId);
       let dropped = 0;
       let deferred = 0;
       for (let i = 0; i < keys.length; i += 500) {
@@ -997,6 +1480,34 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         deferred += result.deferred.length;
       }
       return { dropped, deferred };
+    },
+
+    async sweepFirstCopies() {
+      // Newer copies that took over (every rendition the first has) over a week ago: by when the
+      // newer copy was last prepared, which is when it took over or later.
+      const before = new Date(deps.clock.now().getTime() - FIRST_COPY_KEPT_MS);
+      const rows = (await db.execute(sql`
+        select b.key as key
+        from ${PI} v join ${PI} b on b.key = regexp_replace(v.key, '-p[0-9]+$', '')
+        where v.key ~ '-p[0-9]+$' and v.status = 'ready' and v.prepared_at < ${before.toISOString()}::timestamptz
+          and exists (select 1 from ${PR} r where r.key = v.key)
+          and not exists (select 1 from ${PR} r where r.key = b.key and not exists (select 1 from ${PR} n where n.key = v.key and n.rendition = r.rendition))
+        order by b.key`)) as unknown as { rows: Array<{ key: string }> };
+      if (!rows.rows.length) return { dropped: 0, deferred: 0 };
+      // This process reads the newer copy as the one to air before the first goes (the others have for a week).
+      await syncPreparedVersions(db, { force: true });
+      const result = await service.dropPrepared(
+        rows.rows.map((r) => r.key),
+        { evenIfAiring: false, alone: true }
+      );
+      return { dropped: result.dropped.length, deferred: result.deferred.length };
+    },
+
+    async breakSuggestions(contentIds) {
+      const unique = [...new Set(contentIds.filter(Boolean))];
+      if (!unique.length) return new Map();
+      const rows = await db.select().from(schema.breakSuggestions).where(inArray(schema.breakSuggestions.contentId, unique));
+      return new Map(rows.flatMap((r) => (r.source && r.offsetsMs.length ? [[r.contentId, { source: r.source, offsetsMs: [...r.offsetsMs].sort((a, b) => a - b) }] as const] : [])));
     }
   };
   return service;

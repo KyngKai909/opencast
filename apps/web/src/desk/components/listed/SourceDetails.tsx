@@ -6,17 +6,20 @@
 // cover its address now, "Change" and "Take off the dial for good"; one taken off offers "Put back
 // on the list". A241: a schedule entered by hand, compactly ("Mon–Fri 6:00–9:00 pm: City Council"),
 // where it was checked and the dates it skips; a webpage with no event data says so, and offers
-// entering the schedule by hand.
+// entering the schedule by hand. A248: a spreadsheet: what was read (the summary, the tab, the zone
+// and why, the cells skipped), its link or uploaded file, and a Google Sheet that isn't public.
 import type { ReactNode } from "react";
 import { networkApi, type ListedSource } from "@opencast/contracts";
 import { Button, KeyValueList, Modal, type KeyValueRow } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
 import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
-import { dateAtTime } from "../../lib/dates";
+import { dateAtTime, dayMonth, localDate } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
+import { channelWords, guideCadence, guideProblem, guideSize, guideSummary } from "./guides";
 import { browserNote, changeWords, familyLine, FORMAT_LABELS, nativeOnlyNote, NO_EVENT_DATA, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
 import { weekLines } from "./manual";
+import { datesPassed, fileWords, NOT_PUBLIC_HELP, sheetSummary, skippedWords, tabWords, ZONE_FROM_WORDS, zoneShort, zonesNamedWords } from "./sheets";
 import { channelText } from "./SourceStatus";
 import "./SourceDetails.css";
 
@@ -71,7 +74,37 @@ function earlierRows(s: ListedSource, tz: string): KeyValueRow[] {
   }));
 }
 
-function scheduleRows(s: ListedSource, tz: string): KeyValueRow[] {
+/** A248: what was read from its spreadsheet, and the file uploaded. */
+function sheetRows(s: ListedSource, tz: string, now: Date): KeyValueRow[] {
+  const sc = s.schedule;
+  const sheet = sc?.sheet;
+  const rows: KeyValueRow[] = [];
+  if (sheet) {
+    const skipped = skippedWords(sheet);
+    const passed = datesPassed(sheet, localDate(now, tz), sc?.source === "file");
+    rows.push({ title: "What was read", detail: `${sheetSummary(sheet)}. ${sc?.source === "file" ? "Read when it was uploaded" : `Last read ${dateAtTime(sheet.readAt, tz)}`}` });
+    const tab = tabWords(sheet);
+    if (tab) rows.push({ title: "Tab", detail: tab });
+    rows.push({ title: "Times in", detail: [`${zoneShort(sheet.timeZone)}: ${ZONE_FROM_WORDS[sheet.timeZoneFrom]}`, zonesNamedWords(sheet)].filter(Boolean).join(". ") });
+    if (passed) rows.push({ title: "Nothing to come", detail: passed });
+    if (skipped) {
+      rows.push({
+        title: skipped.title,
+        detail: (
+          <ul className="nd-src__week" aria-label="Skipped">
+            {skipped.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        )
+      });
+    }
+  }
+  if (sc?.source === "file" && sc.file) rows.push({ title: "Spreadsheet file", detail: fileWords(sc.file, dayMonth(sc.file.uploadedAt, tz, { short: true })) });
+  return rows;
+}
+
+function scheduleRows(s: ListedSource, tz: string, now: Date): KeyValueRow[] {
   const w = scheduleWords({ ...s, waiting: null });
   const sc = s.schedule;
   const rows: KeyValueRow[] = [{ title: w.text, detail: w.detail }];
@@ -93,12 +126,20 @@ function scheduleRows(s: ListedSource, tz: string): KeyValueRow[] {
     });
   }
   if (sc?.source === "manual" && sc.skipDates?.length) rows.push({ title: "Doesn't air on", detail: sc.skipDates.map((d) => shortDate(d, tz)).join(", ") });
+  rows.push(...sheetRows(s, tz, now));
   if ((sc?.source === "guide_data" || sc?.source === "manual") && sc.checkedAgainst) {
     rows.push({ title: "Checked against", detail: <>{<Link href={sc.checkedAgainst} />}{sc.checkedOn ? `, ${shortDate(sc.checkedOn, tz)}` : ""}</> });
   }
-  if (sc?.source !== "none" && sc?.source !== "manual" && s.calendarUrl) {
-    rows.push({ title: sc?.source === "guide_data" ? "Guide data address" : sc?.format === "webpage" ? "Schedule page" : "Feed address", detail: <Link href={s.calendarUrl} /> });
-    if (sc?.format) rows.push({ title: "Format", detail: FORMAT_LABELS[sc.format] });
+  if (sc?.source !== "none" && sc?.source !== "manual" && sc?.source !== "file" && s.calendarUrl) {
+    rows.push({ title: sc?.source === "guide_data" ? "Guide data address" : sc?.format === "webpage" ? "Schedule page" : sc?.format === "sheet" ? "Spreadsheet link" : "Feed address", detail: <Link href={s.calendarUrl} /> });
+    if (sc?.format && sc.format !== "sheet") rows.push({ title: "Format", detail: FORMAT_LABELS[sc.format] });
+  }
+  // A249: what was read from its XMLTV guide: the channel, of how many, its size, how often.
+  const g = sc?.guide;
+  if (g && s.calendarUrl) {
+    if (g.channel) rows.push({ title: "Channel in the guide", detail: `${channelWords(g)}${g.channels > 1 ? `, one of ${g.channels.toLocaleString("en-US")} channels` : ""}` });
+    rows.push({ title: "What was read", detail: `${g.channel ? `${guideSummary(g)}. ` : ""}${guideSize(g)}. Last read ${dateAtTime(g.readAt, tz)}${g.unchangedAt ? `; not changed since, at ${dateAtTime(g.unchangedAt, tz)}` : ""}` });
+    rows.push({ title: "How often", detail: guideCadence(g) });
   }
   return rows;
 }
@@ -203,7 +244,13 @@ export function SourceDetails({
         {browserNote(s) && <p className="nd-src__note">{browserNote(s)}</p>}
       </Section>
       <Section title="What's on">
-        <KeyValueList variant="rows" items={scheduleRows(s, tz)} />
+        <KeyValueList variant="rows" items={scheduleRows(s, tz, now)} />
+        {s.calendarSync === "not_public" && !gone && (
+          <p className="nd-src__note">
+            This Google Sheet isn't public, so it can't be read: what it listed before stays. {NOT_PUBLIC_HELP.replace("check it again", "it's read again within the hour")}
+          </p>
+        )}
+        {guideProblem(s) && !gone && <p className="nd-src__note">{guideProblem(s)}</p>}
         {s.calendarSync === "no_event_data" && s.schedule?.source !== "manual" && !gone && (
           <p className="nd-src__note">
             {NO_EVENT_DATA}{" "}

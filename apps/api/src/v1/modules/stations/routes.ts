@@ -1,9 +1,13 @@
-import { stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
+import { logApi, stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest, HttpError, notFound } from "../../errors.js";
 import { clientIp, isPrivateAddress } from "../../geo.js";
+import { RELAY_BACKGROUND_MAX_BYTES, RELAY_BACKGROUND_TOO_BIG } from "./relayBackground.js";
 import type { StationProfile } from "./service.js";
+
+/** A246: a break rule's preview covers three hours at most (the tab asks for one). */
+const PREVIEW_MAX_MS = 3 * 3_600_000;
 
 /** A thin dial shows nearby markets' stations after its own. */
 const THIN_DIAL = 6;
@@ -190,6 +194,13 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     };
   });
 
+  // A251 (2026-10-06): a search the viewer settled on, for the desk's analytics: the words (lower
+  // case, spaces evened) and how many results; no account, device or session. Kept 90 days.
+  r.handle(api.searchSeen, async ({ body }) => {
+    await services.audience.recordSearch(body.q, body.results);
+    return { ok: true as const };
+  });
+
   r.handle(api.search, async ({ query }) => {
     const market = query.market ? await network.marketBySlug(query.market) : null;
     const now = deps.clock.now();
@@ -252,6 +263,18 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     await accounts.requireStation(user, params.stationId, [...staff]);
     return stations.setBreakRule(params.stationId, body);
   });
+  // A246: the breaks in a window rebuilt with a rule that isn't saved: the same checks and merging
+  // as setBreakRule (resolveBreakRule), then the log's own walk with that rule. Nothing is written.
+  r.handle(logApi.previewBreakRule, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    const from = new Date(body.from);
+    const to = new Date(body.to);
+    if (to.getTime() <= from.getTime()) throw badRequest("The preview ends after it starts.", { to: "After from" });
+    if (to.getTime() - from.getTime() > PREVIEW_MAX_MS) throw badRequest("Preview three hours at most.", { to: "Three hours at most" });
+    const rule = await stations.resolveBreakRule(params.stationId, body.rule);
+    const preview = await log.previewBreaks(params.stationId, from, to, rule);
+    return { rule, from: from.toISOString(), to: to.toISOString(), ...preview };
+  });
 
   r.handle(api.listTranslators, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
@@ -276,9 +299,10 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     await accounts.requireStation(user, params.stationId, [...staff]);
     return { background: await stations.getRelayBackground(params.stationId) };
   });
-  r.handle(api.setRelayBackground, async ({ user, params, file }) => {
-    await accounts.requireStation(user, params.stationId, [...staff]);
-    return stations.setRelayBackground(params.stationId, file);
+  r.handle(api.setRelayBackground, ({ params, file }) => stations.setRelayBackground(params.stationId, file), {
+    maxBytes: RELAY_BACKGROUND_MAX_BYTES,
+    tooBig: RELAY_BACKGROUND_TOO_BIG,
+    authorize: ({ user, params }) => accounts.requireStation(user, params.stationId, [...staff])
   });
   r.handle(api.removeRelayBackground, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);

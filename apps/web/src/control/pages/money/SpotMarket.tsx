@@ -1,7 +1,10 @@
 // C.2 Spot market (/spot-market, a spot's pane at /spot-market/:spotId), with biz-funding 05.1's
 // runway ("About 44 days at the current pace", never the balance), blocked categories kept out
 // (station-settings 02.1: "Blocked means invisible"), and the tabs production-orders 03.1 adds:
-// Market, Your rotation (/spot-market/rotation), Production orders (Orders.tsx).
+// Market, Your rotation (/spot-market/rotation), Production orders (Orders.tsx). A246: the
+// rotation tab has what the Breaks page had about the rotation (decision 4): the paused-spot
+// notices with "Add it back", C.3's toast for what was just added, and "See tonight's breaks" (the
+// Schedule).
 //
 // Without a spot chosen, the market is biz-funding 05.1's wide list (Spot, Rate, Budget, Add);
 // with one chosen, it's C.2's list and pane.
@@ -12,6 +15,9 @@ import { type MarketSpot, stationsApi } from "@opencast/contracts";
 import { Button, ChipRow, ControlTitle, KeyValueList, Lines, Modal, Segmented, Sheet, Table, Tag, useToast, type Column } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
 import { errorText, useAvails, useMarket, useRotations, useSetRotation } from "../../components/spots/data";
+import { useJustAddedToast } from "../../components/spots/justAddedToast";
+import { MockPauseControls } from "../../components/spots/MockPauseControls";
+import { PauseNotices } from "../../components/spots/PauseNotices";
 import { dateText, milesText, rateParts, rateText, runwayParts, runsText, upToText, spotLength } from "../../components/spots/format";
 import { noteAdded } from "../../components/spots/justAdded";
 import { ErrorLine, SpotStill, SpotTabs, SpotThumb } from "../../components/spots/parts";
@@ -49,17 +55,38 @@ function RotationTab() {
   const show = params.get("show");
   const rotations = useRotations(s.id);
   const market = useMarket(s.id);
+  const setRotation = useSetRotation();
+  const toast = useToast();
+  const canAct = s.can("spots");
+  useJustAddedToast(s.id);
+  // A spot that came back is added back at the end of the main rotation, with Undo.
+  const addBack = (m: MarketSpot) => {
+    const before = rotations.data?.main.spots.map((x) => x.spotId) ?? [];
+    setRotation.mutate(
+      { params: { stationId: s.id, kind: "main" }, body: { spotIds: [...before, m.spot.id] } },
+      {
+        onSuccess: () =>
+          toast.show({
+            message: `${m.spot.title} is back in your rotation.`,
+            onUndo: () => setRotation.mutate({ params: { stationId: s.id, kind: "main" }, body: { spotIds: before } })
+          }),
+        onError: (e) => toast.show({ message: errorText(e) })
+      }
+    );
+  };
   return (
     <>
-      <ControlTitle title="Spot market" />
+      <ControlTitle title="Spot market" end={<Button href={`${s.base}/schedule`}>See tonight's breaks</Button>} />
       <SpotTabs value="rotation" />
+      {market.data && <PauseNotices spots={market.data} rotationHref={`${s.base}/spot-market/rotation`} onAddBack={canAct ? addBack : undefined} busy={setRotation.isPending} />}
       {rotations.isLoading || market.isLoading ? (
         <Quiet />
       ) : rotations.error || market.error ? (
         <ErrorLine>{errorText(rotations.error ?? market.error)}</ErrorLine>
       ) : (
-        <RotationEditor stationId={s.id} rotations={rotations.data!} market={market.data!} canEdit={s.can("spots")} marketHref={`${s.base}/spot-market`} show={show === "backup" || show === "main" ? show : undefined} />
+        <RotationEditor stationId={s.id} rotations={rotations.data!} market={market.data!} canEdit={canAct} marketHref={`${s.base}/spot-market`} show={show === "backup" || show === "main" ? show : undefined} />
       )}
+      {canAct && market.data && <MockPauseControls spots={market.data} />}
     </>
   );
 }
@@ -238,7 +265,7 @@ function MarketTab() {
 
   const blockedLine = blocked.length > 0 && (
     <p className="cc-spm__blocked">
-      Never on {call}: {blocked.join(", ")}. <a href={`${s.base}/settings/breaks`}>Change in Settings</a>
+      Never on {call}: {blocked.join(", ")}. <a href={`${s.base}/schedule/rules`}>Change in Break rules</a>
     </p>
   );
 

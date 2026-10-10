@@ -10,6 +10,7 @@ import { marketOf } from "../viewer/mocks/view";
 import type { MockPerson } from "./people";
 import { isAdminNow, rolesOf } from "../desk/mocks/settingsDb";
 import { needsUser, path, reply } from "./respond";
+import { admittedNow } from "./invites";
 
 export function meView(p: MockPerson): Me {
   const prof = profileOf(p);
@@ -31,7 +32,9 @@ export function meView(p: MockPerson): Me {
     settings: prof.settings,
     clear: c.clearLinks?.[p.id] ?? null,
     // Network desk roles (added 2026-09-29): Settings, Team in the desk's mock.
-    deskRoles: rolesOf(p)
+    deskRoles: rolesOf(p),
+    // Invite-only sign-ups (added 2026-10-07): new@invite.example waits for a code.
+    admitted: admittedNow(p)
   };
 }
 

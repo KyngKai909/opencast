@@ -17,6 +17,10 @@ import StationPreview from "../components/overlays/StationPreview";
 import PlayerModals from "../components/overlays/PlayerModals";
 import SignInModal from "../components/overlays/SignInModal";
 import ReplaceKeyDialog from "../components/overlays/ReplaceKeyDialog";
+import { TunePad } from "../components/swipe/TunePad";
+import { OrderSync } from "../components/swipe/useSwipeOrder";
+import { leftText } from "../components/swipe/padRules";
+import { useNow } from "../../lib/clock";
 
 const SECTION_HREF: Record<ViewerSection, string> = { dial: "/", guide: "/guide", radio: "/radio", presets: "/presets" };
 const TAB_HREF: Record<ViewerTab, string> = { dial: "/", guide: "/guide", search: "/search", you: "/you" };
@@ -82,11 +86,20 @@ function usePresetKeys() {
 /** Once per visit: "Start on" is read when the app opens, not on every visit to the dial. */
 let startChecked = false;
 
+/** How far into the program, 0 to 1, for the mini player's thin line. */
+function progressOf(a: { startsAt: string; endsAt: string } | null | undefined, now: Date): number | null {
+  if (!a) return null;
+  const s = Date.parse(a.startsAt);
+  const e = Date.parse(a.endsAt);
+  return e > s ? Math.min(1, Math.max(0, (now.getTime() - s) / (e - s))) : null;
+}
+
 /**
  * "Start on: Last channel" (Settings, Watching): the app opened at the dial tunes the last
- * channel instead, the account's (A2's watch history) or this device's.
+ * channel instead, the account's (A2's watch history) or this device's. (On phones and tablets the
+ * swipe home makes the same choice itself: components/swipe/SwipeHome.)
  */
-function useStartOnLastChannel() {
+function useStartOnLastChannel(on: boolean) {
   const loc = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -97,6 +110,7 @@ function useStartOnLastChannel() {
   const openedAtDial = useRef(loc.pathname === "/" && !loc.search);
   const atDial = loc.pathname === "/" && !loc.search;
   useEffect(() => {
+    if (!on) return;
     if (startChecked || !auth.ready) return;
     if (!openedAtDial.current || !atDial) return void (startChecked = true);
     if (!settings) return; // the account's, still loading
@@ -106,8 +120,9 @@ function useStartOnLastChannel() {
     if (id && !channels.length) return; // the dial, still loading
     startChecked = true;
     const row = id ? channels.find((c) => c.station.id === id) : undefined;
-    if (row) navigate(`/watch/${stationSlug(row.station)}`, { replace: true });
-  }, [auth.ready, auth.signedIn, atDial, settings, history.isLoading, history.data, device.lastStationId, channels, navigate]);
+    // A251: the tune says it's the app starting on its last channel, not a link.
+    if (row) navigate(`/watch/${stationSlug(row.station)}`, { replace: true, state: { via: "resume" } });
+  }, [on, auth.ready, auth.signedIn, atDial, settings, history.isLoading, history.data, device.lastStationId, channels, navigate]);
 }
 
 /**
@@ -143,7 +158,8 @@ export function AppLayout() {
   const np = useNowPlaying();
   usePresetKeys();
   useInAppLinks();
-  useStartOnLastChannel();
+  useStartOnLastChannel(!phone);
+  const clockNow = useNow(30_000);
 
   const marketName = markets.data?.find((m) => m.slug === slug)?.name ?? "Choose a market";
   const menu = useAreasMenu(me.data);
@@ -161,6 +177,9 @@ export function AppLayout() {
 
   const overlays = (
     <>
+      {/* The phone and tablet app's order: presets, then the dial (A245). */}
+      <OrderSync on={phone} />
+      <TunePad />
       <MarketPicker />
       <SearchOverlay />
       <StationPreview />
@@ -171,19 +190,42 @@ export function AppLayout() {
   );
 
   if (phone) {
+    // Watch is the picture: the channel you're on, or the home's start when nothing is.
+    const watchHref = row ? `/watch/${stationSlug(row.station)}` : "/";
+    const ident = row ? [row.station.callSign, row.station.channel].filter(Boolean).join(" ") : "";
+    const airing = row?.now && row.now.kind !== "off_air" ? row.now : null;
     return (
       <ViewerPhoneShell
         tab={tabFor(loc.pathname)}
-        linkTo={(t) => TAB_HREF[t]}
+        linkTo={(t) => (t === "dial" ? watchHref : TAB_HREF[t])}
         tabs={shell.tabs !== false}
         market={{ name: marketName, onClick: openMarket }}
         onSearch={() => navigate("/search")}
         back={shell.back}
         top={shell.top}
         padded={shell.padded !== false}
+        // The swipe home's floating bar (A245): the four tabs and the Tune button, on every tab.
+        floating
+        onPicture={!!shell.picture}
+        barHidden={!!shell.barHidden}
+        noBar={!!shell.noBar}
+        onTune={() => setParams((p) => (p.set("sheet", "tune"), p))}
         player={
-          showPlayer ? (
-            <MiniPlayer title={row.now?.title ?? row.station.name} station={[row.station.callSign, row.station.channel].filter(Boolean).join(" ")} colour={row.station.colour ?? "#33507A"} card={radio ? row.station.channel ?? undefined : undefined} playing={np.playing} flicker={false} onTogglePlay={() => engine.togglePlay()} onOpen={openPlayer} />
+          // Swiped down, it stopped: gone until something is tuned.
+          showPlayer && np.status !== "stopped" ? (
+            <MiniPlayer
+              title={airing?.title ?? row.station.name}
+              station={ident}
+              line={airing ? `${ident}${leftText(airing.endsAt, clockNow)}` : ident}
+              progress={progressOf(airing, clockNow)}
+              colour={row.station.colour ?? "#33507A"}
+              card={radio ? row.station.channel ?? undefined : undefined}
+              playing={np.playing}
+              flicker={false}
+              onTogglePlay={() => engine.togglePlay()}
+              onOpen={openPlayer}
+              onDismiss={() => engine.stop()}
+            />
           ) : undefined
         }
       >

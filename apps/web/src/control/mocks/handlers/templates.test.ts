@@ -1,6 +1,9 @@
 // @vitest-environment node
 // Day templates and off air hours on the mocks (G8, G9): BEAT's templates, making, changing and
-// stopping one, the off air hours and their 400, and planned off air kept out of dead air.
+// stopping one, the off air hours and their 400, and planned off air kept out of dead air. G18:
+// "Keep at this time" as the API keeps it: the batch's `keep`, a kept entry's move refused, and a
+// template made from a day carrying the mark onto its dates. A246 (Phase 4): a template's own
+// rundown replaced (`entries`, as the template editor saves it), and "Reset to template".
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -128,6 +131,44 @@ describe("day templates (G8)", () => {
   });
 });
 
+describe("a template's rundown, and resetting a date to it (A246, Phase 4)", () => {
+  const weekdaysId = async () => (await api(`/stations/${beat()}/log/templates`)).body.templates.find((t: { name: string }) => t.name === "After work").id as string;
+
+  it("replaces its entries, refusing two that overlap, and makes the dates that weren't edited again", async () => {
+    const id = await weekdaysId();
+    const t = (await api(`/stations/${beat()}/log/templates/${id}`)).body;
+    const [late, crate] = t.entries;
+    const clash = await api(`/stations/${beat()}/log/templates/${id}`, { method: "PATCH", body: { entries: [{ startTime: "21:30", lengthMs: 60 * 60_000, kind: "program", itemId: late.itemId }, { startTime: "22:00", kind: "program", itemId: crate.itemId }] } });
+    expect(clash).toMatchObject({ status: 400, body: { error: { message: "Two entries overlap.", fields: { entries: "Overlap" } } } });
+    const r = await api(`/stations/${beat()}/log/templates/${id}`, { method: "PATCH", body: { entries: [{ startTime: "21:00", lengthMs: late.lengthMs, kind: "program", itemId: late.itemId, episodeTitle: late.episodeTitle ?? undefined }, { startTime: "22:00", lengthMs: crate.lengthMs, kind: "program", itemId: crate.itemId }] } });
+    expect(r.status).toBe(200);
+    expect(r.body.template.entries.map((e: { startTime: string; title: string }) => `${e.startTime} ${e.title}`)).toEqual(["21:00 Late Crate, ep. 13", "22:00 Crate Session 01"]);
+    expect(r.body.generated).toMatchObject({ dates: 14, exceptions: 1 });
+  });
+
+  it("resets an edited date: what the template didn't make comes off, and it's no longer an exception", async () => {
+    const id = await weekdaysId();
+    const edited = (await api(`/stations/${beat()}/log/templates/${id}`)).body.dates.find((d: { edited: boolean }) => d.edited).date as string;
+    // Something put on by hand that evening, besides what the template makes.
+    // 7:00 to 8:00 pm Pacific is 2:00 to 3:00 am UTC the calendar day after.
+    const after = isoDate(addDays(broadcastDay(`${edited}T20:00:00.000Z`), 1));
+    const hand = { ...getDb().log.find((e) => e.stationId === beat())!, id: "hand-put", title: "Crate Talk", kind: "live" as const, itemId: null, repeatGroupId: null, startsAt: `${after}T02:00:00.000Z`, endsAt: `${after}T03:00:00.000Z` };
+    getDb().log.push(hand);
+    const r = await api(`/stations/${beat()}/log/templates/${id}/dates/${edited}/reset`, { method: "POST" });
+    expect(r.status).toBe(200);
+    expect(r.body.generated).toMatchObject({ removed: 1 });
+    expect(r.body.template.dates.find((d: { date: string }) => d.date === edited).edited).toBe(false);
+    const day = broadcastDay(`${edited}T20:00:00.000Z`);
+    const titles = getDb().log.filter((e) => e.stationId === beat() && isoDate(broadcastDay(e.startsAt)) === isoDate(day)).map((e) => e.title);
+    expect(titles).toEqual(expect.arrayContaining(["Late Crate, ep. 13", "Crate Session 01"]));
+    expect(titles).not.toContain("Crate Talk");
+    // Again: nothing to do. Today has started; Sunday isn't one of its dates.
+    expect((await api(`/stations/${beat()}/log/templates/${id}/dates/${edited}/reset`, { method: "POST" })).body.generated).toEqual({ dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 });
+    expect((await api(`/stations/${beat()}/log/templates/${id}/dates/${isoDate(broadcastDay(now()))}/reset`, { method: "POST" })).body.error.code).toBe("date_started");
+    expect((await api(`/stations/${beat()}/log/templates/${id}/dates/${isoDate(addDays(broadcastDay(now()), 1))}/reset`, { method: "POST" })).status).toBe(404);
+  });
+});
+
 describe("off air hours (G9)", () => {
   it("reads BEAT's: every night, 2:00 to 6:00 am", async () => {
     const r = await api(`/stations/${beat()}/off-air-hours`);
@@ -168,5 +209,46 @@ describe("off air hours (G9)", () => {
 
     const checks = (await api(`/stations/${beat()}/sign-on/checks`)).body.checks;
     expect(checks.find((c: { key: string }) => c.key === "off_air_hours")).toMatchObject({ label: "Off air hours planned", passed: true, blocking: false, detail: expect.stringMatching(/^Off air from .+, back at .+\. Not dead air: no warnings, nothing fills it$/) });
+  });
+});
+
+describe("Keep at this time (G18)", () => {
+  const sat = () => {
+    const win = viewWindow("day", broadcastDay(now()));
+    return { win, path: `/stations/${beat()}/log?from=${encodeURIComponent(win.from)}&to=${encodeURIComponent(win.to)}` };
+  };
+  const lateCrate15 = () => getDb().log.find((e) => e.stationId === beat() && e.title === "Late Crate, ep. 15" && e.localNote !== "Overnight repeat")!;
+
+  it("marks an entry in a batch, checked first and then published, and the log says so", async () => {
+    const id = lateCrate15().id;
+    const check = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "keep", entryId: id, keep: true }] } });
+    expect(check.status).toBe(200);
+    expect(check.body.changes[0]).toMatchObject({ op: "keep", entryId: id, line: "Late Crate, ep. 15 keeps its time" });
+    expect(lateCrate15().keepTime).toBeUndefined();
+    expect((await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { changes: [{ op: "keep", entryId: id, keep: true }] } })).body.applied).toBe(true);
+    const log = (await api(sat().path)).body;
+    expect(log.entries.find((e: { id: string }) => e.id === id).keepTime).toBe(true);
+  });
+
+  it("refuses to move a kept entry, unless the batch clears the mark first", async () => {
+    const e = lateCrate15();
+    e.keepTime = true;
+    const earlier = new Date(Date.parse(e.startsAt) - 60_000).toISOString();
+    const refused = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "move", entryId: e.id, startsAt: earlier }] } });
+    expect(refused.body.problems).toEqual([{ index: 0, code: "kept", message: "Late Crate, ep. 15 is kept at its time. Turn off Keep at this time to move it." }]);
+    const cleared = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "keep", entryId: e.id, keep: false }, { op: "move", entryId: e.id, startsAt: earlier }] } });
+    expect(cleared.body.problems).toEqual([]);
+    expect(cleared.body.changes[0].line).toBe("Late Crate, ep. 15 no longer keeps its time");
+  });
+
+  it("puts an entry on kept, and a template made from the day keeps the mark on its dates", async () => {
+    lateCrate15().keepTime = true;
+    const made = await api(`/stations/${beat()}/log/templates`, { method: "POST", body: { fromDay: isoDate(broadcastDay(now())), pattern: "once", onto: isoDate(addDays(broadcastDay(now()), 14)) } });
+    expect(made.status).toBe(201);
+    expect(made.body.template.entries.find((e: { title: string; startTime: string }) => e.title === "Late Crate, ep. 15" && e.startTime === "22:00").keepTime).toBe(true);
+    const onto = addDays(broadcastDay(now()), 14);
+    const w = viewWindow("day", onto);
+    const log = (await api(`/stations/${beat()}/log?from=${encodeURIComponent(w.from)}&to=${encodeURIComponent(w.to)}`)).body;
+    expect(log.entries.filter((e: { keepTime?: boolean }) => e.keepTime).map((e: { title: string }) => e.title)).toEqual(["Late Crate, ep. 15"]);
   });
 });

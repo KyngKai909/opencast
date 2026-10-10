@@ -2,14 +2,38 @@ import { z } from "zod";
 import { endpoint } from "./core.js";
 import { Id, Platform, StationIdent, Timestamp } from "./common.js";
 
+/**
+ * Added 2026-10-06 (A251, the desk's analytics): how a channel was tuned. `swipe` (the phone's
+ * swipe home), `channel` (channel up or down), `keypad` (a number), `guide`, `search`, `link` (a
+ * shared or typed address), `preset`, `last` (last channel), `remote` (a phone remote or Cast
+ * sender), `reminder`, `resume` (the app's first channel), `dial` (a station picked from a list),
+ * `suggestion` (one offered on screen, as Stand by's "on now").
+ */
+export const TuneVia = z.enum(["swipe", "channel", "keypad", "guide", "search", "link", "preset", "last", "remote", "reminder", "resume", "dial", "suggestion"]);
+export type TuneVia = z.infer<typeof TuneVia>;
+
 export const Heartbeat = z.object({
   stationId: Id,
-  /** A random id the player keeps for the session. */
+  /**
+   * A random id the player keeps for the tab (or the TV app's run). Changed 2026-10-06 (A251): a
+   * session is one station's, and the API makes a session of its own for each station the same id
+   * beats for (before, a beat for a second station was refused and never counted).
+   */
   sessionId: Id,
   platform: Platform,
   /** Media time in ms, so sessions with no progress don't count. */
   mediaTimeMs: z.number().int().nonnegative(),
-  playing: z.boolean()
+  playing: z.boolean(),
+  /**
+   * Added 2026-10-06 (A251), optional: a random id the player keeps on the device (not the person,
+   * never tied to an account), for counts of devices. The API keeps a hash of it with the session
+   * (30 days); after that only counts.
+   */
+  deviceId: Id.optional(),
+  /** Added 2026-10-06 (A251), optional, the station's first beat only: how it was tuned. */
+  via: TuneVia.optional(),
+  /** Added 2026-10-06 (A251), optional, the first beat only: ms from the press to the first picture. */
+  tuneMs: z.number().int().nonnegative().max(600_000).optional()
 });
 
 // ---- Watch data (added 2026-09-29, follow-up Phase 1) ----
@@ -154,7 +178,22 @@ export const AudienceReport = z.object({
   /** U3: the same window a week earlier, minute by minute, past now too. */
   comparison: z.array(z.object({ minute: Timestamp, tunedIn: z.number().int() })).optional(),
   /** U3: every break in the window, for the shaded bands. */
-  breaks: z.array(z.object({ startsAt: Timestamp, endsAt: Timestamp })).optional()
+  breaks: z.array(z.object({ startsAt: Timestamp, endsAt: Timestamp })).optional(),
+  /**
+   * Programming Phase 5 (added 2026-10-10): the audience source "Other apps", viewers tuned from
+   * the channel list (`/v1/iptv/channels.m3u`) in TiviMate, Jellyfin, Channels DVR, Kodi or VLC.
+   * Counted apart, from runs of playlist polls (those apps send no heartbeats): never in the
+   * numbers above, and never billed. `byMarket`'s `market` is null for those Opencast couldn't
+   * place. Absent from an older API.
+   */
+  otherApps: z
+    .object({
+      tunedInNow: z.number().int(),
+      sessions: z.number().int(),
+      hoursWatched: z.number(),
+      byMarket: z.array(z.object({ market: z.object({ id: Id, slug: z.string(), name: z.string() }).nullable(), sessions: z.number().int(), hoursWatched: z.number() }))
+    })
+    .optional()
 });
 
 export const audienceApi = {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { AccountExport, ClearLink, InvitePreview, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -6,6 +6,7 @@ import type { CurrentUser } from "../../http.js";
 import { ClearLookupUnavailable } from "../../clearLink.js";
 import { badRequest, conflict, forbidden, HttpError, notFound, refused } from "../../errors.js";
 import { maskEmail } from "../../email.js";
+import { createInvites, type Invites } from "./invites.js";
 
 export type StationRole = "owner" | "operator" | "host";
 export type BusinessRole = "owner" | "manager" | "viewer";
@@ -62,6 +63,10 @@ export interface AccountsService {
   suggestPresetKey(userId: string): Promise<number | null>;
   usePresetKey(userId: string, key: number): Promise<void>;
   presetCounts(stationIds: string[]): Promise<Map<string, number>>;
+  /** A251: presets saved in a span, per station (still saved now). */
+  presetsAdded(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /** A251 Phase 7: accounts made in a span (by Pacific day) and accounts seen in it. */
+  growth(from: Date, to: Date): Promise<{ newAccounts: number; activeAccounts: number; newByDay: Map<string, number> }>;
 
   reminders(userId: string): Promise<ReminderRow[]>;
   addReminder(userId: string, input: { logEntryId?: string; listedAiringId?: string; switchMeOver: boolean }): Promise<ReminderRow>;
@@ -84,6 +89,13 @@ export interface AccountsService {
   cancelReminders(ex: Executor, entryIds: string[]): Promise<Array<{ id: string; userId: string; logEntryId: string }>>;
   /** Entries moved (a new start): their reminders come again at the new start, even if one already went. */
   rearmReminders(ex: Executor, entryIds: string[]): Promise<void>;
+  /**
+   * 2026-10-03: an external station's listed airings going away when its schedule is read again:
+   * each one's reminders move to `to` (the same show, read in at another time), reminded again at
+   * its start, or are deleted when it's null (the show is gone from the source's schedule). Someone
+   * who already has one there keeps that one. Answers how many moved and how many were deleted.
+   */
+  moveListedReminders(ex: Executor, moves: Array<{ from: string; to: string | null }>): Promise<{ moved: number; deleted: number }>;
 
   /** Throws unless the user holds one of the roles (admins count as owner of stations Opencast runs). */
   requireStation(user: CurrentUser, stationId: string, roles: StationRole[]): Promise<StationRole>;
@@ -92,6 +104,8 @@ export interface AccountsService {
   addStationMember(db: Executor, stationId: string, userId: string, role: StationRole): Promise<void>;
   addBusinessMember(db: Executor, businessId: string, userId: string, role: BusinessRole): Promise<void>;
   stationMemberIds(stationId: string, roles?: StationRole[]): Promise<string[]>;
+  /** The desk's station file (added 2026-10-07): everyone on a station, oldest first, with their account's dates. */
+  stationPeople(stationId: string): Promise<Array<{ userId: string; name: string | null; email: string | null; role: string; joinedAt: Date; lastInAt: Date | null; lastSeenAt: Date | null; accountCreatedAt: Date }>>;
   /** Added 2026-09-30 (A230): the stations a person holds the owner role on (their own subchannels). */
   ownedStationIds(userId: string): Promise<string[]>;
   /** Opencast admins (Network desk). */
@@ -150,6 +164,8 @@ export interface AccountsService {
   resendInvite(user: CurrentUser, inviteId: string): Promise<InviteRow>;
   /** Joins the team. An invite to an email needs that email on the account, unless INVITE_EMAIL_MATCH=off. */
   acceptInvite(user: CurrentUser, inviteId: string): Promise<void>;
+  /** Invite-only sign-ups and invite codes (added 2026-10-07). */
+  invites: Invites;
   /** An invite as its link's page shows it; signed in, whether the account's email matches. */
   invitePreview(inviteId: string, user: CurrentUser | null): Promise<InvitePreview>;
 }
@@ -177,6 +193,8 @@ export interface ReminderRow {
     listed: boolean;
     logEntryId: string | null;
     listedAiringId: string | null;
+    /** Programming Phase 3: the episode, as the guide lists it. */
+    episodeTitle: string | null;
   };
 }
 
@@ -296,7 +314,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
             station,
             listed: Boolean(row.listedAiringId),
             logEntryId: row.logEntryId,
-            listedAiringId: row.listedAiringId
+            listedAiringId: row.listedAiringId,
+            episodeTitle: "episodeTitle" in target ? ((target.episodeTitle as string | null | undefined) ?? null) : null
           }
         }
       ];
@@ -373,7 +392,23 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
     return row ?? null;
   }
 
+  const invites = createInvites({ deps, services });
+
+  /**
+   * Whether someone's in (added 2026-10-07). Not yet: let in now if sign-ups aren't invite-only,
+   * or they're an admin; otherwise they wait for a code, a team invite or the desk.
+   */
+  async function admitted(user: { id: string; isAdmin: boolean; admittedAt: Date | null }): Promise<boolean> {
+    if (user.admittedAt) return true;
+    const how = user.isAdmin ? "admin" : !(await invites.inviteOnly()) ? "open" : null;
+    if (!how) return false;
+    await invites.admit(db, user.id, how);
+    return true;
+  }
+
   const service: AccountsService = {
+    invites,
+
     async userForToken(token) {
       const verified = await deps.auth.verify(token);
       const user = await promoteByEmail(await findOrCreateUser(verified.privyDid, verified.issuedAt, verified.sessionId));
@@ -389,7 +424,7 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         if (session?.endedAt) throw signedOut();
         if (!session) await db.insert(S).values({ userId: user.id, sid: verified.sessionId, firstSeenAt: wallClock() }).onConflictDoNothing();
       }
-      return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin };
+      return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin, admitted: await admitted(user) };
     },
 
     async currentUser(userId) {
@@ -443,7 +478,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         settings: (user.settings ?? {}) as Me["settings"],
         clear: clear ? { address: clear.address, access: clear.access, linkedAt: clear.linkedAt } : null,
         // Added 2026-09-29: Network desk roles (admin, rights reviewer, market lead).
-        deskRoles: await services.settings.rolesOf({ id: user.id, isAdmin: user.isAdmin })
+        deskRoles: await services.settings.rolesOf({ id: user.id, isAdmin: user.isAdmin }),
+        admitted: !!user.admittedAt
       };
     },
 
@@ -668,6 +704,26 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         });
     },
 
+    async growth(from, to) {
+      const U = schema.users;
+      const day = sql<string>`to_char(${U.createdAt} at time zone 'America/Los_Angeles', 'YYYY-MM-DD')`;
+      const [made, seen] = await Promise.all([
+        db.select({ day, n: sql<number>`count(*)::int` }).from(U).where(and(gte(U.createdAt, from), lt(U.createdAt, to), isNull(U.deletedAt))).groupBy(day),
+        db.select({ n: sql<number>`count(*)::int` }).from(U).where(and(gte(U.lastSeenAt, from), lt(U.lastSeenAt, to), isNull(U.deletedAt)))
+      ]);
+      return { newAccounts: made.reduce((t, r) => t + r.n, 0), activeAccounts: seen[0]?.n ?? 0, newByDay: new Map(made.map((r) => [r.day, r.n])) };
+    },
+
+    async presetsAdded(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: schema.presets.stationId, n: sql<number>`count(*)::int` })
+        .from(schema.presets)
+        .where(and(inArray(schema.presets.stationId, stationIds), gte(schema.presets.createdAt, from), lt(schema.presets.createdAt, to)))
+        .groupBy(schema.presets.stationId);
+      return new Map(rows.map((r) => [r.stationId, r.n]));
+    },
+
     async presetCounts(stationIds) {
       if (!stationIds.length) return new Map();
       const rows = await db
@@ -775,6 +831,31 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       await ex.update(R).set({ notifiedAt: null }).where(and(inArray(R.logEntryId, [...new Set(entryIds)]), sql`${R.notifiedAt} is not null`));
     },
 
+    async moveListedReminders(ex, moves) {
+      const R = schema.reminders;
+      if (!moves.length) return { moved: 0, deleted: 0 };
+      const rows = await ex.select().from(R).where(inArray(R.listedAiringId, [...new Set(moves.map((m) => m.from))]));
+      if (!rows.length) return { moved: 0, deleted: 0 };
+      const target = new Map(moves.map((m) => [m.from, m.to]));
+      const targets = [...new Set(moves.map((m) => m.to).filter((t): t is string => t !== null))];
+      const there = targets.length ? await ex.select({ userId: R.userId, listedAiringId: R.listedAiringId }).from(R).where(inArray(R.listedAiringId, targets)) : [];
+      const has = new Set(there.map((r) => `${r.userId}@${r.listedAiringId}`));
+      const gone: string[] = [];
+      let moved = 0;
+      for (const r of rows) {
+        const to = target.get(r.listedAiringId!) ?? null;
+        if (!to || has.has(`${r.userId}@${to}`)) {
+          gone.push(r.id);
+          continue;
+        }
+        has.add(`${r.userId}@${to}`);
+        await ex.update(R).set({ listedAiringId: to, notifiedAt: null }).where(eq(R.id, r.id));
+        moved++;
+      }
+      if (gone.length) await ex.delete(R).where(inArray(R.id, gone));
+      return { moved, deleted: gone.length };
+    },
+
     async stationRole(user, stationId) {
       const [row] = await db
         .select({ role: schema.stationMemberships.role })
@@ -873,6 +954,18 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         .from(schema.stationMemberships)
         .where(eq(schema.stationMemberships.stationId, stationId));
       return rows.filter((r) => !roles || roles.includes(r.role)).map((r) => r.userId);
+    },
+
+    async stationPeople(stationId) {
+      const M = schema.stationMemberships;
+      const U = schema.users;
+      const rows = await db
+        .select({ userId: M.userId, role: M.role, joinedAt: M.createdAt, lastInAt: M.lastInAt, name: U.displayName, email: U.email, lastSeenAt: U.lastSeenAt, accountCreatedAt: U.createdAt, deletedAt: U.deletedAt })
+        .from(M)
+        .innerJoin(U, eq(U.id, M.userId))
+        .where(eq(M.stationId, stationId))
+        .orderBy(asc(M.createdAt));
+      return rows.map(({ deletedAt, ...r }) => ({ ...r, role: String(r.role), name: deletedAt ? null : r.name, email: deletedAt ? null : r.email }));
     },
 
     async businessMemberIds(businessId, roles) {
@@ -1256,6 +1349,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         // A4: the programs the invite named, still live programs of the station.
         if (row.stationId && row.role === "host" && row.programIds?.length) await services.stations.addHost(tx, row.stationId, user.id, row.programIds);
         if (row.advertiserId) await service.addBusinessMember(tx, row.advertiserId, user.id, row.role as BusinessRole);
+        // Added 2026-10-07: a team invite lets someone in, invite-only or not.
+        await invites.admit(tx, user.id, "team_invite");
       });
       if (row.stationId) await ownersChanged(row.stationId, before);
     },

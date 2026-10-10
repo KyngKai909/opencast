@@ -38,6 +38,8 @@ export interface TvService {
   /** What a `tvd_`, `tvs_` or `tvp_` token is, or null (unknown, signed out, unpaired). */
   resolveToken(token: string): Promise<TvTokenResolution | null>;
   register(input: { platform: TvPlatform; name?: string }): Promise<RegisteredTv>;
+  /** A251 Phase 7: TVs registered in a span by platform, TVs seen in it, and phones paired to TVs. */
+  growth(from: Date, to: Date): Promise<{ newTvs: Record<string, number>; activeTvs: number; phonesPaired: number }>;
   createCode(tvId: string): Promise<TvCode>;
   pollCode(pollToken: string): Promise<TvCodeStatus>;
   approveCode(user: CurrentUser, code: string): Promise<Tv>;
@@ -163,6 +165,16 @@ export function createTvService(ctx: ModuleContext): TvService {
         return phone ? { kind: "phone", phoneId: phone.id, tvId: phone.deviceId } : null;
       }
       return null;
+    },
+
+    async growth(from, to) {
+      const D = schema.tvDevices;
+      const [made, seen, phones] = await Promise.all([
+        db.select({ platform: D.platform, n: sql<number>`count(*)::int` }).from(D).where(and(gte(D.createdAt, from), lt(D.createdAt, to))).groupBy(D.platform),
+        db.select({ n: sql<number>`count(*)::int` }).from(D).where(and(gte(D.lastSeenAt, from), lt(D.lastSeenAt, to))),
+        db.select({ n: sql<number>`count(*)::int` }).from(schema.tvRemotePhones).where(and(gte(schema.tvRemotePhones.pairedAt, from), lt(schema.tvRemotePhones.pairedAt, to)))
+      ]);
+      return { newTvs: Object.fromEntries(made.map((r) => [r.platform, r.n])), activeTvs: seen[0]?.n ?? 0, phonesPaired: phones[0]?.n ?? 0 };
     },
 
     async register(input) {

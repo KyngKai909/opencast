@@ -110,7 +110,10 @@ export default defineRailway((ctx) => {
       OPENCAST_ADMIN_EMAILS: secret(),
       // Radio encoders push to the worker's RTMP ingest, through its TCP proxy.
       WORKER_INGEST_SERVER: "rtmp://${{worker.RAILWAY_TCP_PROXY_DOMAIN}}:${{worker.RAILWAY_TCP_PROXY_PORT}}/live",
-      WEB_ORIGIN: production ? secret() : (["web", "business", "site", "tv"] as const).map(webOrigin).join(","),
+      // A250 (2026-10-06): plus "null", the origin the Samsung TV app (a packaged Tizen web app,
+      // opened from a file) sends; the API's CORS carries no credentials, so it gains nothing a
+      // page without a sign-in token couldn't already do.
+      WEB_ORIGIN: production ? secret() : [...(["web", "business", "site", "tv"] as const).map(webOrigin), "null"].join(","),
       SERVE_WEB_APP: "false",
       // A237: Opencast's HTTPS relay for external stations' http:// stream links, a Cloudflare Worker
       // (apps/stream-relay, docs/stream-relay.md): its address (`https://opencast-stream-relay.<account>.workers.dev`,

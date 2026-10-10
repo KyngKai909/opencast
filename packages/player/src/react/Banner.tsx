@@ -29,13 +29,12 @@ function ident(c: Channel) {
 export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, onAirHere }: BannerProps) {
   const air = c.now;
   const next = c.next;
-  // An external station (follow-up Phase 6): the "External" tag, Live and whose stream it is. With
-  // nothing scheduled, the station's name and no progress bar: never a made-up title.
-  const external = c.station.kind === "listed" ? (c.external ?? null) : null;
+  // An external station (follow-up Phase 6): the "External" tag beside its call sign. With nothing
+  // scheduled, the station's name and no progress bar: never a made-up title. 2026-10-04, the user's
+  // call: no "Live from {the station's own name}" line, which only said the name again.
+  const listed = c.station.kind === "listed";
   const source: ReactNode =
-    c.station.kind === "listed" ? (
-      <ExternalFrom source={external?.source ?? null} />
-    ) : air?.carriedFrom ? (
+    listed ? null : air?.carriedFrom ? (
       `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}`
     ) : air?.live ? (
       size === "tv" ? (
@@ -59,11 +58,26 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
     <div className={cx("oc-banner", `oc-banner--${size}`)} data-theme="dark" role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
       <div className="oc-banner__id">
         <span className="oc-banner__ch oc-mono">{c.station.channel}</span>
-        <span className="oc-banner__cs oc-cs">{c.station.callSign ?? c.station.handle}</span>
+        <span className="oc-banner__csrow">
+          <span className="oc-banner__cs oc-cs">{c.station.callSign ?? c.station.handle}</span>
+          {/* On the phone's narrow banner, beside the call sign; on TV and the desktop, above the title. */}
+          {listed && (
+            <Tag variant="listed" onPicture className="oc-banner__ext oc-banner__ext--id">
+              External
+            </Tag>
+          )}
+        </span>
         <small>{c.station.name}</small>
       </div>
       <div className="oc-banner__now">
         {source && <span className="oc-banner__src">{source}</span>}
+        {listed && (
+          <span className="oc-banner__src oc-banner__ext oc-banner__ext--now">
+            <Tag variant="listed" onPicture>
+              External
+            </Tag>
+          </span>
+        )}
         <h3 aria-label={block ? `${block.name} · ${title}` : undefined}>
           {block && (
             <span className="oc-banner__blk">
@@ -119,19 +133,6 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
         </div>
       )}
     </div>
-  );
-}
-
-/** An external station's line: the dashed "External" tag, then "Live from City of Colton" (the source's own stream). */
-function ExternalFrom({ source }: { source: string | null }) {
-  return (
-    <>
-      <Tag variant="listed" onPicture>
-        External
-      </Tag>{" "}
-      <span className="oc-banner__live">Live</span>
-      {source ? ` from ${source}` : null}
-    </>
   );
 }
 

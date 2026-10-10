@@ -1,36 +1,42 @@
-// A244: programming blocks (/:callSign/blocks; one block at /blocks/:blockId; a new one at
-// /blocks/new). No frame draws them: built like the library's pages. "Named stretches of your
-// schedule with their own look": a card per block (its colour, logo, name, when it's on and its
-// next date), and the block editor (components/live/BlockEditor.tsx).
+// A244: programming blocks; A246 (Phase 4, opencast-schedule 07): the Schedule's Blocks tab
+// (/:callSign/schedule/blocks; one block at /schedule/blocks/:blockId; a new one at
+// /schedule/blocks/new; the old /blocks routes redirect here). On the left, a card per block: its
+// colour, its name, when it runs ("Fridays and Saturdays, 9:00 pm to 1:00 am") and what it has of
+// its own, and its next airing ("Next: tonight at 9:00 pm"), or "Not on the log yet". On the
+// right, the block open (the first, when none is asked for): components/live/BlockPage.tsx.
+// Building blocks is desk work: on the phone the tab says so, with the way back to the Log.
 
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { blocksApi, type ProgramBlock } from "@opencast/contracts";
-import { Button, ControlTitle, Field, Modal, stationColourPasses } from "@opencast/ui";
+import { Button, Field, Modal, stationColourPasses } from "@opencast/ui";
+import { ScheduleHead } from "../../components/onair/ScheduleHead";
+import { DeskOnly } from "../../components/onair/DeskOnly";
+import { scheduleHref } from "../../components/onair/scheduleRoutes";
 import { ApiError, call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
+import { useNow } from "../../../lib/clock";
+import { useIsPhone } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
-import { BlockEditor } from "../../components/live/BlockEditor";
-import { nextWords } from "../../components/live/blocks";
+import { BlockPage } from "../../components/live/BlockPage";
+import { nextAiring, ownWords, scheduleWords } from "../../components/live/blockAirs";
 import { Quiet } from "../common";
 import "./Blocks.css";
 
-const DESCRIPTION = "Named stretches of your schedule with their own look: a logo, an ID, bumpers, an intro and an outro. The programs inside belong to the block while it's on.";
-
-function BlockCard({ block, href }: { block: ProgramBlock; href: string }) {
+function BlockCard({ block, href, on, callSign, now }: { block: ProgramBlock; href: string; on: boolean; callSign: string; now: number }) {
+  const when = scheduleWords(block.schedule.label);
+  const next = nextAiring(block.schedule.next, now);
   return (
     <li>
-      <a className="cc-blks__card" href={href}>
-        <span className="cc-blks__swatch" style={{ background: block.colour ?? "var(--ink-70)" }} aria-hidden="true">
-          {block.logoUrl ? <img src={block.logoUrl} alt="" /> : block.name.slice(0, 1)}
-        </span>
-        <span className="cc-blks__text">
+      <Link className={on ? "cc-bcard cc-bcard--on" : "cc-bcard"} to={href} aria-current={on ? "page" : undefined}>
+        <span className="cc-bcard__sw" style={{ background: block.colour ?? "var(--ink-70)" }} aria-hidden="true" />
+        <span className="cc-bcard__text">
           <b>{block.name}</b>
-          <small>{block.schedule.label ?? "Not on the log yet"}</small>
-          {nextWords(block) && <small>{nextWords(block)}</small>}
+          <small>{when ? `${when}. ${ownWords(block, callSign)}` : "Not on the log yet"}</small>
+          {next ? <small className="cc-bcard__nx">{next}</small> : <small className="cc-bcard__nx cc-bcard__nx--place">Place on the log</small>}
         </span>
-      </a>
+      </Link>
     </li>
   );
 }
@@ -48,7 +54,7 @@ function NewBlock({ onClose }: { onClose: () => void }) {
     try {
       const b = await call(blocksApi.createBlock, { params: { stationId: s.id }, body: { name: name.trim(), ...(colour ? { colour } : {}) } });
       await qc.invalidateQueries({ queryKey: [blocksApi.listBlocks.method, blocksApi.listBlocks.path] });
-      navigate(`${s.base}/blocks/${b.id}`);
+      navigate(`${scheduleHref(s.base, "blocks")}/${b.id}`);
     } catch (e) {
       if (e instanceof ApiError) setError({ name: e.code === "block_name_taken" ? e.message : "", ...(e.fields ?? {}), ...(e.code !== "block_name_taken" ? { form: e.message } : {}) });
     }
@@ -79,56 +85,60 @@ function NewBlock({ onClose }: { onClose: () => void }) {
 export default function Blocks() {
   const { blockId } = useParams();
   const s = useStation();
+  const phone = useIsPhone();
   const navigate = useNavigate();
+  const now = useNow(60_000).getTime();
   const list = useApi(blocksApi.listBlocks, { params: { stationId: s.id } }, { retry: false });
-  const one = useApi(blocksApi.getBlock, { params: { stationId: s.id, blockId: blockId ?? "" } }, { enabled: !!blockId && blockId !== "new", retry: false });
   const creating = blockId === "new";
+  const blocks = list.data?.blocks ?? [];
+  const pickedId = blockId && !creating ? blockId : blocks[0]?.id;
+  const one = useApi(blocksApi.getBlock, { params: { stationId: s.id, blockId: pickedId ?? "" } }, { enabled: !!pickedId && !phone, retry: false });
+  const all = scheduleHref(s.base, "blocks");
 
-  if (blockId && !creating) {
-    if (one.isLoading) return <Quiet />;
-    if (!one.data) return <ControlTitle title="Blocks" description={one.error?.message ?? "That block wasn't found."} />;
+  if (phone) {
     return (
-      <div className="cc-blks">
-        <ControlTitle
-          title={one.data.name}
-          description={one.data.schedule.label ?? "Not on the log yet."}
-          end={
-            <Button size="sm" href={`${s.base}/blocks`}>
-              All blocks
-            </Button>
-          }
-        />
-        <BlockEditor block={one.data} />
+      <div className="cc-sch">
+        <ScheduleHead tab="blocks" />
+        <DeskOnly what="Blocks" base={s.base} />
       </div>
     );
   }
+  if (list.isLoading || (pickedId && one.isLoading)) return <Quiet />;
 
-  if (list.isLoading) return <Quiet />;
-  const blocks = list.data?.blocks ?? [];
-  return (
-    <div className="cc-blks">
-      <ControlTitle
-        title="Blocks"
-        description={DESCRIPTION}
-        end={
-          s.can("programming") && (
-            <Button variant="primary" size="sm" onClick={() => navigate(`${s.base}/blocks/new`)}>
-              New block
-            </Button>
-          )
-        }
-      />
+  const cards = (
+    <div className="cc-bcards">
       {list.isError && <p role="alert">{list.error.message}</p>}
       {blocks.length ? (
-        <ul className="cc-blks__list" aria-label="Your blocks">
+        <ul className="cc-bcards__list" aria-label="Your blocks">
           {blocks.map((b) => (
-            <BlockCard key={b.id} block={b} href={`${s.base}/blocks/${b.id}`} />
+            <BlockCard key={b.id} block={b} href={`${all}/${b.id}`} on={b.id === pickedId} callSign={s.station.callSign ?? s.label} now={now} />
           ))}
         </ul>
       ) : (
-        !list.isError && <p className="cc-blk__quiet">No blocks yet. Make one, then put it on the log.</p>
+        !list.isError && <p className="cc-blk__quiet">No blocks yet: named stretches of your schedule with their own look, ID, bumpers, intro and outro. Make one, then place it on the log.</p>
       )}
-      {creating && <NewBlock onClose={() => navigate(`${s.base}/blocks`)} />}
+      {s.can("programming") && (
+        <button type="button" className="cc-btn-xs cc-btn-xs--pri cc-bcards__new" onClick={() => navigate(`${all}/new`)}>
+          New block
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="cc-sch cc-blkspage">
+      {one.data ? (
+        <BlockPage block={one.data} head={(go) => <ScheduleHead tab="blocks" onNavigate={go} />} list={cards} />
+      ) : (
+        <>
+          <ScheduleHead tab="blocks" />
+          <div className="cc-blks">
+            {cards}
+            {blockId && !creating && <p className="cc-blk__quiet">{one.error?.message ?? "That block wasn't found."}</p>}
+          </div>
+        </>
+      )}
+      {creating && <NewBlock onClose={() => navigate(all)} />}
     </div>
   );
 }

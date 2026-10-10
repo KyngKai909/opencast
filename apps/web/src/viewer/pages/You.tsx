@@ -1,5 +1,6 @@
 // You (you 02.1 web, 06.1 and 06.2 phone): presets, reminders, pledges and TVs, in the order
-// people use them, then a way into running a station. Settings is a link on the web and the name
+// people use them, then invites, watching in other apps (programming Phase 5: the channel list and
+// guide for IPTV apps) and a way into running a station. Settings is a link on the web and the name
 // row on the phone. Signed out, it says what an account adds and names the presets on this device.
 // /you/pledges/:pledgeId opens a pledge over it; ?modal=tv-code adds a TV.
 
@@ -11,7 +12,7 @@ import { call } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
 import { useMe, usePresets } from "../data/viewer";
 import { useDevice } from "../device/store";
-import { useIsPhone, useShellOptions } from "../layout/shell";
+import { useLandscape, useShellOptions, useViewerLayout } from "../layout/shell";
 import { useNow } from "../../lib/clock";
 import { useTune } from "../player/PlayerRoot";
 import { useCastSession } from "../cast/session";
@@ -19,13 +20,19 @@ import { setCached } from "../components/you/cache";
 import { PledgeModal } from "../components/you/PledgeModal";
 import { PresetTiles } from "../components/you/PresetTiles";
 import { TvCodeDialog } from "../components/you/TvCodeDialog";
+import { InvitesSection } from "../components/you/InvitesSection";
+import { OtherAppsSection } from "../components/you/OtherAppsSection";
 import { PledgeRows, ReminderRows, RunStation, SignedOutYou, TvRows, comingUp, supportingSub } from "../components/you/YouSections";
 import { useMyStation, useOpenChannels, usePledges, useReminders, useRemoveReminder, useTvs } from "../components/you/useYouData";
 import "../components/you/sections.css";
 import "./You.css";
 
 export default function YouPage() {
-  const phone = useIsPhone();
+  // A tablet spreads You into columns (A245; swipe home 07): the web's layout, two columns
+  // upright and three on its side, in the phone shell with the floating bar.
+  const layout = useViewerLayout();
+  const landscape = useLandscape();
+  const phone = layout === "phone";
   const auth = useAuth();
   // The phone's You has no top bar (06.1, 06.2); its rows run edge to edge.
   useShellOptions(phone ? { top: null, padded: false } : {});
@@ -37,7 +44,7 @@ export default function YouPage() {
     return <SignedOutYou form={phone ? "phone" : "web"} devicePresets={device.presets.length} onSignIn={() => auth.openSignIn()} onSettings={() => navigate("/settings")} />;
   return (
     <>
-      {phone ? <YouPhone /> : <YouWeb />}
+      {phone ? <YouPhone /> : <YouWeb columns={layout === "tablet" ? (landscape ? 3 : 2) : undefined} />}
       {pledgeId && <PledgeModal pledgeId={pledgeId} />}
     </>
   );
@@ -54,7 +61,7 @@ function useYou() {
   const mine = useMyStation();
   const open = useOpenChannels(me.data?.market?.slug ?? null);
   const removeReminder = useRemoveReminder();
-  const tune = useTune();
+  const tune = useTune("preset");
   const now = useNow(60_000);
   const qc = useQueryClient();
   const toast = useToast();
@@ -95,7 +102,7 @@ function ErrorLine({ error }: { error: unknown }) {
   );
 }
 
-function YouWeb() {
+function YouWeb({ columns }: { columns?: 2 | 3 }) {
   const y = useYou();
   const navigate = useNavigate();
   const me = y.me.data;
@@ -106,7 +113,7 @@ function YouWeb() {
   const name = me?.displayName ?? me?.email ?? "";
 
   return (
-    <div className="vw-you">
+    <div className={columns ? `vw-you vw-you--cols${columns}` : "vw-you"}>
       <div className="vw-y-pg-h">
         {me ? <Avatar name={name} size={56} decorative /> : <span className="vw-you__avatar-ph" />}
         <div>
@@ -168,6 +175,10 @@ function YouWeb() {
         )}
       </section>
 
+      <InvitesSection form="web" />
+
+      <OtherAppsSection form="web" />
+
       <RunStation form="web" marketName={me?.market?.name ?? null} open={y.open} mine={y.mine} />
       <TvCodeDialog open={y.tvCode.open} onClose={y.tvCode.close} />
     </div>
@@ -219,6 +230,10 @@ function YouPhone() {
         {y.tvs.isLoading ? <Placeholder rows={1} /> : <TvRows tvs={y.tvs.data ?? []} castingTo={y.castingTo} now={y.now} form="phone" onSignOut={(tv) => void y.signOutTv(tv)} onAdd={y.tvCode.show} />}
         {y.tvs.error && <ErrorLine error={y.tvs.error} />}
       </div>
+
+      <InvitesSection form="phone" />
+
+      <OtherAppsSection form="phone" />
 
       <h2 className="vw-y-psec">Run a station</h2>
       <div className="vw-you-p__list">

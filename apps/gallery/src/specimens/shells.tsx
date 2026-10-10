@@ -133,7 +133,6 @@ function PlayerDemo({ mini }: { mini?: boolean }) {
 }
 
 const monitorItems: ShellItems<ControlPage> = {
-  breaks: { count: "3:30", warn: true, countLabel: "of breaks unfilled" },
   library: { count: 7 },
   translators: { count: 1 }
 };
@@ -412,7 +411,7 @@ export const shells = specimens([
           <ControlShell
             station={BEAT}
             active="market"
-            items={{ breaks: { count: "3:30", warn: true }, library: { count: 31 }, listings: { count: 2, warn: true }, translators: { count: 1 }, rights: { count: 1, warn: true } }}
+            items={{ library: { count: 31 }, listings: { count: 2, warn: true }, translators: { count: 1 }, rights: { count: 1, warn: true } }}
             linkTo={go}
             now={AT}
             timeZone={TZ}
@@ -428,8 +427,8 @@ export const shells = specimens([
         label: "Off air",
         note: "The tally is unlit and there's nothing to sign off.",
         render: () => (
-          <ControlShell station={BEAT} active="program-log" linkTo={go} now={AT} timeZone={TZ} onAir={false}>
-            <ControlTitle title="Program log" />
+          <ControlShell station={BEAT} active="schedule" linkTo={go} now={AT} timeZone={TZ} onAir={false}>
+            <ControlTitle title="Schedule" />
             <Filler rows={8} />
           </ControlShell>
         )

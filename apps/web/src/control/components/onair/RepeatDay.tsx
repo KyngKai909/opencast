@@ -1,20 +1,18 @@
-// "Repeat this day" (A.4's pane, G8): the day becomes a template, every Saturday (the day's own
-// weekday), weekdays, every day, or once onto a date. The four choices are the frame's segmented
-// control; choosing one opens the dialog that makes the template (or changes the one built from
-// this day) and then says what it made: dates made, and entries skipped where something was
-// already on the log. Under it, the station's templates with their names, dates and edited dates,
-// each changed (renamed, repeated differently) or stopped, and G7's one-time copies from before
-// templates, which can still be taken off. On the log, `DayOrigin` says which template made a date
-// and whether it was edited since (from the log's `days`, G11, so today and past days too).
+// Making a day template and stopping one (G8): "Make a template from this day" on the Log and "New
+// template" on the Templates tab open RepeatDialog: the day becomes a template, every Saturday (the
+// day's own weekday), weekdays, every day, or once onto a date, then it says what it made (dates
+// made, entries skipped where something was already on the log). The Templates tab's "Change how
+// it repeats" opens it for a template; "Stop repeating" opens StopDialog. A246 (Phase 4): the list
+// of templates is the Templates tab's cards (TemplatesTab.tsx); the pane's "Repeat this day" and
+// the log's notice of where a date came from went with the Log's rundown and template chip.
 
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { logApi, type DayTemplate, type LogDay, type TemplateGeneration } from "@opencast/contracts";
-import { Button, Field, KeyValueList, Modal, Notice, Segmented, Sheet, useToast } from "@opencast/ui";
+import { logApi, type DayTemplate, type TemplateGeneration } from "@opencast/contracts";
+import { Button, Field, KeyValueList, Modal, Segmented, Sheet, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
-import { LOG_READS, useTemplates } from "./data";
-import { copyDetail, copyName, dayOriginOf, generationLines, oldCopies, repeatOptions, shortDate, templateBlocksText, templateDetail, templateName, type LogRepeat, type RepeatPattern } from "./templates";
+import { LOG_READS } from "./data";
+import { copyName, generationLines, repeatOptions, templateName, type LogRepeat, type RepeatPattern } from "./templates";
 import { DAY_WORDS, addDays, broadcastDay, isoDate, localTime, monthDay, weekdayOf, type Ymd } from "./time";
 import { now } from "../../../lib/clock";
 
@@ -200,117 +198,4 @@ export function StopDialog({ stationId, what, phone, onClose }: StopDialogProps)
       )}
     </Dialog>
   );
-}
-
-type Open = { kind: "repeat"; pattern: RepeatPattern; template?: DayTemplate; day: Ymd } | { kind: "stop"; what: StopDialogProps["what"] } | null;
-
-export interface RepeatDaySectionProps {
-  stationId: string;
-  /** The log's day. */
-  day: Ymd;
-  /** `getLog.repeats`: G7's copies (and templates, which the list reads from `listTemplates`). */
-  repeats: LogRepeat[] | undefined;
-  phone: boolean;
-  /** Where a date opens on the log ("?day=2026-10-03"). */
-  dateHref: (date: string) => string;
-}
-
-/** The pane's "Repeat this day": the four choices, then the station's templates. */
-export function RepeatDaySection({ stationId, day, repeats, phone, dateHref }: RepeatDaySectionProps) {
-  const templates = useTemplates(stationId);
-  const [open, setOpen] = useState<Open>(null);
-  const list = templates.data?.templates ?? [];
-  const date = isoDate(day);
-  // The template built from this day, if there is one: the choices show how it repeats.
-  const own = [...list].reverse().find((t) => t.fromDay === date);
-  const copies = oldCopies(repeats, list);
-
-  const rows = [
-    ...list.map((t) => {
-      const next = t.dates[0];
-      return {
-        title: templateName(t),
-        detail: (
-          <>
-            {templateDetail(t)}
-            {/* A244: its programming blocks. */}
-            {templateBlocksText(t) && <span className="cc-log__tblocks">Blocks in this template: {templateBlocksText(t)}</span>}
-            {next && (
-              <>
-                {" "}
-                <Link to={dateHref(next.date)} className="cc-log__link">
-                  Next {shortDate(next.date)}
-                </Link>
-              </>
-            )}
-          </>
-        ),
-        actions: (
-          <>
-            <Button variant="text" size="sm" onClick={() => setOpen({ kind: "repeat", pattern: t.pattern, template: t, day: fromIso(t.fromDay) })}>
-              Change
-            </Button>
-            <Button variant="text" size="sm" onClick={() => setOpen({ kind: "stop", what: { kind: "template", template: t } })}>
-              Stop
-            </Button>
-          </>
-        )
-      };
-    }),
-    ...copies.map((r) => ({
-      title: copyName(r),
-      detail: copyDetail(r),
-      actions: (
-        <Button variant="text" size="sm" onClick={() => setOpen({ kind: "stop", what: { kind: "copy", repeat: r } })}>
-          Take off
-        </Button>
-      )
-    }))
-  ];
-
-  return (
-    <section className="cc-log__sec" aria-labelledby="cc-log-repeat">
-      <h2 className="cc-log__h" id="cc-log-repeat">
-        Repeat this day
-      </h2>
-      <Segmented<RepeatPattern | "">
-        label="Repeat this day"
-        value={own?.pattern ?? ""}
-        onChange={(v) => v && setOpen({ kind: "repeat", pattern: v, template: own, day })}
-        options={repeatOptions(weekdayOf(day))}
-      />
-      {templates.isError && !(templates.error instanceof ApiError && templates.error.status === 404) && <p className="cc-log__quiet">{templates.error.message}</p>}
-      {rows.length > 0 && <KeyValueList variant="rows" items={rows} className="cc-log__templates" />}
-      {open?.kind === "repeat" && <RepeatDialog stationId={stationId} day={open.day} template={open.template} pattern={open.pattern} phone={phone} onClose={() => setOpen(null)} />}
-      {open?.kind === "stop" && <StopDialog stationId={stationId} what={open.what} phone={phone} onClose={() => setOpen(null)} />}
-    </section>
-  );
-}
-
-function fromIso(date: string): Ymd {
-  const [year, month, d] = date.split("-").map(Number);
-  return { year, month, day: d };
-}
-
-/**
- * On the log: the template a date was made from (the log's `days`, G11), and whether it was edited
- * since, or the one built from it. Today and past dates have started: changing the template
- * changes only the dates ahead.
- */
-export function DayOrigin({ stationId, day, days }: { stationId: string; day: Ymd; days?: LogDay[] }) {
-  const templates = useTemplates(stationId);
-  const list = templates.data?.templates ?? [];
-  const date = isoDate(day);
-  const origin = dayOriginOf(days, list, date);
-  if (origin) {
-    const ahead = date > isoDate(broadcastDay(now()));
-    return origin.edited ? (
-      <Notice tone="plain" icon={null} title={`Made from ${origin.name}, then edited.`} detail="Changes to the template leave this date as it is." className="cc-log__origin" />
-    ) : (
-      <Notice tone="plain" icon={null} title={`Made from ${origin.name}.`} detail={ahead ? "Changing the template changes this date too." : undefined} className="cc-log__origin" />
-    );
-  }
-  const built = list.filter((t) => t.fromDay === date);
-  if (!built.length) return null;
-  return <Notice tone="plain" icon={null} title={`${built.map(templateName).join(" and ")} ${built.length === 1 ? "repeats" : "repeat"} this day.`} className="cc-log__origin" />;
 }

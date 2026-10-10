@@ -29,6 +29,8 @@ import { relayApi } from "./relay.js";
 import { platformsApi } from "./platforms.js";
 import { uploadsApi } from "./uploads.js";
 import { blocksApi } from "./blocks.js";
+import { analyticsApi } from "./analytics.js";
+import { licencesApi } from "./licences.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -62,6 +64,9 @@ export * from "./relay.js";
 export * from "./platforms.js";
 export * from "./uploads.js";
 export * from "./blocks.js";
+export * from "./analytics.js";
+export * from "./invites.js";
+export * from "./licences.js";
 
 export const API_PREFIX = "/v1";
 
@@ -88,6 +93,8 @@ export const api = {
   config: configApi,
   /** Added 2026-09-29 (follow-up Phase 2): pay-as-you-go, the Station account. */
   billing: billingApi,
+  /** Added 2026-10-06 (A251): the Network desk's analytics. */
+  analytics: analyticsApi,
   /** Added 2026-09-30 (follow-up Phase 3): platform connections for relays (YouTube, Twitch, any RTMP address). */
   platforms: platformsApi,
   /** Added 2026-09-30 (follow-up Phase 3): relays, set once for all of a station's translators (modes, breaks, the bug, restarts). */
@@ -95,7 +102,9 @@ export const api = {
   /** Added 2026-09-30 (follow-up Phase 4): direct uploads, straight from the browser to object storage in parts. */
   uploads: uploadsApi,
   /** Added 2026-10-02 (A244): programming blocks, named and branded stretches of a station's log. */
-  blocks: blocksApi
+  blocks: blocksApi,
+  /** Added 2026-10-10 (programming Phase 6): network licences and the licensor's monthly minutes. */
+  licences: licencesApi
 } as const;
 
 export const HealthResponse = z.object({

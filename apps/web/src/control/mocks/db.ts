@@ -52,6 +52,12 @@ export interface Db {
   templates: DbTemplate[];
   /** Off air hours (G9), per station. */
   offAirRules: DbOffAirRule[];
+  /**
+   * The live area's week of entries (fixtures/live.ts) went on the log: once. Taken off after
+   * (an edit, "Reset to template"), they stay off. Left out by a db saved before A246's Phase 4:
+   * the entries it has are kept as they are.
+   */
+  liveWeekSeeded?: boolean;
 }
 
 // 6: the log's times on 4-second segment boundaries (prepare once, then assemble).

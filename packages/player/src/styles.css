@@ -24,6 +24,15 @@
   opacity: 0; pointer-events: none;
 }
 .oc-player__video.is-on { opacity: 1; pointer-events: auto; }
+/* The swipe home (A245): the picture fills its box (a phone's screen, a tablet's), and while the
+   finger drags the next station's warm picture shows beside it, placed by --oc-peek-y (100% below,
+   -100% above, 0 where the snap left it). */
+.oc-player--fill { aspect-ratio: auto; width: 100%; height: 100%; border-radius: 0; }
+.oc-player--fill[data-fit="cover"] .oc-player__video { object-fit: cover; }
+/* The peek sits over the old picture (where the snap leaves it) and under everything drawn on top. */
+.oc-player--fill .oc-player__stage { isolation: isolate; }
+.oc-player__video.is-peek { opacity: 1; z-index: 1; transform: translateY(var(--oc-peek-y, 100%)); }
+.oc-player__video.is-peek.is-on { transform: none; }
 .oc-player__video::cue {
   font-family: var(--font-text); font-size: var(--oc-cue, 4.2cqw); line-height: 1.3;
   color: #fff; background: rgb(10 17 36 / .82);
@@ -104,20 +113,32 @@
      column instead of running into the program's name. */
   display: grid; grid-template-columns: minmax(calc(380 * var(--u)), max-content) minmax(0, 1fr) minmax(calc(260 * var(--u)), max-content); gap: calc(44 * var(--u));
 }
-.oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; }
+/* The number, call sign and name centred down the banner's height, whatever the program column beside
+   them holds (the user's call, 2026-10-04). */
+.oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; align-self: stretch; }
 .oc-banner__ch {
-  grid-row: span 2;
+  /* Centred down the call sign and name beside it, the divider running their full height. */
+  grid-row: span 2; display: flex; align-items: center;
   font: 500 max(calc(76 * var(--u)), 22px)/1 var(--font-mono); letter-spacing: -.05em;
   padding-right: calc(22 * var(--u)); border-right: 2px solid var(--line);
 }
 .oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
+/* The call sign with an external station's "External" beside it. */
+.oc-banner__csrow { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); }
+/* An external station's "External": above the title on TV and the desktop, beside the call sign on
+   the phone's narrow banner (the user's call, 2026-10-04); one shows, the other is hidden. */
+.oc-banner__ext--id { display: none; }
+.oc-banner__ext--now { display: block; margin-bottom: max(calc(10 * var(--u)), 6px); }
+/* "External" at the call sign's size, so it never makes that line taller. */
+.oc-banner .oc-banner__csrow .oc-tag { height: max(calc(40 * var(--u)), 18px); padding: 0 max(calc(12 * var(--u)), 6px); font-size: max(calc(22 * var(--u)), 11px); line-height: 1; }
 .oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__src { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__now h3 {
-  margin: calc(2 * var(--u)) 0 calc(10 * var(--u));
+  /* Room between the title, the progress bar and Next (2026-10-04: too tight, on the web most of all). */
+  margin: calc(2 * var(--u)) 0 max(calc(18 * var(--u)), 9px);
   font: 800 max(calc(58 * var(--u)), 18px)/1.02 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em;
 }
-.oc-banner__nx { margin-top: calc(14 * var(--u)); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
+.oc-banner__nx { margin-top: max(calc(22 * var(--u)), 9px); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
 .oc-banner__nx b { color: var(--pic-ink); font-weight: 600; }
 /* A244: a programming block's name before the title, lighter; after the next title, quieter. */
 .oc-banner__blk { font-weight: 500; color: var(--pic-ink-70); }
@@ -134,11 +155,19 @@
 /* Casting and mirroring (tv 06.1 .castchip): where the controls are, with where to change channel at the end. */
 .oc-banner__chip { color: var(--pic-ink-70); }
 .oc-banner__chip .oc-i { width: calc(30 * var(--u)); height: calc(24 * var(--u)); min-width: 16px; min-height: 13px; }
-/* "Live from Redlands City Hall": Live in the live colour (tv 06.1). */
+/* "Live from Redlands City Hall" (a station's own live block, from its note): Live in the live colour (tv 06.1). */
 .oc-banner__live { color: var(--live); font-weight: 600; }
 /* On TV the tags are the ten-foot size (.tv .tag). */
 .oc-banner--tv .oc-tag { height: 36px; padding: 0 14px; font-size: 22px; border-width: 1.5px; }
 .oc-banner--tv .oc-tag__dot { width: 10px; height: 10px; }
+/* On TV and the desktop, the title and Next are one line each, cut short with "…" (the user's call,
+   2026-10-06): a long title ran to three lines and pushed "Next at" onto two. The phone's narrow
+   banner wraps as before (below). */
+.oc-banner__now { min-width: 0; }
+.oc-banner__now h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-banner__nx { white-space: nowrap; min-width: 0; }
+.oc-banner__nx > :not(b) { flex-shrink: 0; }
+.oc-banner__nx b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* In a web page the banner is shorter: one row, and no hint row unless one is given. */
 .oc-banner--web { grid-template-columns: auto minmax(0, 1fr) auto; gap: max(calc(44 * var(--u)), 14px); padding: max(calc(26 * var(--u)), 10px) max(calc(34 * var(--u)), 12px); left: 3%; right: 3%; bottom: 4%; }
@@ -146,15 +175,20 @@
 
 /* A narrow picture (a phone's full player): the ident over what's on, the clock and tally beside. */
 @container (max-width: 560px) {
-  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
+  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
   .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
   .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
-  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
-  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 6px; }
+  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; gap: 12px; }
+  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; white-space: normal; }
+  .oc-banner--web .oc-banner__nx { white-space: normal; }
+  .oc-banner--web .oc-banner__nx b { overflow: visible; }
   .oc-banner--web .oc-banner__ch { font-size: 20px; }
   .oc-banner--web .oc-banner__cs { font-size: 15px; }
+  .oc-banner--web .oc-banner__csrow .oc-tag { height: 16px; padding: 0 5px; font-size: 10.5px; }
+  .oc-banner--web .oc-banner__ext--id { display: inline-flex; }
+  .oc-banner--web .oc-banner__ext--now { display: none; }
   .oc-banner--web .oc-banner__clock { font-size: 13px; }
-  .oc-banner--web .oc-banner__nx { font-size: 12px; }
+  .oc-banner--web .oc-banner__nx { font-size: 12px; margin-top: 9px; }
   .oc-banner--web .oc-banner__hints { display: none; }
 }
 

@@ -159,7 +159,10 @@ describe("a radio live block through the worker", () => {
     const tail = rows.slice(rows.indexOf(lastLive) + 1);
     expect(tail[0], summary.join("\n")).toMatchObject({ reason: "slate" });
     // (The channel runs a fraction of a second off the log's times: its slates are whole seconds.)
-    expect(rows.find((r) => Math.abs(r.startedAt.getTime() - (t0 + 84_000)) < 1_000), summary.join("\n")).toMatchObject({ code: "PGM", reason: "planned" });
+    // (The stand-by stops a second or so short of the block's end, so its last piece is a short slate.)
+    const back = tail.find((r) => r.reason !== "slate");
+    expect(back, summary.join("\n")).toMatchObject({ code: "PGM", reason: "planned" });
+    expect(Math.abs(back!.startedAt.getTime() - (t0 + 84_000)), summary.join("\n")).toBeLessThan(1_000);
     expect(standingBy[0].standingBy).toBe(true);
     expect(standingBy.some((x) => !x.standingBy)).toBe(true);
     expect(standingBy[standingBy.length - 1].standingBy).toBe(true);

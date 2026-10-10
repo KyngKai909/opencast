@@ -6,6 +6,7 @@ import express from "express";
 import { API_PORT, STORAGE_ROOT, HLS_ROOT, UPLOAD_ROOT, WEB_DIST_DIR, WEB_ORIGIN } from "./config.js";
 import { bootV1 } from "./v1/boot.js";
 import { checkoutWebhookHandler, webhookHandler } from "./v1/webhooks.js";
+import { clientIp } from "./v1/geo.js";
 
 const app = express();
 // The API (mounted at /v1 below).
@@ -18,7 +19,8 @@ function addCorsOriginWithAliases(input: string, allowed: Set<string>) {
   }
   try {
     const base = new URL(trimmed);
-    allowed.add(base.origin);
+    // A scheme with no origin of its own (file://, the Samsung TV app's page) is matched as written.
+    allowed.add(base.origin === "null" ? trimmed : base.origin);
     if (base.hostname === "localhost") {
       const alias = new URL(trimmed);
       alias.hostname = "127.0.0.1";
@@ -83,7 +85,9 @@ app.get("/hls/:stationId/:file", async (req, res, next) => {
   // The subtitle rendition's empty segment (empty.vtt) is served here too (X2).
   if (!/^[0-9a-f-]{36}$/.test(req.params.stationId) || !/^([a-z0-9]+\.m3u8|empty\.vtt)$/.test(req.params.file)) return next();
   try {
-    const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file);
+    // Programming Phase 5: `?via=iptv` (the channel list's) counts the poll as "Other apps".
+    const via = typeof req.query.via === "string" ? req.query.via : null;
+    const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file, via ? { via, ip: clientIp(req), userAgent: req.get("user-agent") ?? null } : undefined);
     if (playlist === null) return next();
     res.setHeader("Content-Type", playlist.contentType ?? "application/vnd.apple.mpegurl");
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -113,6 +117,23 @@ app.get("/hls/prepared/:key/:rendition/:file", async (req, res, next) => {
     stream.pipe(res);
   } catch {
     next();
+  }
+});
+
+// Programming Phase 6: the other apps' "Airing on Opencast" slate, a prepared segment re-timed to
+// its place in the program it stands in for (the `via=iptv` playlists name these).
+app.get("/hls/elsewhere/:key/:rendition/:file", async (req, res, next) => {
+  const match = /^(\d{1,6})-(\d{1,9})\.ts$/.exec(req.params.file);
+  if (!match) return next();
+  try {
+    const segment = await v1.services.playout.elsewhereSegment(req.params.key, req.params.rendition, Number(match[1]), Number(match[2]));
+    if (!segment) return next();
+    res.setHeader("Content-Type", "video/mp2t");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(segment);
+  } catch (error) {
+    next(error);
   }
 });
 

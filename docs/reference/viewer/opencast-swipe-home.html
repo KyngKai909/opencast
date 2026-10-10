@@ -1,0 +1,1355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The swipe home · Opencast reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+
+
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+
+/* ===== Master control ===== */
+.step-h { display:flex; align-items:baseline; gap:12px; margin:var(--s6) 0 var(--s3); }
+.step-h:first-of-type { margin-top:0; }
+.step-h .mono { font-size:13px; color:var(--ink-50); }
+.step-h h3 { margin:0; font:700 22px/1.2 var(--font-display); letter-spacing:-.015em; }
+.flow-map { display:flex; flex-wrap:wrap; gap:6px 0; margin:0 0 var(--s5); padding:0; list-style:none; font-size:14px; }
+.flow-map li { display:flex; align-items:center; color:var(--ink-70); }
+.flow-map li + li::before { content:""; width:22px; height:1px; background:var(--line); margin:0 10px; }
+.flow-map .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+
+.mc-head { height:56px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1px solid var(--hair); }
+.mc-lock { display:inline-flex; align-items:center; gap:12px; }
+.mc-lock .a-logo { font-size:18px; } .mc-lock .a-logo svg { width:24px; height:19px; }
+.mc-lock .div { width:1px; height:20px; background:var(--line); }
+.mc-lock b { font-weight:600; font-size:15px; }
+.stn-switch { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:var(--r-control); background:none; cursor:pointer; }
+.stn-switch .sw { width:14px; height:14px; border-radius:3px; }
+.stn-switch .ch { font-size:14px; } .stn-switch .cs { font-size:14px; }
+.mc-clock { margin-left:auto; font:500 15px var(--font-mono); font-variant-numeric:tabular-nums; }
+.mc-end { display:flex; align-items:center; gap:10px; }
+.mc-body { flex:1; display:grid; grid-template-columns:200px minmax(0,1fr); min-height:0; }
+.mc-rail { border-right:1px solid var(--hair); padding:14px 10px; overflow:auto; }
+.mc-rail .g { font-size:12px; font-weight:600; color:var(--ink-50); padding:12px 10px 4px; }
+.mc-rail .g:first-child { padding-top:0; }
+.mc-rail a { display:flex; align-items:center; gap:8px; height:34px; padding:0 10px; border-radius:var(--r-control); text-decoration:none; color:var(--ink-70); font-size:14.5px; font-weight:500; }
+.mc-rail a.on { background:var(--raised); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair); }
+.mc-rail a .ct { margin-left:auto; font:500 12px var(--font-mono); color:var(--ink-50); }
+.mc-rail a .ct.warn { color:var(--standby); }
+.mc-steps { padding:18px 14px; }
+.mc-steps .st { display:flex; align-items:center; gap:10px; padding:9px 4px; font-size:14.5px; color:var(--ink-50); font-weight:500; }
+.mc-steps .st .n { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font:500 12px var(--font-mono); flex:none; }
+.mc-steps .st.done { color:var(--ink-70); } .mc-steps .st.done .n { background:var(--ink); border-color:var(--ink); color:var(--ground); }
+.mc-steps .st.cur { color:var(--ink); } .mc-steps .st.cur .n { border-color:var(--signal); color:var(--signal); box-shadow:0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent); }
+.mc-steps .hint { margin-top:18px; padding-top:14px; border-top:1px solid var(--hair); font-size:13px; color:var(--ink-70); line-height:1.45; }
+.mc-main { overflow:auto; padding:22px 28px 28px; position:relative; }
+.mc-title { display:flex; align-items:flex-end; gap:14px; margin-bottom:18px; }
+.mc-title h2 { margin:0; font:800 28px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.mc-title p { margin:4px 0 0; font-size:14.5px; color:var(--ink-70); max-width:62ch; }
+.mc-title .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.mc-foot { display:flex; align-items:center; gap:12px; padding-top:16px; margin-top:18px; border-top:1px solid var(--hair); }
+.mc-foot .end { margin-left:auto; display:flex; gap:10px; }
+.split { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:28px; }
+.pane { border-left:1px solid var(--hair); padding-left:28px; }
+.pane h4 { margin:0 0 10px; font:700 15px var(--font-display); }
+.fld { margin-bottom:16px; }
+.fld > label, .fld > .lb { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.fld .field { color:var(--ink); }
+.fld .ok { font-size:13px; color:var(--signal); margin-top:6px; display:flex; gap:6px; align-items:center; }
+.fld .help { font-size:13px; color:var(--ink-50); margin-top:6px; }
+.fld-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.chgrid { display:grid; grid-template-columns:repeat(10,1fr); gap:5px; }
+.cn { height:32px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:500 13px var(--font-mono); color:var(--ink); cursor:pointer; }
+.cn.taken { border-style:dashed; border-color:var(--hair); color:var(--ink-50); text-decoration:line-through; cursor:not-allowed; }
+.cn.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.swatches { display:flex; gap:8px; align-items:center; }
+.swatches i { width:30px; height:30px; border-radius:var(--r-control); display:block; cursor:pointer; }
+.swatches i.sel { box-shadow:0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.swatches .field { height:34px; width:120px; font:500 13px var(--font-mono); }
+.vis { display:flex; flex-direction:column; gap:14px; }
+.vis .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; }
+.mini-listing { display:grid; grid-template-columns:40px 1fr 72px; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+.mini-listing .ch { font-size:15px; font-weight:500; } .mini-listing .cs { font-size:13px; } .mini-listing b { display:block; font:700 14px/1.2 var(--font-display); } .mini-listing small { font-size:12px; color:var(--ink-50); }
+.mini-listing .tc { padding:4px 6px; } .mini-listing .tc .t { font-size:9px; }
+
+/* library */
+.drop { border:1.5px dashed var(--line); border-radius:var(--r-screen); padding:18px; display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+.drop .ic { width:44px; height:44px; border-radius:var(--r-control); background:var(--raised); display:grid; place-items:center; flex:none; }
+.drop b { display:block; font-weight:600; } .drop small { color:var(--ink-70); font-size:13px; }
+.drop .end { margin-left:auto; display:flex; gap:8px; }
+.lib-h, .lib-row { display:grid; grid-template-columns:88px minmax(0,1fr) 128px 64px 190px 36px; gap:14px; align-items:center; }
+.lib-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding:0 0 6px; border-bottom:1px solid var(--line); }
+.lib-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.lib-row .tc { padding:4px 6px; } .lib-row .tc .t { font-size:9.5px; }
+.lib-row b { display:block; font-weight:600; font-size:14.5px; } .lib-row small { font-size:12.5px; color:var(--ink-50); }
+.lib-row .d { font:500 13px var(--font-mono); }
+.typesel { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 8px; border:1px solid var(--line); border-radius:var(--r-control); font:500 12px var(--font-mono); background:none; }
+.typesel.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.typesel.spt { color:var(--standby); border-color:var(--standby); }
+.typesel.und { border-style:dashed; }
+.status { font-size:13px; display:flex; flex-direction:column; gap:4px; }
+.status.ready { color:var(--ink-70); } .status.ready::before { content:"Ready for air"; color:var(--ink); font-weight:600; }
+.status .bar { height:4px; background:var(--hair); border-radius:2px; overflow:hidden; } .status .bar i { display:block; height:100%; background:var(--signal); }
+.status.need { color:var(--standby); font-weight:600; }
+.dots3 { width:30px; height:30px; border-radius:var(--r-control); border:0; background:none; color:var(--ink-50); font-size:18px; line-height:1; cursor:pointer; }
+.lib-sum { display:flex; gap:18px; font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.lib-sum b { color:var(--ink); font-weight:600; }
+
+/* program log timeline */
+.days { display:flex; gap:4px; margin-bottom:14px; }
+.days button { height:32px; padding:0 12px; border:1px solid var(--hair); border-radius:var(--r-control); background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.days button.on { border-color:var(--ink); color:var(--ink); }
+.tl { position:relative; display:grid; grid-template-columns:56px 1fr; }
+.tl .hrs { position:relative; }
+.tl .hrs span { position:absolute; left:0; font:500 12px var(--font-mono); color:var(--ink-50); transform:translateY(-50%); }
+.tl .col { position:relative; border-left:1px solid var(--line); }
+.tl .col .hl { position:absolute; left:0; right:0; height:1px; background:var(--hair); }
+.blk { position:absolute; left:8px; right:0; border-radius:var(--r-control); padding:5px 10px; font-size:13px; overflow:hidden; display:flex; gap:10px; align-items:flex-start; }
+.blk b { font-weight:600; font-size:13.5px; }
+.blk small { color:var(--ink-70); font-size:12px; }
+.blk .code { flex:none; margin-top:1px; }
+.blk.pgm { background:var(--raised); box-shadow:inset 0 0 0 1px var(--hair); }
+.blk.car { background:var(--raised); box-shadow:inset 0 0 0 1px var(--line); border:1px dashed var(--line); }
+.blk.brk { background:color-mix(in srgb, var(--standby-fill) 22%, var(--ground)); box-shadow:inset 3px 0 0 var(--standby); padding:0 10px; align-items:center; font-size:11.5px; color:var(--ink-70); }
+.blk.dead { background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby-fill) 18%, transparent) 0 8px, transparent 8px 16px); border:1.5px dashed var(--standby); color:var(--standby); align-items:center; justify-content:center; font-weight:600; }
+.blk.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.code { display:inline-block; min-width:36px; text-align:center; font:500 11px var(--font-mono); padding:1px 5px; border-radius:var(--r-sign); border:1px solid var(--line); }
+.code.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.code.spt { border-color:var(--standby); color:var(--standby); }
+.code.und { border-style:dashed; }
+.warnbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--standby); border-radius:var(--r-control); color:var(--ink); font-size:14px; margin-bottom:14px; }
+.warnbar .ic { color:var(--standby); }
+.warnbar b { font-weight:600; }
+.warnbar .end { margin-left:auto; }
+.okbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:var(--r-control); font-size:14px; margin-bottom:14px; }
+
+/* translators */
+.tr-row { display:grid; grid-template-columns:44px minmax(0,1fr) 250px 90px; gap:14px; align-items:center; padding:14px 0; border-bottom:1px solid var(--hair); }
+.tr-row:first-of-type { border-top:1px solid var(--line); }
+.tr-row .lg { width:44px; height:44px; border-radius:var(--r-control); display:grid; place-items:center; font:800 13px var(--font-display); color:#fff; }
+.tr-row b { display:block; font-weight:600; } .tr-row small { font-size:13px; color:var(--ink-70); display:block; }
+.tr-row .lb { font-size:12px; color:var(--ink-50); font-weight:600; margin-bottom:4px; }
+.tr-row .seg button { font-size:12px; padding:0 10px; }
+
+/* preflight + monitor */
+.check-list { border-top:1px solid var(--line); }
+.ck { display:grid; grid-template-columns:28px 1fr auto; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--hair); }
+.ck .m { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; }
+.ck.ok .m { background:var(--ink); color:var(--ground); } .ck.ok .m svg { width:14px; height:14px; }
+.ck.warn .m { border:1.5px solid var(--standby); color:var(--standby); font:700 13px var(--font-text); }
+.ck b { font-weight:600; display:block; font-size:14.5px; } .ck small { font-size:13px; color:var(--ink-70); }
+.signon { display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px; border:1px solid var(--hair); border-radius:var(--r-screen); text-align:center; }
+.signon .btn { height:56px; padding:0 40px; font-size:17px; }
+.signon small { font-size:13px; color:var(--ink-70); max-width:32ch; }
+.mon { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; }
+.mon .lbl { font-size:12.5px; font-weight:600; color:var(--ink-50); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.mon .pv { opacity:.85; }
+.rundown { margin-top:16px; border-top:1px solid var(--line); }
+.rd { display:grid; grid-template-columns:78px 50px minmax(0,1fr) 64px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rd .t { font:500 13px var(--font-mono); color:var(--ink-70); }
+.rd .d { font:500 13px var(--font-mono); text-align:right; }
+.rd.now { background:var(--raised); box-shadow:inset 3px 0 0 var(--tally); }
+.rd.now .t { padding-left:10px; }
+.rd small { display:block; font-size:12px; color:var(--ink-50); }
+.cd { font:500 28px var(--font-mono); letter-spacing:-.03em; }
+.health { border-top:1px solid var(--line); }
+.hl-row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.hl-row span:last-child { color:var(--ink-70); font-family:var(--font-mono); font-size:13px; }
+.hl-row .good::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ink-70); margin-right:6px; }
+
+/* syndication + spots */
+.filters { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.syn-h, .syn-row { display:grid; grid-template-columns:112px minmax(0,1fr) 230px 92px 150px; gap:14px; align-items:center; }
+.syn-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.syn-row { padding:10px 0; border-bottom:1px solid var(--hair); }
+.syn-row .tc { padding:6px 8px; } .syn-row .tc .t { font-size:11px; }
+.syn-row b { display:block; font:700 15px/1.2 var(--font-display); } .syn-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.syn-row .terms { font-size:13px; line-height:1.35; } .syn-row .terms em { font-style:normal; font-weight:600; display:block; }
+.syn-row .by { font-size:13px; color:var(--ink-70); }
+.syn-row .acts { display:flex; gap:6px; justify-content:flex-end; }
+.syn-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.syn-row.sel > :first-child { margin-left:10px; }
+.termopt { display:grid; grid-template-columns:22px 1fr auto; gap:12px; padding:13px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.termopt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; margin-top:2px; }
+.termopt.sel .rad { border-color:var(--signal); } .termopt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.termopt b { font-weight:600; display:block; font-size:15px; } .termopt small { font-size:13px; color:var(--ink-70); display:block; margin-top:2px; }
+.termopt .p { font:500 14px var(--font-mono); text-align:right; }
+.brkbar { display:flex; height:18px; border-radius:3px; overflow:hidden; border:1px solid var(--line); }
+.brkbar i { display:block; height:100%; }
+.brkbar .f { background:var(--ink); } .brkbar .th { background:repeating-linear-gradient(135deg, var(--line) 0 4px, transparent 4px 8px); } .brkbar .o { background:transparent; }
+.brkbar .n { background:var(--standby-fill); }
+.bk-h, .bk-row { display:grid; grid-template-columns:78px minmax(0,1fr) 220px 110px 120px; gap:14px; align-items:center; }
+.bk-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.bk-row { padding:12px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.bk-row .t { font:500 13px var(--font-mono); }
+.bk-row b { display:block; font-weight:600; } .bk-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.bk-row .open { font-size:13px; } .bk-row .open .mono { font-weight:500; }
+.legend { display:flex; gap:16px; font-size:12.5px; color:var(--ink-70); margin-top:10px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.legend i { width:14px; height:10px; border-radius:2px; border:1px solid var(--line); display:inline-block; }
+.sp-h, .sp-row { display:grid; grid-template-columns:100px minmax(0,1fr) 54px 150px; gap:12px; align-items:center; }
+.sp-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.sp-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; cursor:pointer; }
+.sp-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.sp-row.sel > :first-child { margin-left:10px; }
+.sp-row .tc { padding:5px 7px; } .sp-row .tc .t { font-size:10px; }
+.sp-row b { display:block; font-weight:600; } .sp-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.sp-row .d { font:500 13px var(--font-mono); }
+.sp-row .rate { font-size:13px; } .sp-row .rate .mono { font-weight:500; }
+.spot-detail .pic { margin-bottom:12px; }
+.adpic { background:#5a3a22 !important; }
+.adpic .card { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:8%; color:#fff; }
+.adpic .card b { font:800 clamp(14px,7cqw,34px)/1 var(--font-display); font-stretch:112%; }
+.adpic .card span { font-size:clamp(9px,3cqw,14px); opacity:.9; margin-top:4px; }
+.adpic .qr { position:absolute; right:6%; top:10%; width:18%; aspect-ratio:1; background:#fff; border-radius:4px; padding:4%; }
+.adpic .qr i { display:block; width:100%; height:100%; background:
+  linear-gradient(90deg,#111 0 30%,transparent 30% 40%,#111 40% 50%,transparent 50% 70%,#111 70%) 0 0/100% 20%,
+  linear-gradient(90deg,transparent 0 20%,#111 20% 45%,transparent 45% 60%,#111 60% 80%,transparent 80%) 0 50%/100% 20%,
+  linear-gradient(90deg,#111 0 35%,transparent 35% 55%,#111 55%) 0 100%/100% 20%; background-repeat:no-repeat; }
+.kv { border-top:1px solid var(--line); margin:10px 0; }
+.kv div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.kv div span:first-child { color:var(--ink-70); } .kv div span:last-child { font-weight:600; text-align:right; }
+.week { display:grid; grid-template-columns:56px repeat(7,1fr); border-top:1px solid var(--line); }
+.week .wh { font-size:12.5px; font-weight:600; color:var(--ink-50); padding:6px 8px; border-bottom:1px solid var(--line); }
+.week .wh.on { color:var(--ink); }
+.week .tm { font:500 12px var(--font-mono); color:var(--ink-50); padding:8px 0; border-bottom:1px solid var(--hair); }
+.week .cl { border-left:1px solid var(--hair); border-bottom:1px solid var(--hair); padding:4px; font-size:12px; min-height:48px; }
+.week .cl .it { border-radius:4px; padding:4px 6px; background:var(--raised); height:100%; line-height:1.25; }
+.week .cl .it.new { background:transparent; border:2px solid var(--signal); }
+.week .cl .it.rep { text-decoration:line-through; color:var(--ink-50); }
+.week .cl .it.live { box-shadow:inset 2px 0 0 var(--live); }
+
+/* phone master control */
+.pm-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 16px 10px; border-bottom:1px solid var(--hair); }
+.pm-top .cs { font-size:16px; } .pm-top .ch { font-size:14px; color:var(--ink-50); }
+.pm-sec { padding:14px 16px; border-bottom:1px solid var(--hair); }
+.pm-sec h4 { margin:0 0 8px; font:700 15px var(--font-display); }
+.pm-next { display:flex; align-items:center; gap:12px; }
+.pm-next small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pm-acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:14px 16px; }
+.notif { margin:14px 12px 0; padding:12px 14px; border-radius:16px; background:var(--raised); box-shadow:0 0 0 1px var(--hair), 0 8px 24px rgb(0 0 0 / .25); font-size:13.5px; }
+.notif .top { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--ink-50); margin-bottom:4px; }
+.notif .top svg { width:16px; height:13px; }
+.notif b { display:block; font-weight:600; font-size:14.5px; }
+.demo-wrap { display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap; }
+.ph2 { width:360px; height:740px; border-radius:44px; background:#05080F; padding:10px; box-shadow:0 0 0 1px var(--line), 0 30px 60px rgb(0 0 0 / .35); flex:none; }
+.ph2.land { width:740px; height:360px; }
+.scr { position:relative; width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0A1124; color:#fff; touch-action:none; user-select:none; -webkit-user-select:none; font-family:var(--font-text); }
+.panel { position:absolute; inset:0; will-change:transform; }
+.panel .pv { position:absolute; inset:0; background:radial-gradient(120% 80% at 30% 30%, color-mix(in srgb, var(--pc) 80%, #fff 20%), var(--pc) 50%, color-mix(in srgb, var(--pc) 55%, #000 45%)); }
+.panel .pv.snowy { background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='7'/><feColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.64 0 0 0 0 0.70 0 0 0 0.22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") center/cover, #1C2440; }
+.panel .ttl { position:absolute; left:8%; right:22%; top:40%; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.land .panel .ttl { top:34%; right:30%; font-size:34px; }
+.panel .osd2 { position:absolute; top:112px; right:76px; text-align:right; line-height:1; text-shadow:0 1px 8px rgb(0 0 0 / .5); opacity:0; transition:opacity .15s; }
+.land .panel .osd2 { top:18px; right:22px; }
+.panel .osd2.on { opacity:1; }
+.panel .osd2 .n { display:block; font:500 34px var(--font-mono); letter-spacing:-.04em; }
+.panel .osd2 .c { display:block; font:800 15px var(--font-display); font-stretch:125%; margin-top:3px; }
+.panel canvas { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; display:none; }
+.panel canvas.on { display:block; }
+.panel .tuning { position:absolute; left:8%; bottom:150px; display:none; }
+.panel .tuning.on { display:block; } .panel .tuning b { display:block; font:800 20px var(--font-display); font-stretch:112%; } .panel .tuning span { font-size:12px; opacity:.8; }
+/* player banner and bug (unchanged player) */
+.pbanner { position:absolute; left:10px; right:10px; bottom:96px; background:rgb(10 17 36 / .86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-radius:14px; padding:12px 14px 12px; box-shadow:0 0 0 1px rgb(255 255 255 / .1); transform:translateY(16px); opacity:0; transition:transform .24s cubic-bezier(.2,.7,.2,1), opacity .24s; pointer-events:none; color:#ECE9E1; }
+.pbanner.on { transform:none; opacity:1; }
+.land .pbanner { left:16px; right:74px; bottom:14px; }
+.pbanner .top3 { display:flex; align-items:center; gap:10px; }
+.pbanner .idn { display:grid; grid-template-columns:auto auto; gap:1px 10px; align-items:center; }
+.pbanner .idn .chn { grid-row:span 2; font:500 22px/1 var(--font-mono); letter-spacing:-.04em; padding-right:10px; border-right:1.5px solid rgb(255 255 255 / .25); }
+.pbanner .idn .cs { font:800 16px/1 var(--font-display); font-stretch:125%; }
+.pbanner .idn small { font-size:11px; color:#B1B8C9; line-height:1.1; }
+.pbanner .side3 { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.pbanner .clock3 { font:500 13px var(--font-mono); }
+.pbanner .tally { font-size:9.5px; }
+.pbanner .src3 { font-size:11.5px; color:#B1B8C9; margin-top:10px; }
+.pbanner h4 { margin:2px 0 8px; font:800 20px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.pbanner .prog3 { display:flex; align-items:center; gap:8px; font-size:11.5px; color:#B1B8C9; }
+.pbanner .prog3 .mono { color:#ECE9E1; font-size:11.5px; }
+.pbanner .prog3 .bar { flex:1; height:4px; border-radius:2px; background:rgb(255 255 255 / .18); overflow:hidden; }
+.pbanner .prog3 .bar i { display:block; height:100%; background:#ECE9E1; }
+.pbanner .nx3 { margin-top:8px; font-size:11.5px; color:#B1B8C9; display:flex; gap:6px; align-items:center; }
+.pbanner .nx3 b { color:#ECE9E1; font-weight:600; }
+.pbanner .live3 { display:inline-flex; align-items:center; gap:4px; height:18px; padding:0 6px; border-radius:3px; border:1px solid #D9301F; color:#FF6A55; font:700 10px var(--font-text); }
+.pbanner .live3 i { width:5px; height:5px; border-radius:50%; background:#FF6A55; }
+.paused .pbanner .tally { background:transparent; color:#8F98AE; box-shadow:inset 0 0 0 1.5px #5A6480; text-shadow:none; animation:none; }
+.pausemark { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.9); display:flex; flex-direction:column; align-items:center; gap:8px; opacity:0; transition:opacity .15s, transform .15s; pointer-events:none; }
+.paused .pausemark { opacity:1; transform:translate(-50%,-50%) scale(1); }
+.pausemark .g { width:64px; height:64px; border-radius:50%; background:rgb(10 17 36 / .6); display:grid; place-items:center; }
+.pausemark .g svg { width:26px; height:26px; }
+.pausemark span { font:600 12.5px var(--font-text); text-shadow:0 1px 6px rgb(0 0 0 / .6); }
+.paused .panel .pv { filter:brightness(.72); transition:filter .2s; }
+.golive { position:absolute; left:50%; transform:translateX(-50%) translateY(8px); bottom:94px; display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 14px; border-radius:999px; border:0; background:#ECE9E1; color:#0F1830; font:700 13px var(--font-text); box-shadow:0 8px 24px rgb(0 0 0 / .35); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s, bottom .24s cubic-bezier(.2,.7,.2,1); cursor:pointer; white-space:nowrap; z-index:6; }
+.pbanner.on ~ .golive { bottom:262px; }
+.golive.on ~ .pos { opacity:0; }
+.golive.on ~ .pbug { bottom:146px; }
+.pbug { transition:opacity .3s, bottom .24s cubic-bezier(.2,.7,.2,1); }
+.golive.on { opacity:1; transform:translateX(-50%); pointer-events:auto; }
+.golive i { width:8px; height:8px; border-radius:50%; background:#D9301F; }
+.golive span { font:500 12px var(--font-mono); color:#525C73; }
+.land .golive { bottom:auto; top:18px; }
+.pbug { position:absolute; right:22px; bottom:112px; text-align:right; line-height:1; opacity:0; transition:opacity .3s; }
+.land .pbug { right:24px; bottom:22px; }
+.pbug.on { opacity:.8; } .pbug .cs { display:block; font:800 13px var(--font-display); font-stretch:125%; } .pbug .chn { font:500 9px var(--font-mono); }
+/* packaging */
+.topbar { position:absolute; left:0; right:0; top:0; padding:calc(var(--safe-top, 44px) + 8px) 16px 0; display:grid; grid-template-columns:1fr auto 1fr; align-items:start; background:linear-gradient(to bottom, rgb(5 8 15 / .5) 0%, rgb(5 8 15 / .28) 45%, rgb(5 8 15 / 0) 100%); height:calc(var(--safe-top, 44px) + 96px); pointer-events:none; transition:opacity .25s; }
+.topbar > * { pointer-events:auto; }
+.topbar .mkt { font-size:12.5px; font-weight:600; opacity:.9; display:flex; gap:4px; align-items:center; }
+.topbar .mkt svg { width:13px; height:13px; }
+.band { display:inline-flex; gap:18px; font:700 15px var(--font-display); }
+.band span { opacity:.6; padding-bottom:4px; } .band span.on { opacity:1; box-shadow:inset 0 -2px 0 #fff; }
+.topbar .srch { justify-self:end; width:22px; height:22px; }
+.sbar2 { position:absolute; top:0; left:0; right:0; height:40px; display:flex; justify-content:space-between; align-items:flex-end; padding:0 26px 4px; font:600 13px var(--font-text); z-index:5; pointer-events:none; }
+.land .sbar2, .land .homebar { display:none; }
+.land .topbar { display:none; }
+.land .rail2 button { font-size:0; gap:0; }
+.land .rail2 .ic2 { width:38px; height:38px; }
+.land .rail2 .ic2 svg { width:18px; height:18px; }
+.rail2 { position:absolute; right:10px; bottom:284px; display:flex; flex-direction:column; gap:10px; align-items:center; transition:opacity .25s; }
+.land .rail2 { right:16px; bottom:auto; top:50%; transform:translateY(-50%); gap:9px; }
+.rail2 button { background:none; border:0; color:#fff; display:flex; flex-direction:column; align-items:center; gap:4px; font:600 10.5px var(--font-text); cursor:pointer; text-shadow:0 1px 6px rgb(0 0 0 / .5); }
+.rail2 .ic2 { width:44px; height:44px; border-radius:50%; background:rgb(10 17 36 / .45); display:grid; place-items:center; }
+.rail2 .ic2 svg { width:21px; height:21px; }
+.rail2 .ic2.filled { background:#fff; color:#0A1124; }
+.pos { position:absolute; left:18px; bottom:262px; font:500 11px var(--font-mono); opacity:.85; letter-spacing:.02em; transition:opacity .25s; text-shadow:0 1px 6px rgb(0 0 0 / .6); }
+.land .pos { left:18px; bottom:auto; top:16px; }
+.tabs2 { position:absolute; left:14px; right:14px; bottom:22px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; transition:opacity .25s; }
+.tabs2 > * { pointer-events:auto; }
+.tabs2 .pill { display:flex; gap:2px; padding:5px; border-radius:999px; background:rgb(10 17 36 / .72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:0 0 0 1px rgb(255 255 255 / .12), 0 10px 30px rgb(0 0 0 / .35); }
+.tabs2 .pill span { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; width:56px; height:46px; border-radius:999px; font:600 10px var(--font-text); opacity:.62; }
+.tabs2 .pill span.on { opacity:1; background:rgb(255 255 255 / .12); }
+.tabs2 .pill svg { width:19px; height:19px; }
+.tabs2 .main { width:58px; height:58px; border-radius:50%; border:0; display:grid; place-items:center; background:#6CCFEA; color:#0F1830; box-shadow:0 10px 30px rgb(0 0 0 / .4); cursor:pointer; }
+.tabs2 .main svg { width:22px; height:22px; }
+.land .tabs2 { display:none; }
+.homebar { position:absolute; left:50%; bottom:5px; width:120px; height:4px; border-radius:2px; background:#fff; opacity:.8; transform:translateX(-50%); }
+.detent { position:absolute; left:0; right:0; display:grid; place-items:center; pointer-events:none; opacity:0; transition:opacity .12s; }
+.detent.on { opacity:1; }
+.detent div { background:rgb(10 17 36 / .88); border:1px solid rgb(255 255 255 / .2); border-radius:999px; padding:8px 14px; font-size:12.5px; font-weight:600; text-align:center; line-height:1.3; }
+.detent div small { display:block; font-weight:500; opacity:.75; font-size:11px; }
+.chrome-off .topbar, .chrome-off .rail2, .chrome-off .pos, .chrome-off .tabs2 { opacity:0; }
+.mini-wrap { width:270px; height:555px; }
+.mini-wrap.land { width:555px; height:270px; }
+.mini-wrap .ph2 { transform:scale(.75); transform-origin:top left; }
+.dragging .pbug, .dragging .pbanner { opacity:0 !important; }
+
+/* ---------- other tabs ---------- */
+.scr.tabview { background:var(--ground); color:var(--ink); }
+.tabview .sbar2 { color:var(--ink); }
+.tabview .homebar { background:var(--ink); }
+.tabview .tabs2 .pill { background:color-mix(in srgb, var(--raised) 90%, transparent); box-shadow:0 0 0 1px var(--line), 0 10px 30px rgb(0 0 0 / .25); }
+.tabview .tabs2 .pill span { color:var(--ink); }
+.tabview .tabs2 .pill span.on { background:var(--hair); }
+.tabs2 .main { background:var(--signal-fill, #6CCFEA); color:var(--on-signal, #0F1830); }
+.tv-body { position:absolute; inset:0; padding:52px 0 150px; overflow:hidden; }
+.tv-head { padding:10px 18px 8px; display:flex; align-items:flex-end; gap:10px; }
+.tv-head h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.tv-head .end { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.chipsel { display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 10px; border-radius:999px; border:1px solid var(--line); font:600 12px var(--font-text); color:var(--ink); background:none; }
+.chipsel svg { width:12px; height:12px; }
+.bandseg { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+.bandseg span { font:700 12px var(--font-display); padding:6px 12px; color:var(--ink-70); }
+.bandseg span.on { background:var(--ink); color:var(--ground); }
+/* guide */
+.g-ruler { display:grid; grid-template-columns:70px 1fr; border-bottom:1px solid var(--line); margin-top:6px; }
+.g-times { position:relative; height:24px; }
+.g-times span { position:absolute; top:4px; font:500 11px var(--font-mono); color:var(--ink-50); transform:translateX(-50%); }
+.g-times span.nowlbl { color:var(--live); }
+.g-sec { padding:10px 18px 4px; font-size:11.5px; font-weight:600; color:var(--ink-50); letter-spacing:.02em; }
+.g-row { display:grid; grid-template-columns:70px 1fr; border-bottom:1px solid var(--hair); height:58px; }
+.g-id { padding:8px 0 0 18px; line-height:1.1; border-right:1px solid var(--hair); }
+.g-id .n { display:block; font:500 12px var(--font-mono); color:var(--ink-70); }
+.g-id .c { display:block; font:800 14px var(--font-display); font-stretch:125%; }
+.g-track { position:relative; overflow:hidden; }
+.g-cell { position:absolute; top:0; bottom:0; padding:8px 8px 0 10px; border-right:1px solid var(--hair); overflow:hidden; white-space:nowrap; }
+.g-cell b { display:block; font-weight:600; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; }
+.g-cell small { display:block; font-size:11px; color:var(--ink-70); }
+.g-cell.now { box-shadow:inset 3px 0 0 var(--live); }
+.g-cell .lv { display:inline-flex; align-items:center; gap:3px; font:700 9.5px var(--font-text); color:var(--live); margin-left:4px; }
+.g-now { position:absolute; top:0; bottom:0; width:1.5px; background:var(--live); opacity:.75; z-index:0; }
+.g-cell { z-index:1; }
+.g-cell b, .g-cell small { text-shadow:0 0 6px var(--ground), 0 0 2px var(--ground); }
+.g-now::before { content:""; position:absolute; top:-3px; left:-3px; width:8px; height:8px; border-radius:50%; background:var(--live); }
+.g-row.tuned { background:color-mix(in srgb, var(--signal) 10%, transparent); }
+.miniplay { position:absolute; left:14px; right:14px; bottom:92px; height:54px; border-radius:14px; display:grid; grid-template-columns:78px minmax(0,1fr) auto; gap:10px; align-items:center; padding:6px; background:var(--raised); box-shadow:0 0 0 1px var(--line), 0 10px 24px rgb(0 0 0 / .25); }
+.miniplay .thumb { height:42px; border-radius:9px; background:radial-gradient(120% 90% at 30% 30%, color-mix(in srgb, var(--pc) 80%, #fff 20%), var(--pc)); position:relative; }
+.miniplay .thumb .tally { position:absolute; left:4px; bottom:4px; font-size:7px; padding:1px 3px; }
+.miniplay b { display:block; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.miniplay small { display:block; font-size:11px; color:var(--ink-70); }
+.miniplay small .mono { color:var(--ink); }
+.miniplay .pp { width:36px; height:36px; border-radius:50%; border:0; background:none; color:var(--ink); display:grid; place-items:center; }
+.miniplay .pp svg { width:18px; height:18px; }
+.miniplay .mbar { position:absolute; left:14px; right:14px; bottom:0; height:2px; border-radius:1px; background:var(--hair); overflow:hidden; }
+.miniplay .mbar i { display:block; height:100%; background:var(--ink); }
+/* search */
+.s-field { margin:6px 18px 10px; height:44px; border-radius:12px; border:1.5px solid var(--signal); display:flex; align-items:center; gap:10px; padding:0 12px; font-size:15px; background:var(--raised); }
+.s-field svg { width:18px; height:18px; color:var(--ink-70); }
+.s-field .caret { width:1.5px; height:20px; background:var(--signal); margin-left:-8px; }
+.s-field .ph { color:var(--ink-50); }
+.s-tune { margin:0 18px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; padding:12px 0; border-top:2px solid var(--ink); border-bottom:1px solid var(--hair); }
+.s-tune .n { font:500 30px/1 var(--font-mono); letter-spacing:-.04em; }
+.s-tune b { display:block; font:800 16px var(--font-display); font-stretch:125%; } .s-tune small { font-size:12px; color:var(--ink-70); }
+.s-sec { margin:16px 18px 2px; font-size:11.5px; font-weight:600; color:var(--ink-50); }
+.s-row { margin:0 18px; display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.s-row .sw { width:12px; height:12px; border-radius:3px; }
+.s-row b { display:block; font-weight:600; } .s-row small { display:block; font-size:11.5px; color:var(--ink-70); }
+.s-row small .mono { color:var(--ink); }
+.s-row .act { font:600 12px var(--font-text); color:var(--signal); }
+.s-row mark { background:none; color:inherit; box-shadow:inset 0 -2px 0 var(--signal); }
+.s-chips { display:flex; flex-wrap:wrap; gap:8px; margin:8px 18px 0; }
+.s-chips span { height:34px; display:inline-flex; align-items:center; padding:0 14px; border-radius:999px; border:1px solid var(--line); font-size:13px; font-weight:600; }
+.s-recent { margin:0 18px; }
+.s-recent div { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; color:var(--ink-70); }
+.s-recent svg { width:15px; height:15px; }
+/* you */
+.y-top { display:flex; align-items:center; gap:12px; padding:14px 18px 12px; }
+.y-top .av { width:52px; height:52px; border-radius:50%; background:var(--raised); box-shadow:inset 0 0 0 1px var(--line); display:grid; place-items:center; font:800 18px var(--font-display); }
+.y-top b { display:block; font:800 22px var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.y-top small { font-size:12.5px; color:var(--ink-70); }
+.y-top .gear { margin-left:auto; height:32px; padding:0 12px; border-radius:999px; border:1px solid var(--line); background:none; color:var(--ink); font:600 12px var(--font-text); }
+.y-sec { margin:12px 18px 6px; display:flex; align-items:baseline; gap:8px; }
+.y-sec h3 { margin:0; font:700 15px var(--font-display); }
+.y-sec span { margin-left:auto; font-size:12px; color:var(--signal); font-weight:600; }
+.y-presets { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 18px; }
+.y-presets div { height:58px; border-radius:10px; padding:7px 9px; position:relative; color:#fff; display:flex; flex-direction:column; justify-content:flex-end; line-height:1.05; }
+.y-presets div .k { position:absolute; top:6px; left:8px; font:500 10px var(--font-mono); opacity:.85; }
+.y-presets div .n { font:500 11px var(--font-mono); opacity:.9; } .y-presets div .c { font:800 14px var(--font-display); font-stretch:125%; }
+.y-presets div.empty { border:1.5px dashed var(--line); color:var(--ink-50); align-items:center; justify-content:center; font-size:12px; font-weight:600; }
+.y-presets div.empty .k { color:var(--ink-50); }
+.y-row { margin:0 18px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.y-row:first-of-type { border-top:1px solid var(--line); }
+.y-row b { display:block; font-weight:600; } .y-row small { display:block; font-size:11.5px; color:var(--ink-70); }
+.y-row .tg { width:36px; height:22px; border-radius:11px; background:var(--ink); position:relative; }
+.y-row .tg::after { content:""; position:absolute; top:3px; right:3px; width:16px; height:16px; border-radius:50%; background:var(--ground); }
+.y-row .lnk { font-size:12px; font-weight:600; color:var(--signal); }
+
+/* ---------- tune keypad ---------- */
+.kp { position:absolute; inset:0; z-index:20; background:rgb(5 8 15 / .45); opacity:0; pointer-events:none; transition:opacity .2s; }
+.kp.on { opacity:1; pointer-events:auto; }
+.kp-sheet { position:absolute; left:0; right:0; bottom:0; padding:14px 18px 26px; border-radius:24px 24px 0 0; background:rgb(15 24 48 / .96); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:0 -1px 0 rgb(255 255 255 / .12); color:#ECE9E1; transform:translateY(24px); transition:transform .24s cubic-bezier(.2,.7,.2,1); }
+.kp.on .kp-sheet { transform:none; }
+.kp-grab { width:40px; height:4px; border-radius:2px; background:rgb(255 255 255 / .3); margin:0 auto 12px; }
+.kp-disp { display:flex; align-items:baseline; gap:10px; min-height:62px; border-bottom:2px solid #ECE9E1; padding-bottom:6px; }
+.kp-num { font:500 54px/1 var(--font-mono); letter-spacing:-.04em; }
+.kp-num .ph { color:#5A6480; font-size:34px; }
+.kp-caret { width:2px; height:44px; background:#6CCFEA; align-self:center; animation:blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.kp-band { margin-left:auto; font:600 10.5px var(--font-text); color:#8F98AE; align-self:center; text-align:right; max-width:110px; line-height:1.3; }
+.kp-match { min-height:42px; margin-top:8px; font-size:13px; color:#B1B8C9; line-height:1.35; }
+.kp-match b { display:block; color:#ECE9E1; font:800 16px var(--font-display); font-stretch:125%; }
+.kp-match.none b { color:#F0B43C; font-stretch:100%; font-weight:700; }
+.kp-count { height:3px; border-radius:2px; background:rgb(255 255 255 / .12); overflow:hidden; margin:6px 0 12px; }
+.kp-count i { display:block; height:100%; width:0; background:#6CCFEA; }
+.kp-count.run i { animation:cnt 2s linear forwards; }
+@keyframes cnt { from { width:100%; } to { width:0; } }
+.kp-keys { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.kp-keys button { height:58px; border-radius:14px; border:0; background:rgb(255 255 255 / .08); color:#ECE9E1; font:500 26px var(--font-mono); cursor:pointer; }
+.kp-keys button:active { background:rgb(255 255 255 / .18); }
+.kp-keys button.fn { color:#B1B8C9; display:grid; place-items:center; }
+.kp-keys button svg { width:20px; height:20px; }
+.kp-acts { display:grid; grid-template-columns:1fr 1.6fr; gap:8px; margin-top:12px; }
+.kp-acts button { height:50px; border-radius:14px; border:0; font:700 15px var(--font-text); cursor:pointer; }
+.kp-acts .cancel { background:none; color:#ECE9E1; box-shadow:inset 0 0 0 1.5px rgb(255 255 255 / .3); }
+.kp-acts .go { background:#6CCFEA; color:#0F1830; }
+.kp-acts .go[disabled] { opacity:.4; }
+.land .kp-sheet { left:auto; top:0; width:330px; border-radius:24px 0 0 24px; padding:14px 18px 14px; box-shadow:-1px 0 0 rgb(255 255 255 / .12); transform:translateX(24px); }
+.land .kp.on .kp-sheet { transform:none; }
+.land .kp-grab, .land .kp-band { display:none; }
+.land .kp-num { font-size:36px; } .land .kp-num .ph { font-size:24px; } .land .kp-disp { min-height:42px; } .land .kp-caret { height:30px; }
+.land .kp-match { min-height:32px; margin-top:4px; font-size:11.5px; } .land .kp-match b { font-size:13.5px; }
+.land .kp-count { margin:4px 0 8px; }
+.land .kp-keys { gap:5px; } .land .kp-keys button { height:33px; font-size:17px; border-radius:9px; }
+.land .kp-acts { margin-top:7px; } .land .kp-acts button { height:34px; border-radius:9px; font-size:13px; }
+
+/* ---------- tablet ---------- */
+.tab-wrap { overflow:hidden; }
+.tab-wrap.p { width:369px; height:531px; } .tab-wrap.l { width:531px; height:369px; }
+.tab-wrap .ph2 { transform:scale(.45); transform-origin:top left; }
+.ph2.tabp { width:820px; height:1180px; border-radius:42px; padding:14px; }
+.ph2.tabl { width:1180px; height:820px; border-radius:42px; padding:14px; }
+.ph2.tabp .scr, .ph2.tabl .scr { border-radius:30px; }
+.tabp .sbar2, .tabl .sbar2 { height:30px; padding:0 30px 4px; font-size:14px; }
+.tabp, .tabl { --safe-top:28px; }
+.tabp .panel .pv.amb, .tabl .panel .pv.amb { filter:blur(28px) brightness(.5); transform:scale(1.1); }
+.f169 { position:absolute; left:0; right:0; aspect-ratio:16/9; background:radial-gradient(120% 90% at 30% 35%, color-mix(in srgb, var(--pc) 80%, #fff 20%), var(--pc) 55%, color-mix(in srgb, var(--pc) 60%, #000 40%)); display:flex; align-items:center; padding:0 7%; }
+.tabp .f169 { top:180px; }
+.tabl .f169 { top:0; bottom:0; aspect-ratio:auto; }
+.f169 b { font:800 56px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.tabp .scr > .topbar, .tabp .scr > .rail2, .tabp .scr > .pbanner, .tabp .scr > .tabs2, .tabp .scr > .pos, .tabp .scr > .pbug, .tabp .scr > .golive,
+.tabl .scr > .topbar, .tabl .scr > .rail2, .tabl .scr > .pbanner, .tabl .scr > .tabs2, .tabl .scr > .pos, .tabl .scr > .pbug { zoom:1.3; }
+.tabp .rail2 { bottom:auto; top:500px; flex-direction:row; right:18px; gap:14px; }
+.tabp .pos { bottom:auto; top:514px; left:18px; }
+.tabp .pbanner { left:16px; right:16px; bottom:88px; }
+.tabl .topbar { display:grid; }
+.tabl .rail2 { right:14px; top:50%; bottom:auto; transform:translateY(-50%); flex-direction:column; gap:10px; }
+.tabl .rail2 button { font-size:10.5px; gap:4px; }
+.tabl .rail2 .ic2 { width:44px; height:44px; }
+.tabl .pbanner { left:16px; right:auto; width:520px; bottom:84px; }
+.tabl .pos { left:18px; top:74px; bottom:auto; }
+.tabl .tabs2 { display:flex; }
+.tabp .kp-sheet, .tabl .kp-sheet { left:auto; right:24px; bottom:112px; top:auto; width:380px; border-radius:24px; box-shadow:0 0 0 1px rgb(255 255 255 / .12), 0 24px 60px rgb(0 0 0 / .5); zoom:1.15; }
+.tabl .kp-sheet { transform:none; }
+.tabp .kp-grab, .tabl .kp-grab { display:none; }
+.tabl .kp-sheet .kp-band { display:block; }
+.tabl .kp-num { font-size:54px; } .tabl .kp-disp { min-height:62px; } .tabl .kp-keys button { height:58px; font-size:26px; border-radius:14px; } .tabl .kp-acts button { height:50px; border-radius:14px; font-size:15px; } .tabl .kp-match { min-height:42px; font-size:13px; } .tabl .kp-match b { font-size:16px; }
+/* tablet tab views */
+.tabp .tv-body, .tabl .tv-body { padding:40px 0 150px; zoom:1.25; }
+.tabp .miniplay, .tabl .miniplay { zoom:1.3; }
+.tcols { display:grid; gap:0 26px; padding:0 8px; }
+.tcols .tv-head { padding-left:10px; }
+.tabp .tcols.two { grid-template-columns:1fr 1fr; }
+.tabl .tcols.two { grid-template-columns:1fr 1fr; }
+.tabl .tcols.three { grid-template-columns:1fr 1fr 1fr; }
+.tsplit { display:grid; grid-template-columns:380px minmax(0,1fr); gap:0; height:100%; }
+.tsplit .lcol { padding:6px 16px 0; border-right:1px solid var(--hair); }
+.tprev { position:relative; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:radial-gradient(120% 90% at 30% 35%, color-mix(in srgb, var(--pc) 80%, #fff 20%), var(--pc)); color:#fff; display:flex; align-items:flex-end; padding:12px; }
+.tprev b { font:800 20px/1 var(--font-display); font-stretch:112%; }
+.tprev .tally { position:absolute; top:10px; left:10px; font-size:9px; }
+.tprev .bg { position:absolute; right:10px; bottom:10px; text-align:right; line-height:1; opacity:.85; } .tprev .bg b { display:block; font-size:13px; font-stretch:125%; } .tprev .bg small { font:500 9px var(--font-mono); }
+.tinfo { padding:12px 2px; }
+.tinfo .idn2 { display:flex; align-items:center; gap:10px; }
+.tinfo .idn2 .n { font:500 20px var(--font-mono); letter-spacing:-.03em; padding-right:10px; border-right:1.5px solid var(--line); }
+.tinfo .idn2 b { font:800 15px var(--font-display); font-stretch:125%; display:block; } .tinfo .idn2 small { font-size:11px; color:var(--ink-70); }
+.tinfo h4 { margin:12px 0 8px; font:800 19px var(--font-display); font-stretch:112%; }
+.tinfo .prog3 { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--ink-70); }
+.tinfo .prog3 .mono { color:var(--ink); } .tinfo .prog3 .bar { flex:1; height:4px; border-radius:2px; background:var(--hair); overflow:hidden; } .tinfo .prog3 .bar i { display:block; height:100%; background:var(--ink); }
+.tinfo .nx3 { margin-top:8px; font-size:11.5px; color:var(--ink-70); } .tinfo .nx3 b { color:var(--ink); }
+.tinfo .btnrow { display:flex; gap:8px; margin-top:12px; }
+.tinfo .btnrow span { height:32px; display:inline-flex; align-items:center; padding:0 12px; border-radius:999px; font:600 12px var(--font-text); box-shadow:inset 0 0 0 1px var(--line); }
+.tinfo .btnrow span.pri { background:var(--signal-fill, #6CCFEA); color:var(--on-signal, #0F1830); box-shadow:none; }
+.tab-frames { display:flex; flex-wrap:wrap; gap:26px; align-items:flex-start; }
+.tab-frames figure { margin:0; }
+.tab-frames figcaption { font-size:12.5px; color:var(--ink-70); margin-top:10px; max-width:369px; line-height:1.4; }
+.tab-frames figure.lw figcaption { max-width:531px; }
+.tab-frames figcaption b { display:block; color:var(--ink); font-size:13px; }
+.tab-sub { font:700 16px var(--font-display); margin:6px 0 12px; }
+
+.sidebtns { display:flex; flex-direction:column; gap:10px; min-width:220px; }
+.sidebtns .opt2 { display:inline-flex; gap:6px; align-items:center; font-size:14px; color:var(--ink-70); }
+.frames { display:flex; flex-wrap:wrap; gap:26px; align-items:flex-start; }
+.frames figure { margin:0; }
+.frames figcaption { font-size:12.5px; color:var(--ink-70); margin-top:10px; max-width:270px; line-height:1.4; }
+.frames figcaption b { display:block; color:var(--ink); font-size:13px; }
+.frames figure.wide figcaption { max-width:555px; }
+.spec { border-top:2px solid var(--ink); max-width:980px; }
+.spec div { display:grid; grid-template-columns:260px minmax(0,1fr); gap:16px; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14.5px; }
+.spec div span:first-child { font-weight:600; }
+@media (max-width:760px) { .spec div { grid-template-columns:1fr; gap:2px; } }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M4 13v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 3l8 14H2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 2.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2L2.5 8l5.2-.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-star-f" viewBox="0 0 20 20"><path d="M10 2.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2L2.5 8l5.2-.7z" fill="currentColor"/></symbol>
+  <symbol id="i-keypad" viewBox="0 0 20 20"><g fill="currentColor"><circle cx="5" cy="4" r="1.6"/><circle cx="10" cy="4" r="1.6"/><circle cx="15" cy="4" r="1.6"/><circle cx="5" cy="9" r="1.6"/><circle cx="10" cy="9" r="1.6"/><circle cx="15" cy="9" r="1.6"/><circle cx="5" cy="14" r="1.6"/><circle cx="10" cy="14" r="1.6"/><circle cx="15" cy="14" r="1.6"/><circle cx="10" cy="18.2" r="1.6"/></g></symbol>
+  <symbol id="i-bksp" viewBox="0 0 20 20"><path d="M7 4h9.5A1.5 1.5 0 0 1 18 5.5v9a1.5 1.5 0 0 1-1.5 1.5H7l-5-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 7.5l5 5M14.5 7.5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 20 20"><path d="M10 16.5S3 12.4 3 7.6A3.6 3.6 0 0 1 10 6a3.6 3.6 0 0 1 7 1.6c0 4.8-7 8.9-7 8.9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+</defs></svg>
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: the swipe home (proposal)</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Home 02</span><span>Viewer app, phone, portrait and landscape</span></div>
+  <h1>The home is the picture. Swipe to change channel.</h1>
+  <p>A redesign of the viewer app's home, for its own focused build pass. The app opens straight onto live TV, full screen. Swiping up and down moves through your presets first, then the rest of the dial in channel order, with resistance as you drag and a snap when you let go. It's the gesture people already know from short-video apps, used for something they know from television: flipping channels.</p>
+  <p>Only the packaging changes. The player is exactly as specified elsewhere: the tuning static, the corner number, the bug, and the banner with its progress bar, time left and what's next.</p>
+  <ul class="toc">
+    <li><a href="#demo"><span class="mono">01</span>Try it</a></li>
+    <li><a href="#frames"><span class="mono">02</span>The moments</a></li>
+    <li><a href="#pause"><span class="mono">03</span>Pause and back to live</a></li>
+    <li><a href="#keypad"><span class="mono">04</span>Tune by number</a></li>
+    <li><a href="#land"><span class="mono">05</span>Landscape</a></li>
+    <li><a href="#tabs"><span class="mono">06</span>Guide, Search and You</a></li>
+    <li><a href="#tablet"><span class="mono">07</span>Tablet</a></li>
+    <li><a href="#rules"><span class="mono">08</span>Gesture and rules</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>Still a dial</h3><p class="muted">The order is fixed: presets, then channel order. Nothing is ranked or recommended, and the same swipe always lands on the same station.</p></div>
+    <div><h3>No counts, ever</h3><p class="muted">The right-hand buttons have labels, not numbers. No likes, no views, no viewers.</p></div>
+    <div><h3>The drag is the tuning</h3><p class="muted">When the next channel is ready, the drag itself is the transition. Static only appears when it isn't.</p></div>
+    <div><h3>You always know where you are</h3><p class="muted">A small line says "Preset 2 of 3" or "Dial, 4 of 5", and crossing from presets into the dial is felt as well as seen.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= DEMO ================= -->
+<section class="ref" id="demo"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Try it</span></div>
+  <h2>Drag the picture up or down.</h2>
+  <p class="lede">A working version in portrait. Drag with a mouse or finger, flick for a fast change, or use the arrow keys. This viewer's presets are BEAT, SAZN and CIVC; after them come the rest of the Inland Empire's TV stations in channel order. PREP 31.1 is slow to load, so you can see the static stand in for it.</p>
+  <div class="stage">
+    <div class="demo-wrap">
+      <div class="ph2" id="demoPhone"></div>
+      <div class="sidebtns">
+        <button class="btn btn-ghost" id="dUp"><svg class="i"><use href="#i-up"/></svg>Next (swipe up)</button>
+        <button class="btn btn-ghost" id="dDn"><svg class="i"><use href="#i-down"/></svg>Previous (swipe down)</button>
+        <label class="opt2"><input type="checkbox" id="dLand"> Landscape</label>
+        <p class="quiet" style="font-size:13px;margin:6px 0 0;max-width:34ch">Press the blue Tune button and type 7, 24 or 45. Tap the picture to pause, and again to resume behind live; then try "Back to live". In landscape the buttons hide after 3 seconds and come back with any tap.</p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Presets, then the dial</h3><p>The first swipes go through the viewer's presets in preset order. Then the rest of the dial in channel order, skipping stations already in the presets. After the last station it wraps back to preset 1.</p></div>
+      <div class="note"><h3>A detent at the boundary</h3><p>Dragging from the last preset into the dial meets extra resistance and shows "End of your presets". It takes a slightly longer pull, so nobody leaves their presets by accident.</p></div>
+      <div class="note"><h3>Live picture, or static</h3><p>The next and previous stations are preloaded, so dragging usually reveals their live picture. If one isn't ready, it shows the tuning static with its number instead, and keeps the static after the snap until its first frame arrives.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= FRAMES ================= -->
+<section class="ref" id="frames"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>The moments</span></div>
+  <h2>At rest, mid-drag, at the boundary, and not ready.</h2>
+  <p class="lede">Four stills from the gesture, in portrait. The packaging around the picture is small: the TV or radio band at the top, five labelled buttons on the right, the position line, and a floating bar with the four tabs on the left and the Tune button on the right.</p>
+  <div class="stage">
+    <div class="frames" id="stills"></div>
+    <div class="notes">
+      <div class="note"><h3>The right-hand buttons</h3><p>Preset (filled when the station is one), Remind, Pledge, Share and Guide. The same actions the old home had, moved to where thumbs expect them.</p></div>
+      <div class="note"><h3>TV and Radio at the top</h3><p>Two bands, like the two feeds short-video apps put at the top. Radio swipes through the radio presets, then the band by frequency, with the needle sweep instead of static.</p></div>
+      <div class="note"><h3>A floating bar and a Tune button</h3><p>The four tabs (Watch, Guide, Search, You) float in a pill over the picture, and the main button sits on its own at the right. Tune opens a number pad: type "18" and it tunes to SAZN, with the usual static and corner number. The full dial as a list lives in Guide.</p></div>
+      <div class="note"><h3>The station page</h3><p>Tapping the call sign in the banner or the corner opens the station's page. No sideways swipes: one gesture per axis keeps it predictable.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= PAUSE ================= -->
+<section class="ref" id="pause"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>Pause and back to live</span></div>
+  <h2>Tap to pause. A button brings you back.</h2>
+  <p class="lede">Tapping the picture pauses, and tapping again resumes from the same moment, now behind the broadcast. While you're behind, a "Back to live" button floats above the banner with how far behind you are. Changing channel always joins the new station live.</p>
+  <div class="stage">
+    <div class="frames" id="pauseStills"></div>
+    <div class="notes">
+      <div class="note"><h3>The tally tells the truth</h3><p>Paused, the banner's ON AIR sign goes unlit, as the style guide says: the station is still broadcasting, but you're not watching it live.</p></div>
+      <div class="note"><h3>How far behind</h3><p>The button counts the gap in minutes and seconds. Behind live is only ever caused by pausing, since there's no scrubbing on a live channel.</p></div>
+      <div class="note"><h3>Held for 30 minutes</h3><p>A pause holds for up to 30 minutes, the existing player rule. After that, resuming goes straight back to live.</p></div>
+      <div class="note"><h3>Buttons don't pause</h3><p>Taps on the right-hand buttons, the top bar and the floating bar never pause. Only the picture does.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= KEYPAD ================= -->
+<section class="ref" id="keypad"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Tune by number</span></div>
+  <h2>The Tune button: type a channel, and you're there.</h2>
+  <p class="lede">The main button opens a number pad over the picture. Type a channel (18, or 18.2 for a subchannel) or a radio frequency (90.7), and it tunes 2 seconds after you stop typing, or straight away with Tune. It's the same rule as typing a number on the TV remote, and the one thing a swipe can't do: jump anywhere on the dial at once. Try it in the demo above: press the blue button and type 7, 24 or 45.</p>
+  <div class="stage">
+    <div class="frames" id="kpStills"></div>
+    <div class="notes">
+      <div class="note"><h3>No band switch needed</h3><p>TV channels run 2 to 69 and radio 88.1 to 107.9, so the number says which band it is. "18" means TV 18.1; "90.7" means radio.</p></div>
+      <div class="note"><h3>It tells you before it tunes</h3><p>As you type, the pad names the station and what's on. A number with no station says so and suggests the nearest, instead of tuning into nothing.</p></div>
+      <div class="note"><h3>Then the usual tuning</h3><p>Number entry uses the full channel change: static for at least 300 ms, the corner number, then the banner. Unlike a swipe, the station wasn't preloaded.</p></div>
+      <div class="note"><h3>From any tab</h3><p>The Tune button is on every tab. From Guide, Search or You, tuning opens Watch on that station.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= LANDSCAPE ================= -->
+<section class="ref" id="land"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>Landscape</span></div>
+  <h2>The same swipe, sideways on.</h2>
+  <p class="lede">Turn the phone and the picture fills the screen. Swiping is still up and down. The tabs and band switch go away; the buttons and position line fade after 3 seconds and come back with a tap.</p>
+  <div class="stage">
+    <div class="frames" id="landStills"></div>
+    <div class="notes">
+      <div class="note"><h3>Up and down, both ways</h3><p>Landscape keeps the vertical swipe, so the gesture never changes meaning when the phone turns. Horizontal swipes do nothing, which also protects the picture from accidental changes.</p></div>
+      <div class="note"><h3>Icons only, sideways</h3><p>In landscape the button labels drop to leave room for the picture. Each keeps its name for screen readers, and a long press shows it.</p></div>
+      <div class="note"><h3>Casting and mirroring</h3><p>When the phone is a remote for a TV, this screen becomes the remote as already designed; swiping there changes the TV's channel.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= TABS ================= -->
+<section class="ref" id="tabs"><div class="wrap">
+  <div class="ch-label"><span class="n">06</span><span>Guide, Search and You</span></div>
+  <h2>The other tabs, in the new packaging.</h2>
+  <p class="lede">The three other tabs, reworked around the floating bar. They sit on the app's ground instead of the picture, and the channel you were watching keeps playing in a strip above the bar: tap it to go back to Watch, or swipe it down to stop. Guide follows the same order as the swipe, presets first and then the dial.</p>
+  <div class="stage">
+    <div class="frames" id="tabStills"></div>
+    <div class="notes">
+      <div class="note"><h3>The guide matches the swipe</h3><p>Your presets first, then the rest of the dial in channel order, so the guide and the swipe never disagree. A red line marks now; the station you're watching is tinted. Tap a row to tune in; tap a later program to set a reminder.</p></div>
+      <div class="note"><h3>Search tunes numbers</h3><p>Typing a number, call sign or frequency puts "Tune to" at the top, the same shortcut as the Tune button. Then stations, and programs on now or later tonight, never ranked by popularity.</p></div>
+      <div class="note"><h3>Browse by kind, not by trending</h3><p>Before typing, Search offers kinds of station and recent searches. There's no "trending" or "popular", in keeping with the rule that viewers never see audience numbers.</p></div>
+      <div class="note"><h3>You is the viewer's own</h3><p>Presets as six slots in order (the swipe's order), reminders with "switch me over", pledges, TVs, and settings. "Run a station" leads into master control in the same account.</p></div>
+      <div class="note"><h3>The mini player</h3><p>Shows the channel's colour, call sign, what's on with time left, and the tally. Its thin line is the program's progress, not a scrub bar.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= TABLET ================= -->
+<section class="ref" id="tablet"><div class="wrap">
+  <div class="ch-label"><span class="n">07</span><span>Tablet</span></div>
+  <h2>Every screen on iPad and Android tablets.</h2>
+  <p class="lede">The same app on a tablet, in both orientations. Everything works the same way (swipe for channels, tap to pause, the Tune button, the floating bar), but each screen uses the room: portrait keeps the picture 16:9 with the station's colour around it, and landscape puts the live picture beside the guide and search instead of shrinking it into a strip.</p>
+  <div class="tab-sub">Portrait</div>
+  <div class="tab-frames" id="tabPortrait"></div>
+  <div class="tab-sub" style="margin-top:28px">Landscape</div>
+  <div class="stage">
+    <div class="tab-frames" id="tabLand"></div>
+    <div class="notes">
+      <div class="note"><h3>Never crop the picture</h3><p>On a phone the picture can fill the screen. On a portrait tablet that would cut off most of a 16:9 broadcast, so it stays 16:9 and the station's colour fills the space, blurred, like light from the screen.</p></div>
+      <div class="note"><h3>Swipe the whole screen</h3><p>In portrait the swipe moves the whole screen, picture and glow together, exactly as on a phone.</p></div>
+      <div class="note"><h3>The pad as a panel</h3><p>On tablets the Tune pad opens as a panel above the Tune button, in both orientations, so the picture stays visible while typing.</p></div>
+      <div class="note"><h3>The picture moves over</h3><p>In landscape, Guide and Search keep the live picture on screen instead of a mini player: beside the guide it's the channel you're watching, beside search it's the top match.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= RULES ================= -->
+<section class="ref" id="rules"><div class="wrap">
+  <div class="ch-label"><span class="n">08</span><span>Gesture and rules</span></div>
+  <h2>The numbers behind the feel.</h2>
+  <p class="lede">For the focused build pass. These sit alongside the player's tuning constants, not in place of them.</p>
+  <div class="spec">
+    <div><span>Order</span><span>Presets in preset order, then the rest of the band in channel order, skipping presets; wraps to preset 1. No presets: the dial alone</span></div>
+    <div><span>Drag</span><span>Follows the finger 1:1 up to 60% of the screen, then a third as far (rubber band)</span></div>
+    <div><span>Snap</span><span>Past 20% of the screen, or a flick faster than 0.5 px per ms; snaps in 240 ms, easing out</span></div>
+    <div><span>Spring back</span><span>Under the threshold, returns in 280 ms with a slight overshoot</span></div>
+    <div><span>Detent (presets to dial, and the wrap)</span><span>Half the drag distance for the same finger movement, a 35% threshold, a label, and a light haptic tick when crossed</span></div>
+    <div><span>Incoming station</span><span>Live picture if preloaded, with its corner number; otherwise the tuning static and number, which stays after the snap until its first frame</span></div>
+    <div><span>Static on a swipe</span><span>Only when the station isn't ready. The 300 ms minimum applies to buttons, remotes and number entry, not to a swipe that already showed the picture</span></div>
+    <div><span>Tap</span><span>Tapping the picture pauses and resumes, in both orientations. Taps on buttons and bars never pause. In landscape, any tap also brings the buttons back for 3 seconds</span></div>
+    <div><span>Paused</span><span>Picture dimmed, a play mark with "Paused at" and the time, the banner up with the tally unlit; holds up to 30 minutes, then resuming goes to live</span></div>
+    <div><span>Back to live</span><span>Appears whenever playback is behind the broadcast, showing how far behind. While the banner is up (paused, or just after resuming) it sits just above the banner; once the banner hides, it slides down to just above the floating bar. The position line hides while it shows. Tapping it, or changing channel, joins live</span></div>
+    <div><span>After the snap</span><span>Corner number, then the banner as usual; haptic tick on snap</span></div>
+    <div><span>Preloading</span><span>The next and previous station in the swipe order, plus the first station of the dial while in presets</span></div>
+    <div><span>Sound</span><span>Plays with sound after the viewer's first tap, as browsers require; "Muted previews" in Watching settings keeps it muted</span></div>
+    <div><span>Off air stations</span><span>Stay in the order and show their Off air screen with the time they're back</span></div>
+    <div><span>Reduced motion</span><span>The drag still works; the snap is a 200 ms crossfade instead of a slide</span></div>
+    <div><span>Accessibility</span><span>Next and previous are exposed as actions for screen readers, and the arrow keys and volume-free keyboard shortcuts work on the web</span></div>
+    <div><span>Floating bar</span><span>A pill holding Watch, Guide, Search and You on the left and the round Tune button on the right, 14 px from the screen edges and 22 px above the home indicator, space between them. The picture runs underneath, full bleed. It fades with the other buttons when they hide</span></div>
+    <div><span>Tune button</span><span>Opens the number pad: a sheet from the bottom in portrait, a panel on the right in landscape, with the picture dimmed but playing. Keys 0 to 9, a point for subchannels and frequencies, and delete. It names the station and what is on as you type, tunes 2 seconds after the last key or on Tune, and for an empty number says "No station on" with the nearest. 2 to 69 is TV (a whole number means .1); 88.1 to 107.9 is radio. Tuning by number always uses the full channel change with static</span></div>
+    <div><span>Top edge</span><span>The picture is full bleed to the very top of the screen, under the status bar, in the app and in a phone browser (<code>viewport-fit=cover</code>, with the top bar padded by <code>env(safe-area-inset-top)</code>). The top bar's fade starts at the screen edge and eases to nothing, so there's never a band below the status bar</span></div>
+    <div><span>Other tabs</span><span>Guide, Search and You sit on the app ground with the same floating bar; the watched channel continues in a mini player above the bar. Guide order matches the swipe: presets, then the dial</span></div>
+    <div><span>Tablet</span><span>Same gestures and bar. Portrait: the picture stays 16:9 across the width with the station's colour blurred above and below, buttons in a row under it, the banner below. Landscape: full picture, buttons on the right, banner bottom left, floating bar kept (fading with the buttons). The Tune pad is a panel above the Tune button. In landscape, Guide and Search show the live picture in a side column instead of the mini player; You spreads into two or three columns</span></div>
+    <div><span>Web and TV</span><span>The web home uses the same full-screen picture with the scroll wheel and arrow keys. TV mode is unchanged: channel up and down follow channel order</span></div>
+  </div>
+</div></section>
+</main>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, the swipe home. A proposal for a focused build pass. Stations and programs are illustrations. Opencast is a working name.</p></div></footer>
+
+<script>
+(function(){
+  var PRE=[{ch:'12.1',cs:'BEAT',nm:'Inland Beat',src:'',p:'Late Crate',a:'8:30',b:'9:00',pct:40,left:'18 min left',nt:'9:00',nx:'Beat Tape Live',lv:1,c:'#8C3B7A',ok:1},{ch:'18.1',cs:'SAZN',nm:'Sazón',src:'',p:'Tamales for forty',a:'8:00',b:'9:00',pct:70,left:'18 min left',nt:'9:00',nx:'Kitchen Radio',lv:0,c:'#A3402A',ok:1},{ch:'7.1',cs:'CIVC',nm:'Civic Channel',src:'',p:'Council Watch',a:'8:00',b:'10:00',pct:35,left:'1 hr 18 min left',nt:'10:00',nx:'Town Hall',lv:1,c:'#2E6B5A',ok:1}];
+  var DIAL=[{ch:'9.1',cs:'CITY',nm:'City of Redlands',src:'',p:'City Council',a:'7:00',b:'9:30',pct:69,left:'48 min left',nt:'9:30',nx:'Public comment',lv:1,c:'#525C73',ok:1},{ch:'24.1',cs:'REEL',nm:'Reel',src:'',p:'Saturday Reel',a:'8:30',b:'9:00',pct:40,left:'18 min left',nt:'9:00',nx:'Newsreels',lv:0,c:'#33507A',ok:1},{ch:'31.1',cs:'PREP',nm:'Prep Sports',src:'',p:'Friday Night Lights',a:'7:00',b:'10:00',pct:57,left:'1 hr 18 min left',nt:'10:00',nx:'Highlights',lv:0,c:'#1F5E3A',ok:0},{ch:'33.1',cs:'LUPE',nm:'Lupe',src:'Carried from SAZN 18.1',p:'Lupe en la cocina',a:'8:30',b:'9:00',pct:40,left:'18 min left',nt:'9:00',nx:'Mercado',lv:0,c:'#9A5412',ok:1},{ch:'60.1',cs:'OCAT',nm:'Opencast Catalog',src:'From the Opencast catalog',p:'Nights at the observatory',a:'8:00',b:'10:00',pct:35,left:'1 hr 18 min left',nt:'10:00',nx:'Cartoons',lv:0,c:'#1F3A5F',ok:1}];
+  var SEQ=PRE.map(function(s,i){ s.pre=i+1; return s; }).concat(DIAL.map(function(s,i){ s.di=i+1; return s; }));
+  var NP=PRE.length, N=SEQ.length;
+  function posText(s){ return s.pre ? 'PRESET '+s.pre+' OF '+NP : 'DIAL, '+s.di+' OF '+DIAL.length; }
+  function isBoundary(a,b){ return (a===NP-1&&b===NP)||(a===NP&&b===NP-1)||(a===N-1&&b===0)||(a===0&&b===N-1); }
+  function boundaryLabel(a,b){ if((a===NP-1&&b===NP)) return ['End of your presets','The dial, in channel order']; if(a===NP&&b===NP-1) return ['Back to your presets','Preset '+NP]; if(a===N-1&&b===0) return ['End of the dial','Back to preset 1']; return ['Start of your presets','To the end of the dial']; }
+  function icon(id){ return '<svg><use href="#'+id+'"/></svg>'; }
+  function panelHTML(s,opts){ opts=opts||{}; var snowy=!s.ok && opts.peek; return '<div class="pv'+(snowy||opts.snowy?' snowy':'')+'" style="--pc:'+s.c+'"></div>'+(snowy||opts.snowy?'':'<div class="ttl">'+s.p+'</div>')+'<canvas width="180" height="360"></canvas><div class="tuning"><b>'+s.p+'</b><span>Tuning in</span></div><div class="osd2'+(opts.osd?' on':'')+'"><span class="n">'+s.ch+'</span><span class="c">'+s.cs+'</span></div>'; }
+  function chromeHTML(s,opts){ opts=opts||{};
+    return '<div class="pbanner'+(opts.banner?' on':'')+'"><div class="top3"><div class="idn"><span class="chn">'+s.ch+'</span><span class="cs">'+s.cs+'</span><small>'+s.nm+'</small></div><div class="side3"><span class="clock3">8:42 pm</span><span class="tally lit">ON AIR</span></div></div>'+(s.src?'<div class="src3">'+s.src+'</div>':'<div class="src3" style="visibility:hidden">.</div>')+'<h4>'+s.p+'</h4><div class="prog3"><span class="mono">'+s.a+'</span><span class="bar"><i style="width:'+s.pct+'%"></i></span><span class="mono">'+s.b+'</span><span>'+s.left+'</span></div>'+'<div class="nx3">Next at <span class="mono">'+s.nt+'</span><b>'+s.nx+'</b>'+(s.lv?'<span class="live3"><i></i>Live</span>':'')+'</div></div>'+'<div class="pausemark"><span class="g">'+icon('i-play')+'</span><span>Paused at 8:42 pm</span></div><button class="golive" aria-label="Back to live"><i></i>Back to live<span class="behind">0:00 behind</span></button>'+
+    '<div class="pbug'+(opts.banner?'':' on')+'"><span class="cs">'+s.cs+'</span><span class="chn">'+s.ch+'</span></div>'+
+    '<div class="sbar2"><span>8:42</span><span>●●●</span></div>'+
+    '<div class="topbar"><span class="mkt">Inland Empire'+icon('i-down')+'</span><span class="band"><span class="on">TV</span><span>Radio</span></span><svg class="srch"><use href="#i-search"/></svg></div>'+
+    '<div class="rail2"><button><span class="ic2'+(s.pre?' filled':'')+'">'+icon(s.pre?'i-star-f':'i-star')+'</span>'+(s.pre?'Preset '+s.pre:'Preset')+'</button><button><span class="ic2">'+icon('i-bell')+'</span>Remind</button><button><span class="ic2">'+icon('i-heart')+'</span>Pledge</button><button><span class="ic2">'+icon('i-share')+'</span>Share</button><button><span class="ic2">'+icon('i-guide')+'</span>Guide</button></div>'+
+    '<div class="pos">'+posText(s)+'</div>'+
+    '<div class="tabs2"><div class="pill"><span class="on">'+icon('i-dial')+'Watch</span><span>'+icon('i-guide')+'Guide</span><span>'+icon('i-search')+'Search</span><span>'+icon('i-user')+'You</span></div><button class="main" aria-label="Tune by number">'+icon('i-keypad')+'</button></div><div class="homebar"></div>'+
+    '<div class="kp"><div class="kp-sheet"><div class="kp-grab"></div><div class="kp-disp"><span class="kp-num"><span class="ph">Channel</span></span><span class="kp-caret"></span><span class="kp-band">TV 2 to 69, radio 88.1 to 107.9</span></div><div class="kp-match">Type a channel or frequency.</div><div class="kp-count"><i></i></div><div class="kp-keys">'+['1','2','3','4','5','6','7','8','9','.','0','del'].map(function(k){ return k==='del'?'<button class="fn" data-k="del" aria-label="Delete">'+icon('i-bksp')+'</button>':'<button data-k="'+k+'">'+k+'</button>'; }).join('')+'</div><div class="kp-acts"><button class="cancel">Cancel</button><button class="go" disabled>Tune</button></div></div></div>'+'<div class="detent"><div></div></div>';
+  }
+  // ---------- stills ----------
+  function still(host,cls,cap,cfg){
+    var fig=document.createElement('figure'); if(cls.indexOf('land')>-1) fig.className='wide';
+    var s=SEQ[cfg.i], t=cfg.to!=null?SEQ[cfg.to]:null;
+    var html='<div class="mini-wrap '+cls+'"><div class="ph2 '+cls+'"><div class="scr'+(cfg.chromeOff?' chrome-off':'')+(cfg.off?' dragging':'')+'">';
+    var off=cfg.off||0;
+    html+='<div class="panel" style="transform:translateY('+(-off)+'%)">'+panelHTML(s,{osd:false})+'</div>';
+    if(t) html+='<div class="panel" style="transform:translateY('+(100-off)+'%)">'+panelHTML(t,{peek:true,osd:true})+'</div>';
+    html+=chromeHTML(t&&off>50?t:s,{banner:cfg.banner});
+    html+='</div></div></div><figcaption><b>'+cap[0]+'</b>'+cap[1]+'</figcaption>';
+    fig.innerHTML=html; host.appendChild(fig);
+    if(cfg.detent){ var d=fig.querySelector('.detent'); d.classList.add('on'); d.style.top=(100-off-6)+'%'; var L=boundaryLabel(cfg.i,cfg.to); d.firstChild.innerHTML=L[0]+'<small>'+L[1]+'</small>'; }
+    if(off) { fig.querySelector('.pbanner').classList.remove('on'); }
+    if(cfg.paused){ fig.querySelector('.scr').classList.add('paused'); fig.querySelector('.pbanner').classList.add('on'); fig.querySelector('.pbug').classList.remove('on'); var gp=fig.querySelector('.golive'); gp.classList.add('on'); gp.querySelector('.behind').textContent='0:48 behind'; }
+    if(cfg.behind){ var gl=fig.querySelector('.golive'); gl.classList.add('on'); gl.querySelector('.behind').textContent=cfg.behind+' behind'; }
+  }
+  var st=document.getElementById('stills');
+  still(st,'',['At rest','BEAT, preset 1, just after tuning in: the banner is up, and the position line says where you are.'],{i:0,banner:1});
+  still(st,'',['Mid-drag, within presets','SAZN\'s live picture follows the finger, with its number already showing.'],{i:0,to:1,off:38});
+  still(st,'',['The detent','From the last preset into the dial: extra resistance and "End of your presets".'],{i:2,to:3,off:22,detent:1});
+  still(st,'',['Not ready','PREP hasn\'t loaded, so it arrives as tuning static with its number. The static stays after the snap until its first frame.'],{i:4,to:5,off:44});
+  var ps=document.getElementById('pauseStills');
+  still(ps,'',['Paused','A tap pauses. The picture dims, the banner comes up with the tally unlit, and \"Back to live\" sits just above the banner, counting how far behind you are.'],{i:0,paused:1});
+  still(ps,'',['Behind live','A tap resumes where you left off. Once the banner tucks away, \"Back to live\" drops to just above the floating bar, until you tap it or change channel.'],{i:0,behind:'2:14'});
+
+  // ---------- other tabs ----------
+  function frameTab(host,cap,body,active){
+    var fig=document.createElement('figure');
+    var tabs=['Watch','Guide','Search','You'], ic={Watch:'i-dial',Guide:'i-guide',Search:'i-search',You:'i-user'};
+    var bar='<div class="tabs2"><div class="pill">'+tabs.map(function(t){ return '<span'+(t===active?' class="on"':'')+'>'+icon(ic[t])+t+'</span>'; }).join('')+'</div><button class="main" aria-label="Tune by number">'+icon('i-keypad')+'</button></div><div class="homebar"></div>';
+    var s0=SEQ[0];
+    var mini='<div class="miniplay"><div class="thumb" style="--pc:'+s0.c+'"><span class="tally lit">ON AIR</span></div><div><b>'+s0.cs+' '+s0.ch+', '+s0.p+'</b><small><span class="mono">'+s0.a+' – '+s0.b+'</span>, '+s0.left+'</small></div><button class="pp" aria-label="Pause">'+icon('i-pause')+'</button><div class="mbar"><i style="width:'+s0.pct+'%"></i></div></div>';
+    fig.innerHTML='<div class="mini-wrap"><div class="ph2"><div class="scr tabview"><div class="sbar2"><span>8:42</span><span>●●●</span></div><div class="tv-body">'+body+'</div>'+mini+bar+'</div></div></div><figcaption><b>'+cap[0]+'</b>'+cap[1]+'</figcaption>';
+    host.appendChild(fig);
+  }
+  function tpos(t){ var m=t.split(':'), h=+m[0], mm=+m[1]; var mins=(h<7?h+12:h)*60+mm; return (mins-(8*60+30))/90*100; }
+  function guideBody(){
+    var times=['9:00','9:30'];
+    var ruler='<div class="g-ruler"><div></div><div class="g-times"><span class="nowlbl" style="left:'+tpos('8:42')+'%">8:42</span>'+times.map(function(t){ return '<span style="left:'+tpos(t)+'%">'+t+'</span>'; }).join('')+'</div></div>';
+    var later={'BEAT':['Beat Tape Live',1],'SAZN':['Kitchen Radio',0],'CIVC':['Town Hall',1],'CITY':['Public comment',1],'REEL':['Newsreels',0],'PREP':['Highlights',0],'LUPE':['Mercado',0],'OCAT':['Cartoons',0]};
+    function row(s,k){ var a=Math.max(0,tpos(s.a)), b=Math.min(100,tpos(s.b)); var nx=later[s.cs];
+      return '<div class="g-row'+(k===0?' tuned':'')+'"><div class="g-id"><span class="n">'+s.ch+'</span><span class="c">'+s.cs+'</span></div><div class="g-track"><div class="g-now" style="left:'+tpos('8:42')+'%"></div><div class="g-cell now" style="left:'+a+'%;width:'+(b-a)+'%"><b>'+s.p+(s.lv&&false?'':'')+'</b><small>'+s.left+'</small></div><div class="g-cell" style="left:'+b+'%;width:'+(100-b+10)+'%"><b>'+nx[0]+(nx[1]?'<span class="lv">● LIVE</span>':'')+'</b><small>'+s.b+'</small></div></div></div>'; }
+    var h='<div class="tv-head"><h2>Guide</h2><div class="end"><span class="bandseg"><span class="on">TV</span><span>Radio</span></span><span class="chipsel">Tonight'+icon('i-down')+'</span></div></div>'+ruler;
+    h+='<div class="g-sec">YOUR PRESETS</div>'+PRE.map(function(s,k){ return row(s,k); }).join('');
+    h+='<div class="g-sec">THE DIAL</div>'+DIAL.slice(0,3).map(function(s){ return row(s,9); }).join('');
+    return h;
+  }
+  function searchBody(){
+    return '<div class="tv-head"><h2>Search</h2></div><div class="s-field">'+icon('i-search')+'<span>sa</span><span class="caret"></span></div>'+
+      '<div class="s-tune"><span class="n">18.1</span><div><b>Tune to SAZN</b><small>Sazón. Now: Tamales for forty</small></div><span class="act" style="font:600 12px var(--font-text);color:var(--signal)">Tune</span></div>'+
+      '<div class="s-sec">STATIONS</div>'+
+      '<div class="s-row"><span class="sw" style="background:#A3402A"></span><div><b><mark>SA</mark>ZN 18.1</b><small>Food. Redlands</small></div><span class="act">Tune</span></div>'+
+      '<div class="s-sec">ON NOW AND TONIGHT</div>'+
+      '<div class="s-row"><span class="sw" style="background:#33507A"></span><div><b><mark>Sa</mark>turday Reel</b><small>REEL 24.1, now, <span class="mono">18 min</span> left</small></div><span class="act">Tune</span></div>'+
+      '<div class="s-row"><span class="sw" style="background:#9A5412"></span><div><b><mark>Sa</mark>lsa Night</b><small>LUPE 33.1, at <span class="mono">10:00 pm</span></small></div><span class="act">Remind</span></div>';
+  }
+  function searchEmpty(){
+    return '<div class="tv-head"><h2>Search</h2></div><div class="s-field">'+icon('i-search')+'<span class="ph">Stations, programs or a number</span></div>'+
+      '<div class="s-sec">KINDS OF STATION</div><div class="s-chips"><span>Music</span><span>Food</span><span>Public affairs</span><span>Classic</span><span>Sports</span><span>Kids</span><span>Radio band</span><span>Catalog</span></div>'+
+      '<div class="s-sec">RECENT</div><div class="s-recent"><div>'+icon('i-search')+'town hall</div><div>'+icon('i-search')+'90.7</div><div>'+icon('i-search')+'cartoons</div></div>';
+  }
+  function youBody(){
+    var slots=PRE.map(function(s,k){ return '<div style="background:'+s.c+'"><span class="k">'+(k+1)+'</span><span class="n">'+s.ch+'</span><span class="c">'+s.cs+'</span></div>'; }).join('')+'<div class="empty"><span class="k">4</span>+ Add</div><div class="empty"><span class="k">5</span>+ Add</div><div class="empty"><span class="k">6</span>+ Add</div>';
+    return '<div class="y-top"><span class="av">K</span><div><b>Kai</b><small>Inland Empire. Signed in with email</small></div><button class="gear">Settings</button></div>'+
+      '<div class="y-sec"><h3>Presets</h3><span>Edit</span></div><div class="y-presets">'+slots+'</div>'+
+      '<div class="y-sec"><h3>Reminders</h3></div>'+
+      '<div class="y-row"><div><b>Beat Tape Live</b><small>BEAT 12.1, today at <span class="mono">9:00 pm</span>. Switch me over</small></div><span class="tg"></span></div>'+
+      '<div class="y-sec"><h3>Pledges, TVs and your station</h3></div>'+
+      '<div class="y-row"><div><b>Inland Beat member</b><small>$5 a month</small></div><span class="lnk">Manage</span></div>'+
+      '<div class="y-row"><div><b>Living room TV</b><small>Chromecast. Last used tonight</small></div><span class="lnk">Open</span></div>'+
+      '<div class="y-row"><div><b>Run a station</b><small>Master control, in this account</small></div><span class="lnk">Open</span></div>';
+  }
+  var ts=document.getElementById('tabStills');
+  frameTab(ts,['Guide','Presets first, then the dial, with a red line at now. BEAT, the station playing, is tinted. Live programs are marked.'],guideBody(),'Guide');
+  frameTab(ts,['Search, typing','"sa" puts "Tune to SAZN 18.1" first, then stations and tonight\'s programs, matched letters underlined.'],searchBody(),'Search');
+  frameTab(ts,['Search, before typing','Kinds of station and recent searches. Nothing ranked by popularity.'],searchEmpty(),'Search');
+  frameTab(ts,['You','Presets as six numbered slots, reminders, pledges, TVs, and the way into master control.'],youBody(),'You');
+  var ks=document.getElementById('kpStills');
+  function kpStill(host,cls,cap,val,matchHTML,none,run){
+    var fig=document.createElement('figure'); if(cls) fig.className='wide';
+    var s0=SEQ[1];
+    fig.innerHTML='<div class="mini-wrap '+cls+'"><div class="ph2 '+cls+'"><div class="scr"><div class="panel">'+panelHTML(s0)+'</div>'+chromeHTML(s0,{})+'</div></div></div><figcaption><b>'+cap[0]+'</b>'+cap[1]+'</figcaption>';
+    host.appendChild(fig);
+    var box=fig.querySelector('.kp'); box.classList.add('on'); box.querySelector('.kp-num').innerHTML=val; var m=box.querySelector('.kp-match'); m.innerHTML=matchHTML; if(none) m.classList.add('none'); else { box.querySelector('.go').disabled=false; box.querySelector('.kp-count i').style.width=run+'%'; }
+  }
+  kpStill(ks,'',['Portrait, a match','"18" finds SAZN 18.1 and shows what\'s on. The blue line counts down 2 seconds, then it tunes, or press Tune.'],'18','<b>SAZN 18.1</b>Now: Tamales for forty, 18 min left',0,55);
+  kpStill(ks,'',['No station there','"45" isn\'t on the Inland Empire dial, so it says so and names the nearest. Tune stays off.'],'45','<b>No station on 45</b>Nearest is LUPE 33.1.',1,0);
+  kpStill(ks,'land',['Landscape','The pad becomes a panel on the right; the picture keeps playing on the left. Radio works the same way: "90.7" tunes HALL on the radio band.'],'90.7','<b>HALL 90.7</b>Radio band. Now: Hall Sessions',0,30);
+  // ---------- tablet ----------
+  function tabFig(host,o,cap){ var f=document.createElement('figure'); if(o==='l') f.className='lw'; f.innerHTML='<div class="tab-wrap '+o+'"><div class="ph2 tab'+o+'"><div class="scr"></div></div></div><figcaption><b>'+cap[0]+'</b>'+cap[1]+'</figcaption>'; host.appendChild(f); return f.querySelector('.scr'); }
+  function tabWatch(scr0,s,opts){ opts=opts||{}; scr0.innerHTML='<div class="panel"><div class="pv amb" style="--pc:'+s.c+'"></div><div class="f169" style="--pc:'+s.c+'"><b>'+s.p+'</b></div></div>'+chromeHTML(s,{banner:opts.banner}); if(opts.kp){ var box=scr0.querySelector('.kp'); box.classList.add('on'); box.querySelector('.kp-num').innerHTML='18'; box.querySelector('.kp-match').innerHTML='<b>SAZN 18.1</b>Now: Tamales for forty, 18 min left'; box.querySelector('.go').disabled=false; box.querySelector('.kp-count i').style.width='55%'; } }
+  function tabView(scr0,body,active,noMini){ var tabs=['Watch','Guide','Search','You'], ic={Watch:'i-dial',Guide:'i-guide',Search:'i-search',You:'i-user'}; var s0=SEQ[0];
+    var mini=noMini?'':'<div class="miniplay"><div class="thumb" style="--pc:'+s0.c+'"><span class="tally lit">ON AIR</span></div><div><b>'+s0.cs+' '+s0.ch+', '+s0.p+'</b><small><span class="mono">'+s0.a+' – '+s0.b+'</span>, '+s0.left+'</small></div><button class="pp" aria-label="Pause">'+icon('i-pause')+'</button><div class="mbar"><i style="width:'+s0.pct+'%"></i></div></div>';
+    scr0.classList.add('tabview'); scr0.innerHTML='<div class="sbar2"><span>8:42</span><span>●●●</span></div><div class="tv-body">'+body+'</div>'+mini+'<div class="tabs2"><div class="pill">'+tabs.map(function(t){ return '<span'+(t===active?' class="on"':'')+'>'+icon(ic[t])+t+'</span>'; }).join('')+'</div><button class="main" aria-label="Tune by number">'+icon('i-keypad')+'</button></div><div class="homebar"></div>'; }
+  function guideWide(span,withDial){ var st=8*60+30; function tp(t){ var m=t.split(':'), h=+m[0], mm=+m[1]; var mins=(h<7?h+12:h)*60+mm; return (mins-st)/span*100; }
+    var times=span>=150?['9:00','9:30','10:00','10:30']:['9:00','9:30'];
+    var later={'BEAT':['Beat Tape Live',1,'10:30','Slow Hours'],'SAZN':['Kitchen Radio',0,'10:00','Late plates'],'CIVC':['Town Hall',1,'11:00','Replay'],'CITY':['Public comment',1,'10:30','Meeting notes'],'REEL':['Newsreels',0,'10:00','Cartoons'],'PREP':['Highlights',0,'11:00','Sign off'],'LUPE':['Mercado',0,'10:00','Noche'],'OCAT':['Cartoons',0,'11:00','Newsreels']};
+    function row(s,k){ var a=Math.max(0,tp(s.a)), b=Math.min(100,tp(s.b)), nx=later[s.cs], c2=Math.min(100,tp(nx[2]));
+      return '<div class="g-row'+(k===0?' tuned':'')+'"><div class="g-id"><span class="n">'+s.ch+'</span><span class="c">'+s.cs+'</span></div><div class="g-track"><div class="g-now" style="left:'+tp('8:42')+'%"></div><div class="g-cell now" style="left:'+a+'%;width:'+(b-a)+'%"><b>'+s.p+'</b><small>'+s.left+'</small></div><div class="g-cell" style="left:'+b+'%;width:'+(c2-b)+'%"><b>'+nx[0]+(nx[1]?'<span class="lv">● LIVE</span>':'')+'</b><small>'+s.b+'</small></div>'+(c2<100?'<div class="g-cell" style="left:'+c2+'%;width:'+(100-c2+5)+'%"><b>'+nx[3]+'</b><small>'+nx[2]+'</small></div>':'')+'</div></div>'; }
+    var h='<div class="g-ruler"><div></div><div class="g-times"><span class="nowlbl" style="left:'+tp('8:42')+'%">8:42</span>'+times.map(function(t){ return '<span style="left:'+tp(t)+'%">'+t+'</span>'; }).join('')+'</div></div>';
+    h+='<div class="g-sec">YOUR PRESETS</div>'+PRE.map(function(s,k){ return row(s,k); }).join('');
+    h+='<div class="g-sec">THE DIAL</div>'+DIAL.slice(0,withDial).map(function(s){ return row(s,9); }).join('');
+    return h; }
+  function infoBlock(s,btns){ return '<div class="tprev" style="--pc:'+s.c+'"><span class="tally lit">ON AIR</span><b>'+s.p+'</b><span class="bg"><b>'+s.cs+'</b><small>'+s.ch+'</small></span></div><div class="tinfo"><div class="idn2"><span class="n">'+s.ch+'</span><div><b>'+s.cs+'</b><small>'+s.nm+'</small></div></div><h4>'+s.p+'</h4><div class="prog3"><span class="mono">'+s.a+'</span><span class="bar"><i style="width:'+s.pct+'%"></i></span><span class="mono">'+s.b+'</span><span>'+s.left+'</span></div><div class="nx3">Next at <span class="mono">'+s.nt+'</span> <b>'+s.nx+'</b></div>'+(btns?'<div class="btnrow">'+btns+'</div>':'')+'</div>'; }
+  var guideHead='<div class="tv-head"><h2>Guide</h2><div class="end"><span class="bandseg"><span class="on">TV</span><span>Radio</span></span><span class="chipsel">Tonight'+icon('i-down')+'</span></div></div>';
+  var tpH=document.getElementById('tabPortrait'), tlH=document.getElementById('tabLand');
+  var S=tabFig(tpH,'p',['Watch','The 16:9 picture sits across the width, with the station\'s colour glowing above and below. Buttons run in a row under the picture; the full banner has room to stay.']); tabWatch(S,SEQ[0],{banner:1});
+  S=tabFig(tpH,'p',['Tune','The pad opens as a panel above the Tune button instead of a full-width sheet, so the picture stays in view.']); tabWatch(S,SEQ[1],{kp:1});
+  S=tabFig(tpH,'p',['Guide','Two and a half hours across, with the next two programs on each row and more of the dial on screen.']); tabView(S,guideHead+guideWide(150,5),'Guide');
+  S=tabFig(tpH,'p',['Search','Results on the left, kinds of station and recent searches beside them.']); tabView(S,'<div class="tcols two"><div>'+searchBody()+'</div><div style="padding-top:62px"><div class="s-sec">KINDS OF STATION</div><div class="s-chips"><span>Music</span><span>Food</span><span>Public affairs</span><span>Classic</span><span>Sports</span><span>Kids</span><span>Radio band</span><span>Catalog</span></div><div class="s-sec">RECENT</div><div class="s-recent"><div>'+icon('i-search')+'town hall</div><div>'+icon('i-search')+'90.7</div><div>'+icon('i-search')+'cartoons</div></div></div></div>','Search');
+  S=tabFig(tpH,'p',['You','Two columns: presets and reminders, then pledges, TVs and your station.']); var yb=youBody(); var cut=yb.indexOf('<div class="y-sec"><h3>Pledges'); tabView(S,'<div class="tcols two"><div>'+yb.slice(0,cut)+'</div><div style="padding-top:78px">'+yb.slice(cut)+'</div></div>','You');
+  S=tabFig(tlH,'l',['Watch','Close to TV mode: the picture fills the screen, buttons on the right, banner bottom left, and the floating bar stays, fading with the buttons after 3 seconds.']); tabWatch(S,SEQ[0],{banner:1}); S.querySelector('.f169').style.left='0';
+  S=tabFig(tlH,'l',['Tune','The same panel above the Tune button, over the playing picture.']); tabWatch(S,SEQ[1],{kp:1});
+  S=tabFig(tlH,'l',['Guide','The picture keeps playing on the left with what\'s on and what\'s next; the guide fills the right. Tapping a row tunes the left side.']); tabView(S,'<div class="tsplit"><div class="lcol">'+infoBlock(SEQ[0],'<span class="pri">Watch full screen</span><span>Remind</span>')+'</div><div>'+guideHead+guideWide(150,3)+'</div></div>','Guide',true);
+  S=tabFig(tlH,'l',['Search','Results on the left; the top match plays on the right, ready to tune.']); tabView(S,'<div class="tsplit" style="grid-template-columns:minmax(0,1fr) 380px"><div>'+searchBody()+'</div><div class="lcol" style="border-right:0;border-left:1px solid var(--hair);padding-top:62px">'+infoBlock(SEQ[1],'<span class="pri">Tune to 18.1</span><span>Preset</span>')+'</div></div>','Search',true);
+  S=tabFig(tlH,'l',['You','Three columns, nothing hidden below the fold.']); var y1=yb.indexOf('<div class="y-sec"><h3>Reminders'); tabView(S,'<div class="tcols three"><div>'+yb.slice(0,y1)+'</div><div style="padding-top:78px">'+yb.slice(y1,cut)+'</div><div style="padding-top:78px">'+yb.slice(cut)+'</div></div>','You');
+  var ls=document.getElementById('landStills');
+  still(ls,'land',['Landscape, buttons showing','Just after a tap: the buttons and position line are back. The floating bar and band switch stay hidden.'],{i:1,banner:1});
+  still(ls,'land',['Landscape, after 3 seconds','Only the picture and the player\'s bug. Swipe up or down, or tap to bring the buttons back.'],{i:1,chromeOff:1});
+  // ---------- demo ----------
+  var host=document.getElementById('demoPhone'); var i=0, scr, cur, nxt, h, drag=null, anim=false, hideT, raf;
+  function build(){ host.innerHTML='<div class="scr"><div class="panel" id="pCur"></div><div class="panel" id="pNxt"></div>'+chromeHTML(SEQ[i],{banner:0})+'</div>'; scr=host.querySelector('.scr'); cur=scr.querySelector('#pCur'); nxt=scr.querySelector('#pNxt'); cur.innerHTML=panelHTML(SEQ[i]); nxt.style.display='none'; h=scr.clientHeight; bind(); arrive(false); }
+  function setChrome(s){ var tmp=document.createElement('div'); tmp.innerHTML=chromeHTML(s,{}); ['.rail2','.pos','.pbanner','.pbug'].forEach(function(q){ var o=scr.querySelector(q), n=tmp.querySelector(q); o.innerHTML=n.innerHTML; o.className=n.className; }); }
+  function snowLoop(cv){ var cx=cv.getContext('2d'), img=cx.createImageData(cv.width,cv.height), last=0; function f(t){ if(!cv.classList.contains('on')) return; if(t-last>41){ last=t; var d=img.data; for(var k=0;k<d.length;k+=4){ var v=46+((Math.random()*2-1)*18)|0; d[k]=v; d[k+1]=v+2; d[k+2]=v+10; d[k+3]=255; } cx.putImageData(img,0,0); } requestAnimationFrame(f); } requestAnimationFrame(f); }
+  function arrive(showOsd){ var s=SEQ[i]; setChrome(s); var o=cur.querySelector('.osd2'); if(showOsd){ o.classList.add('on'); setTimeout(function(){ o.classList.remove('on'); },1200); }
+    var b=scr.querySelector('.pbanner'), g=scr.querySelector('.pbug');
+    if(!s.ok){ cur.innerHTML=panelHTML(s,{snowy:true,osd:true}); var cv=cur.querySelector('canvas'); cv.classList.add('on'); snowLoop(cv); var tu=cur.querySelector('.tuning'); setTimeout(function(){ if(SEQ[i]===s) tu.classList.add('on'); },800);
+      setTimeout(function(){ if(SEQ[i]!==s) return; cur.innerHTML=panelHTML(s); b.classList.add('on'); g.classList.remove('on'); setTimeout(function(){ b.classList.remove('on'); g.classList.add('on'); },3500); },1900); return; }
+    b.classList.add('on'); g.classList.remove('on'); clearTimeout(arrive.t); arrive.t=setTimeout(function(){ b.classList.remove('on'); g.classList.add('on'); },3500);
+    showChrome(); }
+
+  var paused=false, behind=0, pausedAt=0, tick=null;
+  function fmt(sec){ var m=Math.floor(sec/60), x=sec%60; return m+':'+(x<10?'0':'')+x; }
+  function renderBehind(){ var g=scr.querySelector('.golive'); g.querySelector('.behind').textContent=fmt(behind)+' behind'; }
+  function togglePause(){ var b=scr.querySelector('.pbanner'), g=scr.querySelector('.pbug'), gl=scr.querySelector('.golive');
+    if(!paused){ paused=true; scr.classList.add('paused'); b.classList.add('on'); g.classList.remove('on'); clearTimeout(arrive.t); showChrome(true); clearInterval(tick); tick=setInterval(function(){ behind++; renderBehind(); gl.classList.add('on'); },1000); }
+    else { paused=false; scr.classList.remove('paused'); clearInterval(tick); if(behind>0){ renderBehind(); gl.classList.add('on'); } arrive.t=setTimeout(function(){ b.classList.remove('on'); g.classList.add('on'); },2500); showChrome(); }
+  }
+  function goLive(){ behind=0; paused=false; clearInterval(tick); scr.classList.remove('paused'); scr.querySelector('.golive').classList.remove('on'); var pv=cur.querySelector('.pv'); if(pv){ pv.style.transition='opacity .2s'; pv.style.opacity='.4'; setTimeout(function(){ pv.style.opacity='1'; },120); } }
+  // ---------- tune by number ----------
+  var RADIO=[{ch:'88.3',cs:'NITE',p:'Night Desk'},{ch:'90.7',cs:'HALL',p:'Hall Sessions'},{ch:'94.7',cs:'SOLA',p:'Sola Radio'}];
+  var kpVal='', kpT=null;
+  function lookup(v){ if(!v) return null; var n=parseFloat(v); if(isNaN(n)) return null;
+    if(n>=88){ var r=RADIO.filter(function(x){ return x.ch===v; })[0]; return r?{radio:1,s:r}:{none:1,radio:1}; }
+    var key=v.indexOf('.')>-1?v:v+'.1'; for(var k=0;k<SEQ.length;k++){ if(SEQ[k].ch===key) return {j:k,s:SEQ[k]}; } return {none:1}; }
+  function nearest(v){ var n=parseFloat(v), best=null, d=1e9; SEQ.forEach(function(x){ var dd=Math.abs(parseFloat(x.ch)-n); if(dd<d){ d=dd; best=x; } }); return best; }
+  function kpRender(){ var box=scr.querySelector('.kp'), num=box.querySelector('.kp-num'), m=box.querySelector('.kp-match'), go=box.querySelector('.go'), c=box.querySelector('.kp-count');
+    num.innerHTML=kpVal?kpVal:'<span class="ph">Channel</span>'; m.classList.remove('none'); c.classList.remove('run'); clearTimeout(kpT);
+    if(!kpVal){ m.innerHTML='Type a channel or frequency. It tunes 2 seconds after you stop, or press Tune.'; go.disabled=true; return; }
+    var r=lookup(kpVal);
+    if(r && r.s){ m.innerHTML='<b>'+r.s.cs+' '+r.s.ch+'</b>'+(r.radio?'Radio band. Now: '+r.s.p:'Now: '+r.s.p+(r.s.left?', '+r.s.left:'')); go.disabled=false; void c.offsetWidth; c.classList.add('run'); kpT=setTimeout(kpTune,2000); }
+    else { var nb=nearest(kpVal); m.classList.add('none'); m.innerHTML='<b>No station on '+kpVal+'</b>'+(r&&r.radio?'Nothing on that frequency in the Inland Empire yet.':'Nearest is '+nb.cs+' '+nb.ch+'.'); go.disabled=true; }
+  }
+  function kpOpen(){ kpVal=''; kpRender(); scr.querySelector('.kp').classList.add('on'); }
+  function kpClose(){ clearTimeout(kpT); scr.querySelector('.kp').classList.remove('on'); }
+  function kpTune(){ var r=lookup(kpVal); kpClose(); if(!r||!r.s||r.radio) return; tuneTo(r.j); }
+  function tuneTo(j){ if(j===i){ arrive(true); return; } paused=false; behind=0; clearInterval(tick); scr.classList.remove('paused'); scr.querySelector('.golive').classList.remove('on');
+    i=j; var s=SEQ[i]; cur.innerHTML=panelHTML(s,{snowy:true,osd:true}); var cv=cur.querySelector('canvas'); cv.classList.add('on'); snowLoop(cv); setChrome(s); scr.querySelector('.pbanner').classList.remove('on'); scr.querySelector('.pbug').classList.remove('on');
+    if(!s.ok){ arrive(true); return; }
+    setTimeout(function(){ if(SEQ[i]!==s) return; cur.innerHTML=panelHTML(s); arrive(true); },300); }
+  function bindKp(){ var box=scr.querySelector('.kp');
+    box.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+    box.addEventListener('click',function(e){ if(e.target===box) kpClose(); });
+    box.querySelectorAll('.kp-keys button').forEach(function(b){ b.addEventListener('click',function(){ var k=b.getAttribute('data-k'); if(k==='del') kpVal=kpVal.slice(0,-1); else if(kpVal.length<5 && !(k==='.'&&kpVal.indexOf('.')>-1)) kpVal+=k; kpRender(); }); });
+    box.querySelector('.cancel').addEventListener('click',kpClose); box.querySelector('.go').addEventListener('click',kpTune);
+    scr.querySelector('.tabs2 .main').addEventListener('click',function(e){ e.stopPropagation(); kpOpen(); });
+  }
+  function showChrome(keep){ scr.classList.remove('chrome-off'); clearTimeout(hideT); if(keep) return; if(host.classList.contains('land')) hideT=setTimeout(function(){ scr.classList.add('chrome-off'); },3000); }
+  function place(off,dir){ cur.style.transform='translateY('+off+'px)'; nxt.style.transform='translateY('+(off+(dir>0?h:-h))+'px)'; }
+  function prep(dir){ var j=(i+dir+N)%N; nxt.innerHTML=panelHTML(SEQ[j],{peek:true,osd:true}); nxt.style.display='block'; var bd=isBoundary(i,j), d=scr.querySelector('.detent'); if(bd){ var L=boundaryLabel(i,j); d.firstChild.innerHTML=L[0]+'<small>'+L[1]+'</small>'; } d.classList.toggle('on',false); return {j:j,bd:bd}; }
+  function resist(dy,bd){ var a=Math.abs(dy), f=bd?0.5:1, lim=h*0.6, v=a*f; if(v>lim) v=lim+(v-lim)/3; return (dy<0?-1:1)*v; }
+  function bind(){
+    scr.addEventListener('pointerdown',function(e){ if(anim) return; drag={y:e.clientY,t:performance.now(),last:e.clientY,lt:performance.now(),dir:0,info:null,moved:false}; scr.setPointerCapture(e.pointerId); });
+    scr.addEventListener('pointermove',function(e){ if(!drag) return; var dy=e.clientY-drag.y; if(Math.abs(dy)>4) drag.moved=true; var dir=dy<0?1:-1; if(dir!==drag.dir && Math.abs(dy)>2){ drag.dir=dir; drag.info=prep(dir); } if(!drag.info) return; scr.classList.add('dragging'); var off=resist(dy,drag.info.bd); place(off,drag.dir); drag.off=off; var d=scr.querySelector('.detent'); if(drag.info.bd){ d.classList.add('on'); d.style.top=((drag.dir>0?h+off:off-h+h)/h*100-(drag.dir>0?7:-1))+'%'; if(drag.dir<0) d.style.top=(off/h*100-7)+'%'; } drag.vel=(e.clientY-drag.last)/Math.max(1,performance.now()-drag.lt); drag.last=e.clientY; drag.lt=performance.now(); });
+    scr.addEventListener('pointerup',end); scr.addEventListener('pointercancel',end);
+    scr.querySelector('.golive').addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+    scr.querySelector('.golive').addEventListener('click',function(e){ e.stopPropagation(); goLive(); });
+    scr.querySelectorAll('.rail2 button, .tabs2 button, .tabs2 span, .topbar *').forEach(function(el){ el.addEventListener('pointerdown',function(e){ e.stopPropagation(); }); });
+    bindKp();
+  }
+  function end(){ if(!drag) return; var dd=drag; drag=null; scr.classList.remove('dragging'); scr.querySelector('.detent').classList.remove('on'); if(!dd.moved){ togglePause(); return; } if(!dd.info){ return; } var th=(dd.info.bd?0.35:0.2)*h, fast=Math.abs(dd.vel||0)>(dd.info.bd?0.9:0.5); var go=Math.abs(dd.off||0)>th || (fast && Math.sign(-(dd.vel))===dd.dir); if(go) snap(dd.dir,dd.info.j); else back(dd.dir); }
+  function snap(dir,j){ anim=true; paused=false; behind=0; clearInterval(tick); scr.classList.remove('paused'); scr.querySelector('.golive').classList.remove('on'); var tgt=dir>0?-h:h; [cur,nxt].forEach(function(p){ p.style.transition='transform .24s cubic-bezier(.2,.7,.2,1)'; }); place(tgt,dir); if(navigator.vibrate) try{navigator.vibrate(8)}catch(e){}
+    setTimeout(function(){ [cur,nxt].forEach(function(p){ p.style.transition=''; }); i=j; cur.innerHTML=panelHTML(SEQ[i]); cur.style.transform=''; nxt.style.display='none'; anim=false; arrive(true); },250); }
+  function back(dir){ anim=true; [cur,nxt].forEach(function(p){ p.style.transition='transform .28s cubic-bezier(.34,1.35,.64,1)'; }); place(0,dir); setTimeout(function(){ [cur,nxt].forEach(function(p){ p.style.transition=''; }); nxt.style.display='none'; anim=false; },290); }
+  function step(dir){ if(anim) return; var info=prep(dir); place(0,dir); requestAnimationFrame(function(){ snap(dir,info.j); }); }
+  document.getElementById('dUp').addEventListener('click',function(){ step(1); });
+  document.getElementById('dDn').addEventListener('click',function(){ step(-1); });
+  document.getElementById('dLand').addEventListener('change',function(e){ host.classList.toggle('land',e.target.checked); build(); });
+  document.addEventListener('keydown',function(e){ if(e.target.tagName==='INPUT') return; var kb=scr&&scr.querySelector('.kp.on'); if(kb){ if(/^[0-9.]$/.test(e.key)){ kb.querySelector('[data-k="'+e.key+'"]').click(); return; } if(e.key==='Backspace'){ kb.querySelector('[data-k="del"]').click(); return; } if(e.key==='Enter'){ kpTune(); return; } if(e.key==='Escape'){ kpClose(); return; } } if(e.key==='ArrowUp'){ e.preventDefault(); step(-1);} if(e.key==='ArrowDown'){ e.preventDefault(); step(1);} });
+  build();
+  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  function curT(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
+  function lab(){ btn.textContent = curT()==='dark'?'Light ground':'Dark ground'; }
+  try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab(); btn.addEventListener('click', function(){ var n=curT()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+
+</script>
+</body>
+</html>

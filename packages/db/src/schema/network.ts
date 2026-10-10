@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, boolean, check, date, index, integer, jsonb, serial, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { at, createdAt, id, millis } from "./columns.js";
+import { at, createdAt, id, micros, millis } from "./columns.js";
 import { network, band } from "./namespaces.js";
-import { stations } from "./broadcast.js";
+import { assets, programs, stations } from "./broadcast.js";
 import { users } from "./accounts.js";
 
 // Markets live here because the dial is Opencast's to run. The prompt also lists
@@ -283,8 +283,13 @@ export const listedSources = network.table("listed_sources", {
   streamUrl: text("stream_url").notNull(),
   embedTerms: text("embed_terms", { enum: ["allowed", "unclear"] }).notNull(),
   calendarUrl: text("calendar_url"),
-  /** A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. */
-  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data"] })
+  /**
+   * A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. A248
+   * (2026-10-06): `not_public`, a Google Sheet that isn't published or shared with anyone with the link.
+   * A249 (2026-10-06): `pick_channel` (an XMLTV guide of several channels, none named or matched),
+   * `not_in_guide` (the channel named isn't in it), `too_big` (a guide past a limit).
+   */
+  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data", "not_public", "pick_channel", "not_in_guide", "too_big"] })
     .notNull()
     .default("not_set"),
   listingState: text("listing_state", { enum: ["not_listed", "checking", "listed"] })
@@ -315,9 +320,9 @@ export const listedSources = network.table("listed_sources", {
    * schedule, (A241, migration 0046) a weekly schedule entered by hand (`manual_schedule`, checked
    * against `guide_checked_against` on `guide_checked_on`), or neither.
    */
-  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "manual", "none"] }).notNull().default("none"),
-  /** A241: `webpage`, a page read for its schema.org JSON-LD event data. */
-  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv", "webpage"] }),
+  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "manual", "file", "none"] }).notNull().default("none"),
+  /** A241: `webpage`, a page read for its schema.org JSON-LD event data. A248: `sheet`, a spreadsheet. */
+  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv", "webpage", "sheet"] }),
   guideCheckedAgainst: text("guide_checked_against"),
   guideCheckedOn: date("guide_checked_on"),
   /** The stream, checked every minute: unchecked, up, down (still on the dial), hidden (down 5 minutes: off the dial). */
@@ -377,8 +382,104 @@ export const listedSources = network.table("listed_sources", {
    * optionally `description`, `from` and `until`) and `skipDates` (the dates it doesn't air). Null
    * for every other source (the change history keeps what it was).
    */
-  manualSchedule: jsonb("manual_schedule").$type<{ slots: ManualSlotRow[]; skipDates: string[] }>()
+  manualSchedule: jsonb("manual_schedule").$type<{ slots: ManualSlotRow[]; skipDates: string[] }>(),
+  // ---- A248 (added 2026-10-06, migration 0052): schedules from spreadsheets ----
+  /**
+   * The listing's own time zone (IANA) for the times its source gives without one: a spreadsheet's,
+   * a webpage's event data without an offset. Null: worked out (a zone the sheet names, else the market's).
+   */
+  scheduleTimeZone: text("schedule_time_zone"),
+  /**
+   * What was read from its spreadsheet at the last read (a link, `schedule_format` `sheet`) or when it
+   * was uploaded (`schedule_source` `file`): layout, tab, days, the zone it names and used, cells
+   * skipped. Null for every other schedule.
+   */
+  sheetRead: jsonb("sheet_read").$type<SheetReadRow>(),
+  /**
+   * `schedule_source` `file`: the uploaded spreadsheet, kept as what was read from it (the file itself
+   * isn't kept): its name, kind, size, who uploaded it and when, and its shows (`entries`), made into
+   * airings at once and hourly. Null for every other source.
+   */
+  sheetFile: jsonb("sheet_file").$type<SheetFileRow>(),
+  // ---- A249 (added 2026-10-06, migration 0053): large and compressed XMLTV guides ----
+  /**
+   * What was read from its XMLTV guide at the last read (the channel kept, the guide's channels and
+   * size), with the guide's `ETag` and `Last-Modified` from the last read that worked, sent back on
+   * the next so an unchanged guide isn't downloaded again. Null for every other schedule, and
+   * cleared when its schedule changes.
+   */
+  guideRead: jsonb("guide_read").$type<GuideReadRow>()
 });
+
+/**
+ * What was read from an XMLTV guide (A249), as `ListedSource.schedule.guide` shows it, plus the
+ * address it was read from (without its fragment) and the validators for asking again.
+ */
+export interface GuideReadRow {
+  /** The address read, without its `#channel=`: the validators are for it only. */
+  url: string;
+  etag: string | null;
+  lastModified: string | null;
+  channel: string | null;
+  channelName: string | null;
+  channels: number;
+  programmes: number;
+  compressedBytes: number;
+  bytes: number;
+  gzip: boolean;
+  large: boolean;
+  readAt: string;
+  unchangedAt: string | null;
+  limit: "compressed" | "bytes" | "programmes" | "time" | null;
+}
+
+/**
+ * One show read from a spreadsheet (A248): on `date` (a dated sheet) or every `day` (a weekly one),
+ * from `start` to `end`, minutes after that day's midnight in the schedule's time zone (past 1440
+ * after midnight: a show listed under Monday at 12:15 am is Tuesday's 0:15 by the clock). `end` null:
+ * not known (nothing listed after it, or a gap).
+ */
+export interface SheetEntryRow {
+  date: string | null;
+  day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  start: number;
+  end: number | null;
+  title: string;
+}
+
+/** What was read from a spreadsheet (A248), as `ListedSource.schedule.sheet` shows it, plus the zone it names. */
+export interface SheetReadRow {
+  kind: "google_sheet" | "csv" | "tsv" | "xlsx" | "ods";
+  tab: string | null;
+  gid: string | null;
+  tabs: string[];
+  layout: "week_grid" | "time_grid" | "list" | null;
+  shows: number;
+  weekly: boolean;
+  firstDay: string | null;
+  lastDay: string | null;
+  firstDate: string | null;
+  lastDate: string | null;
+  /** The zone the sheet names (IANA), when it names one; null otherwise. */
+  zone: string | null;
+  zonesNamed: string[];
+  timeZone: string;
+  timeZoneFrom: "listing" | "sheet" | "market";
+  skipped: Array<{ text: string; where: string; why: "no_time" | "no_title" | "out_of_order" | "no_am_pm" | "no_day" }>;
+  skippedCount: number;
+  readAt: string;
+}
+
+/** An uploaded spreadsheet (A248), kept as what was read from it. */
+export interface SheetFileRow {
+  name: string;
+  kind: SheetReadRow["kind"];
+  bytes: number;
+  uploadedAt: string;
+  /** Who uploaded it (a user id), or null. */
+  uploadedBy: string | null;
+  entries: SheetEntryRow[];
+}
 
 /** One weekly slot of a schedule entered by hand (A241). */
 export interface ManualSlotRow {
@@ -497,4 +598,59 @@ export const handovers = network.table(
   createdAt: createdAt()
   },
   (t) => [check("handover_has_station_or_link", sql`${t.stationId} is not null or ${t.requestId} is not null`)]
+);
+
+/**
+ * Programming Phase 6 (migration 0067): a network licence, what Opencast licenses from a distributor
+ * or other licensor: the outlets it may go to (contracts' `Outlet`; `opencast` always), where
+ * (worldwide, or ISO 3166-1 country codes), from `starts_on` to `ends_on` (both included; read in
+ * the airing station's time zone), and the deal, in plain fields (no money moves yet). What it
+ * covers is in `network_licence_covers`. Owned by the licences module.
+ */
+export const networkLicences = network.table(
+  "network_licences",
+  {
+    id: id(),
+    licensor: text("licensor").notNull(),
+    name: text("name"),
+    outlets: text("outlets").array().notNull().default(sql`'{opencast}'::text[]`),
+    worldwide: boolean("worldwide").notNull().default(false),
+    countries: text("countries").array().notNull().default(sql`'{}'::text[]`),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    dealKind: text("deal_kind", { enum: ["rev_share", "flat_fee", "none"] }).notNull().default("none"),
+    /** Rev share, in hundredths of a percent (1250 is 12.5%). */
+    revShareBasisPoints: integer("rev_share_basis_points"),
+    flatFeeMicros: micros("flat_fee_micros"),
+    flatFeePer: text("flat_fee_per", { enum: ["month", "term"] }),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [
+    check("network_licence_dates", sql`${t.endsOn} >= ${t.startsOn}`),
+    check("network_licence_territory", sql`${t.worldwide} or cardinality(${t.countries}) > 0`),
+    check("network_licence_rev_share", sql`${t.dealKind} <> 'rev_share' or ${t.revShareBasisPoints} between 0 and 10000`),
+    check("network_licence_flat_fee", sql`${t.dealKind} <> 'flat_fee' or (${t.flatFeeMicros} >= 0 and ${t.flatFeePer} is not null)`)
+  ]
+);
+
+/** What a network licence covers: a program (every episode of it) or a single library item, one of the two. */
+export const networkLicenceCovers = network.table(
+  "network_licence_covers",
+  {
+    id: id(),
+    licenceId: uuid("licence_id")
+      .notNull()
+      .references(() => networkLicences.id, { onDelete: "cascade" }),
+    programId: uuid("program_id").references(() => programs.id),
+    assetId: uuid("asset_id").references(() => assets.id)
+  },
+  (t) => [
+    check("network_licence_covers_one", sql`(${t.programId} is null) <> (${t.assetId} is null)`),
+    index("network_licence_covers_licence").on(t.licenceId),
+    index("network_licence_covers_program").on(t.programId),
+    index("network_licence_covers_asset").on(t.assetId)
+  ]
 );

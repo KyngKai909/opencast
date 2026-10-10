@@ -51,15 +51,66 @@ export const BAND_MAX_MHZ = 108;
 
 // ---------- Tuning sound ----------
 
-/** A soft hiss while changing channel (radio band by default; video when "Tuning sound" is on). */
-export const HISS_MS = 250;
-/** Its peak gain, well below a program's level (about -26 dB), and its envelope. */
-export const HISS_GAIN = 0.05;
-export const HISS_ATTACK_MS = 20;
-export const HISS_RELEASE_MS = 120;
-/** Band-passed noise, centred here (Hz), a soft "shh" rather than a harsh white noise. */
-export const HISS_CENTRE_HZ = 3000;
-export const HISS_Q = 0.7;
+// Both play for as long as the change's cover is up (the static, or the radio band's needle and
+// waiting), from the press until the picture or sound arrives, then fade. Well below a program's
+// level, and only with "Tuning sound" on for the band (see hiss.ts).
+
+/** It never runs longer than this after the latest press (a channel slow to load goes quiet). */
+export const TUNING_SOUND_MAX_MS = 3000;
+export const TUNING_SOUND_ATTACK_MS = 40;
+/** The fade as the picture arrives (the static's roll is 160 ms; this runs a little past it). */
+export const TUNING_SOUND_RELEASE_MS = 250;
+
+/**
+ * The TV band's tuning sound (2026-10-06, the user's pick "C. Old TV set"): a deep hiss for as long
+ * as the static is up, with a soft low thump as the channel clicks over and a faint mains hum under
+ * it. Gains are the player's volume times these, in the balance the user heard them.
+ */
+export const SET_NOISE_GAIN = 0.075;
+/** The hiss: noise between these (Hz), deep rather than bright. */
+export const SET_LOWPASS_HZ = 1600;
+export const SET_HIGHPASS_HZ = 90;
+/** The thump: a sine falling from FROM to TO Hz, gone in THUMP_MS. */
+export const SET_THUMP_GAIN = 0.125;
+export const SET_THUMP_FROM_HZ = 110;
+export const SET_THUMP_TO_HZ = 45;
+export const SET_THUMP_MS = 180;
+/** The hum: 60 Hz mains, its low harmonics only. */
+export const SET_HUM_GAIN = 0.00875;
+export const SET_HUM_HZ = 60;
+export const SET_HUM_LOWPASS_HZ = 240;
+
+/**
+ * The radio band's (2026-10-06, the user's pick "R2. Dial sweep", a little deeper): hiss through a
+ * band that rises as the needle travels and settles lower while the station comes in, with faint
+ * whistles as the needle passes other stations.
+ */
+export const DIAL_NOISE_GAIN = 0.108;
+export const DIAL_Q = 0.9;
+/** The band's centre (Hz): from, at the needle's stop (SWEEP_MS), and settled DIAL_SETTLE_MS later. */
+export const DIAL_FROM_HZ = 400;
+export const DIAL_PEAK_HZ = 1400;
+export const DIAL_REST_HZ = 650;
+export const DIAL_SETTLE_MS = 500;
+/** The whistles: a tone falling from about 1-1.8 kHz to 250-450 Hz, each this long, this soft. */
+export const DIAL_WHISTLE_GAIN = 0.0104;
+export const DIAL_WHISTLE_MS = 180;
+/** When they start, after the press (on the needle's way). */
+export const DIAL_WHISTLES_AT_MS: readonly number[] = [80, 260];
+
+/**
+ * The clicks (2026-10-06, the user's ask: cues that it's changing and that the station landed): a
+ * short burst of noise through a band, falling away in about CLICK_MS. "Landed" plays on both bands
+ * as the picture or sound arrives (not on Stand by); the radio band also clicks softly on the press
+ * (the TV band has its thump).
+ */
+export const CLICK_MS = 10;
+export const CLICK_LANDED_GAIN = 0.146;
+export const CLICK_PRESS_GAIN = 0.07;
+/** The click's band (Hz): brighter on the radio band, rounder on the TV band. */
+export const CLICK_DIAL_HZ = 2200;
+export const CLICK_SET_HZ = 1500;
+export const CLICK_Q = 2;
 
 // ---------- Photosensitivity (WCAG 2.3.1), a hard limit ----------
 

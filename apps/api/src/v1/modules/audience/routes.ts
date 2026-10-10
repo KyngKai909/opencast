@@ -1,4 +1,4 @@
-import { audienceApi as api } from "@opencast/contracts";
+import { analyticsApi, audienceApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest } from "../../errors.js";
@@ -50,7 +50,24 @@ export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   });
   r.handle(api.voteNotForMe, async ({ params, body }) => {
     // Taken whether or not the player shows the control (features.not_for_me); never tied to the person.
-    const { status } = await services.audience.watch.vote({ stationId: params.stationId, sessionId: body.sessionId });
+    // A251: the player's id stands for its session on this station (its own, or the one made for it).
+    const sessionId = (await services.audience.sessionOn(body.sessionId, params.stationId)) ?? body.sessionId;
+    const { status } = await services.audience.watch.vote({ stationId: params.stationId, sessionId });
     return { ok: true as const, status };
   });
+
+  // A251 (2026-10-06): the Network desk's analytics; admins, and market leads for their market.
+  r.handle(analyticsApi.overview, ({ user, query }) => services.audience.analytics.overview(user, query));
+  r.handle(analyticsApi.stations, ({ user, query }) => services.audience.analytics.stations(user, query));
+  r.handle(analyticsApi.station, ({ user, params, query }) => services.audience.analytics.station(user, params.stationId, query));
+  r.handle(analyticsApi.stationFile, ({ user, params }) => services.audience.analytics.stationFile(user, params.stationId));
+  r.handle(analyticsApi.takeOffAir, ({ user, params, body }) => services.audience.analytics.takeOffAir(user, params.stationId, body.reason));
+  r.handle(analyticsApi.liftHold, ({ user, params }) => services.audience.analytics.liftHold(user, params.stationId));
+  r.handle(analyticsApi.archiveUpload, ({ user, params, body }) => services.audience.analytics.archiveUpload(user, params.stationId, params.itemId, body.reason));
+  r.handle(analyticsApi.audience, ({ user, query }) => services.audience.analytics.audience(user, query));
+  r.handle(analyticsApi.programs, ({ user, query }) => services.audience.analytics.programs(user, query));
+  r.handle(analyticsApi.money, ({ user, query }) => services.audience.analytics.money(user, query));
+  r.handle(analyticsApi.health, ({ user, query }) => services.audience.analytics.health(user, query));
+  r.handle(analyticsApi.growth, ({ user, query }) => services.audience.analytics.growth(user, query));
+  r.handle(analyticsApi.program, ({ user, params, query }) => services.audience.analytics.program(user, params.programId, query));
 }

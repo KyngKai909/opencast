@@ -80,6 +80,28 @@ export function hourTicks(from: TimeInput, to: TimeInput, every = 1, timeZone?: 
   return out;
 }
 
+/**
+ * Day labels for a span of several days (A251, the desk's analytics): "Tue 29" at each local
+ * midnight, every `every` days.
+ */
+export function dayTicks(from: TimeInput, to: TimeInput, every = 1, timeZone?: string): Array<{ at: number; text: string }> {
+  const a = ms(from);
+  const b = ms(to);
+  const hourOf = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" });
+  const dayOf = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", day: "numeric" });
+  const out: Array<{ at: number; text: string }> = [];
+  let n = 0;
+  for (let t = Math.ceil(a / HOUR) * HOUR; t <= b; t += HOUR) {
+    if (Number(hourOf.format(t)) % 24 !== 0) continue;
+    if (n++ % every === 0) {
+      const parts = dayOf.formatToParts(t);
+      out.push({ at: t, text: `${parts.find((p) => p.type === "weekday")!.value} ${parts.find((p) => p.type === "day")!.value}` });
+    }
+    t += 22 * HOUR; // the next midnight is 23 to 25 hours on
+  }
+  return out;
+}
+
 function path(points: ChartPoint[], x: (t: number) => number, y: (v: number) => number) {
   return points.map((p, i) => `${i ? "L" : "M"}${x(ms(p.at)).toFixed(1)} ${y(p.value).toFixed(1)}`).join(" ");
 }
@@ -141,8 +163,10 @@ export function LineChart({
 
   // Hour labels at least ~64px apart.
   const pxPerHour = ((right - left) * HOUR) / (b - a);
-  const every = [1, 2, 3, 6, 12, 24].find((n) => n * pxPerHour >= 64) ?? 24;
-  const xTicks = compact ? [] : hourTicks(a, b, every, timeZone);
+  const every = [1, 2, 3, 6, 12, 24].find((n) => n * pxPerHour >= 64);
+  // Several days: a label a day (or every few), not the hours.
+  const everyDays = [1, 2, 7, 14, 30, 60].find((n) => n * 24 * pxPerHour >= 64) ?? 60;
+  const xTicks = compact ? [] : every && every < 24 && b - a <= 48 * HOUR ? hourTicks(a, b, every, timeZone) : dayTicks(a, b, everyDays, timeZone);
 
   const last = series[series.length - 1];
   const nowX = last ? x(ms(last.at)) : 0;

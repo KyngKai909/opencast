@@ -49,6 +49,36 @@ describe("tuning", () => {
     expect(visible()).toEqual([CIVC.station.id]);
   });
 
+  it("takes the clock moving on as the first frame where frame callbacks never come (Samsung's TVs)", async () => {
+    let t = 0;
+    const saved = [
+      [HTMLVideoElement.prototype, "videoWidth"],
+      [HTMLMediaElement.prototype, "currentTime"],
+      [HTMLVideoElement.prototype, "requestVideoFrameCallback"]
+    ].map(([o, k]) => [o, k, Object.getOwnPropertyDescriptor(o, k as string)] as const);
+    Object.defineProperty(HTMLVideoElement.prototype, "videoWidth", { configurable: true, get: () => 1280 });
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", { configurable: true, get: () => t, set: () => {} });
+    const rvfc = vi.fn();
+    Object.defineProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback", { configurable: true, value: rvfc });
+    try {
+      const done = engine.tune(CIVC.station.id);
+      await flush(100);
+      expect(rvfc).toHaveBeenCalled();
+      expect(visible()).toEqual([]);
+      t = 0.5;
+      host.querySelector<HTMLVideoElement>(`video[data-station="${CIVC.station.id}"]`)!.dispatchEvent(new Event("timeupdate"));
+      await flush(400);
+      await done;
+      expect(engine.getState()).toMatchObject({ currentId: CIVC.station.id, status: "playing" });
+      expect(visible()).toEqual([CIVC.station.id]);
+    } finally {
+      for (const [o, k, d] of saved) {
+        if (d) Object.defineProperty(o, k as string, d);
+        else delete (o as unknown as Record<string, unknown>)[k as string];
+      }
+    }
+  });
+
   it("keeps the old picture until the new one is ready", async () => {
     const first = engine.tune(CIVC.station.id);
     await flush(10);
@@ -386,6 +416,28 @@ describe("the heartbeat", () => {
     expect(beatsToBeat()).toBe(1);
     await flush(5 * 60_000);
     expect(beatsToBeat()).toBe(2);
+    stop();
+  });
+
+  it("says how each station was tuned, and how long its picture took, on its first beat only; the device on every beat (A251)", async () => {
+    const send = vi.fn().mockResolvedValue({ nextInMs: 30_000 });
+    const stop = startHeartbeat(engine, send, "web", "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222");
+    const t = engine.tune(BEAT.station.id, { input: "app", via: "guide" });
+    await flush(10);
+    await t;
+    await flush(0);
+    expect(send.mock.calls[0][0]).toMatchObject({ stationId: BEAT.station.id, deviceId: "22222222-2222-4222-8222-222222222222", via: "guide" });
+    expect(typeof send.mock.calls[0][0].tuneMs).toBe("number");
+    await flush(30_000);
+    expect(send.mock.calls[1][0]).not.toHaveProperty("via");
+    expect(send.mock.calls[1][0]).not.toHaveProperty("tuneMs");
+    expect(send.mock.calls[1][0].deviceId).toBe("22222222-2222-4222-8222-222222222222");
+    // Channel down (to CIVC): the engine knows that one itself.
+    engine.handle({ type: "channel", dir: "down" });
+    await flush(CHANGE_MS);
+    await flush(0);
+    const first = send.mock.calls.find((c) => c[0].stationId !== BEAT.station.id)![0];
+    expect(first.via).toBe("channel");
     stop();
   });
 });

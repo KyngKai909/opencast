@@ -14,7 +14,11 @@ export const GROUPS: Array<{ id: RuleView["group"]; label: string }> = [
   { id: "watch_data", label: "Watch data" },
   // Added 2026-09-30 (follow-up Phase 6): other markets' streams and DASH stream links (A200, A201).
   { id: "external", label: "External stations" },
-  { id: "features", label: "Features" }
+  { id: "features", label: "Features" },
+  // Added 2026-10-07 (A251 Phase 6): what running Opencast costs, for the analytics' estimate.
+  { id: "costs", label: "Costs" },
+  // Added 2026-10-07: invite-only sign-ups, and how many invite codes each person can make.
+  { id: "signups", label: "Sign-ups" }
 ];
 
 /** `letters`: a list of capital-letter words, typed with commas between (call signs' lists). */
@@ -64,7 +68,12 @@ const LABELS: Record<string, [string, FieldKind]> = {
   opencastBps: ["Opencast", "percent"],
   poolBps: ["The co-op pool", "percent"],
   viewers: ["Viewers at once", "number"],
-  carriedAirings: ["Other stations' airings, together", "number"]
+  carriedAirings: ["Other stations' airings, together", "number"],
+  costPerGbMonthMicros: ["Cost a GB a month", "dollars"],
+  costPerMinuteMicros: ["Cost a minute", "dollars"],
+  costPerHourMicros: ["Cost an hour", "dollars"],
+  costPerWeekMicros: ["Cost a week", "dollars"],
+  codes: ["Invite codes each", "number"]
 };
 
 const YES_NO = [
@@ -79,8 +88,8 @@ const ON_OFF = [
 ];
 
 /** Rules whose value has a yes-or-no part, in words. `enabled` is a feature's switch, on or off. */
-const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters", enabled: "In the apps", allowed: "Allowed", played: "Played" };
-const ON_OFF_FIELDS = new Set(["enabled"]);
+const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters", enabled: "In the apps", allowed: "Allowed", played: "Played", on: "Invite only" };
+const ON_OFF_FIELDS = new Set(["enabled", "on"]);
 
 const trimZeros = (s: string) => (s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s);
 

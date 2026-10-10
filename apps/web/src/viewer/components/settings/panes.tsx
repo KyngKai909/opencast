@@ -150,7 +150,7 @@ function MarketPane() {
 
 export const CAPTION_PX = { small: 12, medium: 15, large: 19 } as const;
 
-function WatchingPane() {
+function WatchingPane({ phone }: { phone: boolean }) {
   const { settings, save, error } = useSettings();
   const w = settings.watching ?? {};
   const size = w.captionSize ?? "medium";
@@ -216,13 +216,14 @@ function WatchingPane() {
         )}
       />
       <SettingRow
-        title="Muted previews on the dial"
-        help="The live hero plays with no sound"
+        // Phones and tablets open on the picture (A245, the swipe home); the web's dial has the hero.
+        title={phone ? "Muted previews" : "Muted previews on the dial"}
+        help={phone ? "Watch opens with no sound until you tap" : "The live hero plays with no sound"}
         control={({ labelId, helpId }) => <Toggle checked={w.mutedPreviews ?? true} onChange={(v) => void save({ watching: { mutedPreviews: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
       <SettingRow
         title="Tuning sound"
-        help="A soft hiss when changing channel, on the TV and radio bands. On unless you turn it off"
+        help="Static and a click when changing channel, on the TV and radio bands. On unless you turn it off"
         control={({ labelId, helpId }) => <Toggle checked={w.tuningSound ?? true} onChange={(v) => void save({ watching: { tuningSound: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
       <SettingGroup>Playback</SettingGroup>
@@ -410,6 +411,8 @@ function PrivacyPane() {
       />
       <SettingRow title="Clear watch history" help="Starts fresh, here and on the account" control={() => <Button size="sm" onClick={() => void clear()}>Clear</Button>} />
       <SettingRow title="What stations see" help="Tuned-in counts that stations see are anonymous." />
+      {/* A251 (2026-10-06): the device id the player sends for Opencast's counts of devices. */}
+      <SettingRow title="Counting devices" help="Opencast counts devices with a random number kept on this device. It isn't tied to your account, and only totals are kept after 30 days." />
       <Err error={error ?? clearError} />
     </>
   );
@@ -569,7 +572,7 @@ export function SectionPane({ id, phone }: { id: SectionId; phone: boolean }): R
     case "market":
       return <MarketPane />;
     case "watching":
-      return <WatchingPane />;
+      return <WatchingPane phone={phone} />;
     case "notifications":
       return <NotificationsPane phone={phone} />;
     case "tvs":

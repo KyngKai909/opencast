@@ -77,7 +77,9 @@ describe("the page as drawn", () => {
     // On the dial first, by channel; then the rest by name.
     const names = within(table()).getAllByRole("row").slice(1).map((r) => r.querySelector(".oc-lines__title")?.textContent);
     // A229: Riverside County's streams sit together on 15, the one sharing 15.1's call sign says so.
-    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "Loma Linda Community Access", "Riverside County, Board of Supervisors", "Riverside County Library Live", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "Loma Linda Community Access", "Riverside County, Board of Supervisors", "Riverside County Library Live", "Attic Channel", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    // A248: a schedule from a published Google Sheet.
+    has(rowOf(/^Attic Channel/), ["36.1 ATIC", "Stream link", "Their spreadsheet", "Read every hour", "Up"]);
     has(rowOf(/^Riverside County Library Live/), ["15.3 RIVC", "Same brand as 15.1 RIVC"]);
     has(rowOf(/^Riverside County, Board of Supervisors/), ["15.1 RIVC", "Its call sign is shared by 15.3"]);
     // A201: a DASH stream link, on the dial now that DASH stream links are played.

@@ -2,6 +2,273 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Where it can air, the emails (programming Phase 6, P6.1 and P6.8)
+
+Additive, no migration.
+
+- `notifications.ts`: `NoticeKind` gains `carriage_outlets` (station owners, once per station: carriers can send its carried programs to their relays unless the maker turns it off; email on, push off) and `licence_ending` (station owners, once per licence and last day: a network licence for something on the log ends within two weeks; the Network desk, once per licence; push and email on).
+- Behaviour: both come from the jobs' hourly pass. `confirmRights`'s `outlets` (2026-10-10) is now sent by master control's Rights dialog for the owner's permission (P6.13).
+
+## 2026-10-10: Other apps viewers on per-thousand spots (programming Phase 5, P5.1)
+
+Additive, with migration 0066.
+
+- `platforms.ts`: `OTHER_APPS_LABEL` ("Other apps"); new `OtherAppsPartStatus` (`counting`, `settled`, `not_billed`), `OtherAppsPart` (`label`, `status`, `reason`, `sessions`, `billedSessions`, `costMicros`, `heldMicros`, `working`) and `OtherAppsLine` (`label`, `airings`, `sessionsAddedUp`, `billedSessionsAddedUp`, `spentMicros`, `waitingMicros`, `waitingAirings`).
+- `spots.ts`: `ResultsAiring.otherApps` (optional): the airing's Other apps part, apart from `costMicros` (Opencast's viewers) and `relayViewers`; absent when nobody was watching in another app through the spot. `Results.otherApps` (optional): the period's line. `Results.totals.otherAppsSpentMicros` and `otherAppsWaitingMicros` (optional); `totals.spentMicros`, `byStation[].spentMicros` and `bySpot[].spentMicros` now include Other apps viewers.
+- `ledger.ts`: `Statement.lines[].kind` gains `other_apps`: the business statement's line "Other apps", added in.
+- Behaviour: per-thousand spots now bill sessions in other apps that watched through them (online businesses: all; local businesses: those placed inside the area), settled two minutes after the spot; the hold adds the station's usual Other apps sessions. A business statement receipt's amount now includes relay viewers and Other apps. Station earnings and statements count Other apps in Spots. `docs/open-decisions.md` P5.12 to P5.14 have the rules.
+
+## 2026-10-10: The dial in other apps (programming Phase 5)
+
+Additive, with migration 0065.
+
+- `audience.ts`: `AudienceReport.otherApps` (optional): the audience source "Other apps", viewers tuned from the channel list in TiviMate, Jellyfin, Channels DVR, Kodi or VLC, `{ tunedInNow, sessions, hoursWatched, byMarket[] }` (`byMarket[].market` null for those Opencast couldn't place). Counted apart from runs of `via=iptv` playlist polls; never in the report's other numbers, never billed.
+- `analytics.ts`: `AnalyticsOverview.otherApps` (optional): the same by station and market, `{ station, market, sessions, hours }`, most hours first. Never in the totals, like `relays`.
+- Not in the contracts (files, not JSON; mounted like previews): `GET /v1/iptv/channels.m3u` and `GET /v1/iptv/xmltv.xml` (and `.xml.gz`), public, with `?market=` (a market's slug) and `?band=tv|radio`, an ETag, a minute's cache and gzip. 404 for a market that doesn't exist, 400 for another band. `docs/iptv.md` says what's in them.
+- Behaviour: a station's playlists (`/hls/:stationId/master.m3u8` and its renditions) asked for with `?via=iptv` count as "Other apps", and that master names its renditions with `?via=iptv` too. Without it, nothing changes.
+
+## 2026-10-10: Where it can air (programming Phase 6)
+
+Additive, with migration 0067.
+
+- New `licences.ts`:
+  - `Outlet` (`opencast`, `other_apps`, `relays`, `fast`, `recording`) with `OUTLET_WORDS` (each one's label and meaning), `DEFAULT_OUTLETS` (`opencast` and `relays`: what rows made before 2026-10-10 have) and `outletsWithOpencast` (puts `opencast` in, each once, in the enum's order). `fast` is one value for now; individual platforms can be added as values later;
+  - `CountryCode` (ISO 3166-1 alpha-2, upper case), `LicenceDeal` (`rev_share` with `percent`, `flat_fee` with `feeMicros` and `per` `month` or `term`, or `none`), `NetworkLicenceState` (`upcoming`, `active`, `ending`: within two weeks of its last day, `ended`), `LicenceCovered`, `NetworkLicence`, `NetworkLicenceInput`, `LicensorMinutes` and `LicensorMinutesRow`;
+  - new `licencesApi` (`api.licences`), `auth: "desk"` (writes: rights reviewers and admins): `listLicences` (`GET /admin/licences`), `getLicence` (`GET /admin/licences/:licenceId`), `createLicence` (`POST /admin/licences`; 400 when it ends before it starts, or isn't worldwide and names no countries), `updateLicence` (`PATCH /admin/licences/:licenceId`; what it covers is replaced when sent), `licenceMinutes` (`GET /admin/licences/:licenceId/minutes?month=2026-10`) and `licenceMinutesCsv` (`GET /admin/licences/:licenceId/minutes/csv?month=`, `{ filename, csv }`). Dates are inclusive: `endsOn` is the last day it airs.
+- `library.ts`: `Rights.outlets` (optional): where it may air. Everything for `made_it` and `public_domain`; otherwise what was recorded, `opencast` always in (rights confirmed before 2026-10-10: `opencast` and `relays`). `confirmRights` takes `outlets` (optional; left out: `opencast` and `relays`).
+- `catalog.ts`: `Terms.outlets` (optional), so on `Offer`, `offerProgram`'s and `updateOffer`'s bodies, and `Agreement.terms`: where the carrier may send it, `opencast` always in. Copied onto each agreement when it's made, so narrowing it applies to new carriers only. Left out of a new offer: `opencast` and `relays`, which offers and agreements from before 2026-10-10 have too.
+- `log.ts`: `LogEntry.notes` (optional): quiet notes, not warnings, `{ code: "not_cleared", outlet, message }` ("Not on your YouTube relay") on a program not cleared for an outlet the station uses; new `LicenceWarning` and `ProgramLog.licenceWarnings` (optional): `licence_ending` (its network licence ends within two weeks) and `licence_ended` (the entry is after its last day, and won't air), with the licence, its licensor and last day.
+- Behaviour: a log entry for an item whose network licence isn't in force when it starts is refused (422 `licence_ended`, or `licence_not_started`). A relay sends the station's "Airing on Opencast, channel 12.1" slate in place of a program it isn't cleared for.
+
+## 2026-10-10: Suggested break points (programming Phase 4)
+
+Additive, with migration 0063.
+
+- `library.ts`: `LibraryItem.suggestedBreakPoints` (optional, nullable): break points suggested for a program in the station's own library, found as its file was prepared, `{ source: "chapter" | "fade", pointsMs, previewUrl }`. Null when there are none to answer (none found, not looked for yet, already used or dismissed for this file, or the item has break points of its own). Never applied on their own.
+- `library.ts`: `answerBreakSuggestions` (`POST /library/:itemId/break-suggestions`, body `{ answer: "use" | "dismiss" }`, returns the `LibraryItem`). `use` makes them `breakPointsMs`; either answer ends them for this file. 409 `no_suggestions` when there are none to answer.
+
+## 2026-10-10: Template slots that air the next episode (programming Phase 3)
+
+Additive, with migration 0064.
+
+- `log.ts`:
+  - new `WhatAirs` (`this_episode`, `next_episode`, `fill`, `same_as`) with `WHAT_AIRS_WORDS` (each one's label and meaning), and `AtProgramEnd` (`start_over`, `stop`);
+  - `DayTemplateEntry.slotId` (optional): the slot's lasting id (`id` still changes on each save), and `whatAirs`, `programIds`, `order` (a `PlaybackOrder`), `atEnd`, `sameAsSlotId` (optional);
+  - `DayTemplateEntryInput` takes the same (`slotId`, `whatAirs`, `programIds` up to 20, `order`, `atEnd`, `sameAsSlotId`), each optional; for Next episode and Fill the slot `itemId` is optional. An entry sent without `slotId` (or with one that isn't the template's) is a new slot, whose walk starts afresh. Marathon on a slot with one program is refused (400);
+  - `DayTemplate.dates[].warnings` (optional) and `ProgramLog.warnings` (optional): new `TemplateWarning` (`last_episode`, `pushes_kept`; the template, slot, date, the airing's start and the words). The log lists a program's last new episode from a week before it;
+  - `LogEntry.templateSlot` (optional, nullable): the slot that made the entry (slot id, template, its name and label, the slot's start, what airs);
+  - new endpoint `previewTemplateSlot` (`POST /stations/:stationId/log/templates/:templateId/preview`, owner and operator): what a slot, saved or not, would air on the template's next dates (four by default), as `TemplateSlotPreview` (`dates`, `line`), and `slotPreviewLine`, the line's words for the apps and the mocks.
+- `accounts.ts`: `Reminder.airing.episodeTitle` (optional, nullable): the episode, as the guide lists it.
+- Behaviour: a template entry made before 2026-10-10 airs this episode, as before. Every entry a template makes names its slot; the day a template is built from becomes its slots' first airing.
+
+## 2026-10-09: Cleaner pictures from prepare (programming Phase 1)
+
+Additive, with migration 0061.
+
+- `library.ts`: `ItemHistory.preparation.converted` (optional): what preparing did to the picture, `from_hdr` (an HDR file tonemapped to BT.709) and `deinterlaced`. Empty when it did neither, or when the item was prepared before 2026-10-09 and hasn't been prepared again.
+
+## 2026-10-09: Seasons, multi-part episodes and playback orders (programming Phase 2)
+
+Additive, with migration 0062.
+
+- `library.ts`:
+  - `LibraryItem.seasonNumber`, `partOf`, `partNumber` (optional, nullable): its season, and a multi-part episode's shared words and part number;
+  - on `getLibrary` only, from the station's as-run log: `LibraryItem.neverAired`, `lastAiredAt`, and for a program's episodes `upNext` (where it comes in the program's walk, In order, after its last airing; 0 airs next; null when it can't air yet) and `nextEpisode` (optional);
+  - the update input (`updateItem`, and `upload`'s body) takes `seasonNumber`, `partOf` (1 to 200 characters) and `partNumber`, each nullable;
+  - new `PlaybackOrder` (`in_order`, `newest_first`, `shuffle`, `shuffle_shows`, `marathon`) and `PLAYBACK_ORDER_WORDS` (each order's label and meaning). Nothing takes an order yet; Phase 3's template slots will.
+- `uploads.ts`: `LibraryUploadFields.seasonNumber`, `partOf`, `partNumber` (optional).
+- Behaviour: an upload of a program that sends neither `seasonNumber` nor `episodeNumber` has both guessed from the file's name, and one that sends neither `partOf` nor `partNumber` has its part guessed from the title.
+
+## 2026-10-07: Invite-only sign-ups
+
+Additive, with migration 0060.
+
+- New `invites.ts`:
+  - shapes: `InviteCodeView`, `MyInvites`, `InviteCheck`, `DeskInvites`;
+  - endpoints in `invitesApi`: `check` (public), `redeem`, `mine`, `make`, `takeBack`, and for admins `desk`, `deskMake`, `deskRevoke`, `letIn`.
+- `core.ts`: `EndpointDef.beforeAdmitted`. It marks the endpoints someone who isn't in yet may call; any other `user`, `admin` or `desk` endpoint answers them 403 `invite_required`.
+- `accounts.ts`:
+  - `Me.admitted` (optional);
+  - `getMe`, `signOutEverywhere`, `deleteAccount` and `acceptInvite` are `beforeAdmitted`.
+- `rules.ts`: `signups.invite_only` and `signups.codes_per_person`. `desk.ts`: `RuleGroup` gains `signups`.
+
+## 2026-10-07: Acting from the desk's station file
+
+Additive, with migration 0059.
+
+- `analytics.ts`:
+  - new `DeskActionReason`;
+  - `AnalyticsStationFile.station.held` (optional);
+  - `StationFileUpload.archivedByOpencast` (optional).
+- New endpoints, admins only, each returning the station file:
+  - `analyticsApi.takeOffAir` (`POST /desk/analytics/stations/:stationId/hold`);
+  - `analyticsApi.liftHold` (`DELETE …/hold`);
+  - `analyticsApi.archiveUpload` (`POST …/uploads/:itemId/archive`).
+- `log.ts`: `SignOnCheck.key` gains `held_by_opencast`. It's a new value in an enum the control room reads, deployed with it.
+
+## 2026-10-07: The desk's station file
+
+Additive: a new desk endpoint and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsStationFile` (with `StationFilePerson`, `StationFileUpload` and `StationFileEntry`).
+- New endpoint `analyticsApi.stationFile` (`GET /desk/analytics/stations/:stationId/file`) returns:
+  - the station's own facts (made, first on air, signed off, on air now);
+  - how it started (signed up, or from the pipeline with its creator);
+  - everyone on it, with email, role and dates;
+  - its uploads with rights and a preview once prepared;
+  - its log ahead.
+
+## 2026-10-07: The desk's analytics, Health and Growth (A251, Phase 7)
+
+Additive: two new desk endpoints and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsHealth` and `AnalyticsGrowth`.
+- New endpoint `analyticsApi.health` (`GET /desk/analytics/health`) returns:
+  - dead-air fill and the slate (minutes, against the span before, how many stations);
+  - relay drops;
+  - bots, with their share and reasons;
+  - press to picture (median and 90th percentile);
+  - each station's airtime by kind from the as-run log (programs, breaks, live, planned off air, dead-air fill, slate), and external stations' minutes down;
+  - incidents (dead air, slate, relay, external), with how many were tuned in when each began;
+  - relay sessions, hours and drops;
+  - the slowest stations to start.
+- New endpoint `analyticsApi.growth` (`GET /desk/analytics/growth`) returns:
+  - new and active accounts;
+  - stations started by kind, and first sign-ons;
+  - the creator pipeline by stage, and markets open and opened;
+  - TVs registered by platform and seen, and phones paired;
+  - uploads (items, program items, hours);
+  - searches viewers settled on: the most searched, and those that found nothing.
+- Both are `auth: "desk"`, under the shared filters.
+
+## 2026-10-07: The desk's analytics, Money, and the Costs rules (A251, Phase 6)
+
+Additive: one new desk endpoint, a new rule group with five rules, an optional field on the station page. No migration (rules without a first version use their fallback, "Not set yet").
+
+- `desk.ts`: `RuleGroup` gains `costs`. `rules.ts`: new `costs.storage` (`costPerGbMonthMicros`), `costs.preparing` (`costPerMinuteMicros`), `costs.relays` and `costs.live` (`costPerHourMicros`), `costs.platform` (`costPerWeekMicros`). These are what running Opencast costs, nullable and "Not set yet" until set.
+- `analytics.ts`: new `AnalyticsMoney`, and new endpoint `analyticsApi.money` (`GET /desk/analytics/money`, `auth: "desk"`). It returns:
+  - whether Opencast's share is set;
+  - earnings: independent stations' after card fees, claimable stations' (held) and catalog stations' (catalog sponsors);
+  - pay-as-you-go charges, and the estimated cost to run (`complete` false while a price isn't set);
+  - earnings week by week for 8 weeks;
+  - the spot market;
+  - spots and sponsors per 1,000 hours by station;
+  - Opencast's charges in and estimated costs out (null per line until priced), with what was measured;
+  - claimable stations' escrow (held since, balance, added);
+  - carriage volume.
+- `AnalyticsStationPage` gains optional `cost`: the station's storage, relays and live used and priced, the total, what it was charged, and the share of its breaks with spots.
+
+## 2026-10-07: The desk's analytics, Programs and breaks (A251, Phase 5)
+
+Additive: two new desk endpoints and new shapes. Migration **0057**: new table `audience.break_stats`, one row per aired break, kept for good, naming no one.
+
+- `analytics.ts`: new `AnalyticsProgram`, `AnalyticsBreakHold`, `AnalyticsPrograms`, `AnalyticsProgramDetail`.
+- New endpoints, `auth: "desk"`:
+  - `analyticsApi.programs` (`GET /desk/analytics/programs`): every program aired in the view, added up across its stations (carried airings included), with its maker (null for the catalog), whether any airing was live, stations, airings, hours, average tuned in, stayed to the end and "Not for me" (null under the minimum, its airings' peaks added up). Also break hold (of those tuned in when breaks started, the percent still there when they ended): all, by length (`30`, `60`, `90`, `120`, `150_plus` seconds), by position (`opening`, `inside`, `between`), by first element (`bumper`, `spot`, `sponsor`, `station_id`, `other`), and the share opening with a bumper.
+  - `analyticsApi.program` (`GET /desk/analytics/programs/:programId`): still watching minute by minute (the first minute's audience less everyone who has left), tune-aways by minute, its breaks as its biggest airing aired them, at the start and still at the end, and the biggest drop. A program that didn't air in the view is a 404.
+
+## 2026-10-07: The desk's analytics, Audience (A251, Phase 4)
+
+Additive: one new desk endpoint, new shapes. Migration **0056**: `audience.station_days` gains `minutes_total` and `version`; `audience.device_days` gains `visits` and `visit_sessions` (all with defaults). Days worked out before are worked out again while their sessions are kept, with the reference's length bands.
+
+- `analytics.ts`: new `AnalyticsAudienceQuery` (the shared filters and an optional `station`) and `AnalyticsAudience`. New endpoint `analyticsApi.audience` (`GET /desk/analytics/audience`, `auth: "desk"`) returns:
+  - average tuned in by weekday and hour, against the span before;
+  - sessions by length band (`1_2`, `2_5`, `5_15`, `15_30`, `30_60`, `60_120`, `120_plus`), with median and average length;
+  - stations per visit, and the share of tune-ins that came from another station;
+  - bots by reason;
+  - presets saved, and added in the span, per station;
+  - hours by surface and relays' average viewers, day by day, with relay hours against Opencast's own;
+  - the most common changes between stations;
+  - devices, with the share returning;
+  - how sessions were tuned (`unknown` for players that don't say).
+- A station outside the view is a 404.
+
+## 2026-10-07: The desk's analytics, one station (A251, Phase 3)
+
+Additive: one new desk endpoint and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsVsNetwork`, `AnalyticsAiringSource` (`library`, `carried`, `live`, `guide`, `nothing_listed`), `AnalyticsAiring`, `AnalyticsFlow`, `AnalyticsStationPage`. New endpoint `analyticsApi.station` (`GET /desk/analytics/stations/:stationId`, `auth: "desk"`, the span's `from`, `to`, `previousFrom`):
+  - the station's numbers against the network's;
+  - its busiest night (6 pm to 2 am Pacific) minute by minute, against the same night a week before, with its breaks and airings (null once its minutes are past the 30 days kept);
+  - surfaces, places (its own market marked), and where its sessions came from and went;
+  - airtime from the as-run log, earnings by kind, spots and sponsors per 1,000 hours, and an external station's time down.
+  - A market lead gets a 403 for a station outside their market. An unknown station is a 404.
+- How older builds tolerate it: nothing existing changed.
+
+## 2026-10-07: The desk's analytics, Overview and Stations (A251, Phase 2)
+
+Additive: a new module of two desk endpoints, all new shapes. Migration **0055** (`drizzle-kit generate`): six new tables in `audience` (`station_hours`, `station_hour_places`, `network_hours`, `station_days`, `device_days`, `station_flows`), the totals worked out every ten minutes and kept for good, naming no session, device or person.
+
+- New `analytics.ts`: `AnalyticsQuery` (`from`, `to`, optional `market`, `band`, `previousFrom`), `AnalyticsScope`, `AnalyticsMeasure`, `AnalyticsStation` (`kind`: `independent`, `claimable`, `catalog`, `external`), `AnalyticsOverview`, `AnalyticsStationRow`, `AnalyticsStations`.
+- New endpoints, `auth: "desk"`: `analyticsApi.overview` (`GET /desk/analytics/overview`) and `analyticsApi.stations` (`GET /desk/analytics/stations`). Admins see every market. A market lead sees their own market's stations, whatever `market` asks (`scope.fixedMarket`). A rights reviewer gets 403. A span over a year, or one that ends before it starts, is a 400.
+- How older builds tolerate it: nothing existing changed; only the desk calls these.
+
+## 2026-10-06: Data for the desk's analytics (A251, Phase 1)
+
+Additive: three optional fields on `Heartbeat`, one new enum and one new public endpoint. Migration **0054** (`drizzle-kit generate`): `audience.sessions` gains `visit_id`, `device_hash`, `via` and `tune_ms`, all nullable and null for every existing row; new table `audience.searches`.
+
+- `audience.ts`: new `TuneVia` (`swipe`, `channel`, `keypad`, `guide`, `search`, `link`, `preset`, `last`, `remote`, `reminder`, `resume`, `dial`, `suggestion`). `Heartbeat` gains optional `deviceId` (a random id kept on the device, kept by the API only as a hash, 30 days), `via` and `tuneMs` (the station's first beat only).
+- Behaviour: a `sessionId` that beats for a second station is no longer refused (it was a 400, so nobody was counted after a channel change). The API keeps a session per station for it, with an id worked out from the two, and the id itself as the visit. `POST /stations/:stationId/not-for-me` finds the session on its station the same way.
+- `stations.ts`: new `searchSeen` (`POST /search/seen`, public, `{ q, results }`, answers `{ ok: true }`): a search the viewer settled on. Kept with no account, device or session for 90 days.
+- How older builds tolerate it: every new field is optional, and players that don't send them are counted as before (better: per station). Nothing an app reads changed.
+
+## 2026-10-06: Large and compressed XMLTV guides, and "Find this channel's guide" (A249)
+
+Additive: one new endpoint (request and response both new), new values on a desk-only enum, an optional field on `ListedSource.schedule` and on `SchedulePreview`, and new shapes. `ExternalInfo` (the dial, the guide, the station page, every app) is unchanged. Migration **0053** (after 0052, written by hand and checked with `drizzle-kit generate`, which reports no changes after it): `network.listed_sources.guide_read` (jsonb), nullable and null for every existing row; the new `calendar_sync` values are text, as the column's others are, so no type changes.
+
+- `network.ts`: `ListedSource.calendarSync` gains `pick_channel` (an XMLTV guide of several channels, with no `#channel=` and none named exactly by the listing's name or stream folder: nothing from it is listed, never several channels mixed), `not_in_guide` (the channel `#channel=` names isn't in the guide now) and `too_big` (a guide past `GUIDE_LIMITS`); like `calendar_not_found`, its airings stay. `ListedSource.schedule` gains optional `guide` (`GuideRead`: the guide's channel kept for the listing and its name there, the guide's channel count, airings kept, its size as it came and unzipped, gzipped or not, large or not, when it was read, when it last answered "not changed", the limit a read stopped at; null for anything but an XMLTV guide). `SchedulePreview` gains optional `guide` (the same). New: `GUIDE_LIMITS` (40 MB as it comes, 300 MB unzipped, 5,000 airings to come for one channel, 90 seconds), `GuideRead`, `GuideOption`.
+- New endpoint: `findListedGuides` (`POST /admin/listed-sources/find-guide`, admins, `{ name, sourceId?, creatorId? }`): the channel's name (and a lead's iptv-org id, from its IPTV list's tvg-id) looked up in iptv-org's public lists (`channels.json`, `guides.json`, read at most once a day), and the guide files for it that can be fetched as they are (i.mjh.nz's and nzxmltv.com's), each with its address (`url`, its channel in `#channel=`) and whether the channel is in the file now (`inGuide`: true, false, or null when the file couldn't be read). Answers `{ channels, guides, skipped }`; nothing saved; 502 `lists_unavailable` when the lists can't be read (and none were read in the last day).
+- Behaviour: an XMLTV schedule address is read as it downloads, unzipped when its first bytes are gzip's (whatever its name or type says; a `.gz` that isn't is read as it is), for the listing's channel only: `#channel=<id>` (an id, else one ending `-<id>`, as Plex's do in i.mjh.nz's files), else (new) the one channel of a one-channel guide, or the channel whose id or name is the listing's name or stream folder exactly; a guide of several channels without either was read whole before, mixing them, and is now `pick_channel`. Only airings not over yet are kept. Its ETag and Last-Modified are kept from the last read that worked and sent back (If-None-Match, If-Modified-Since); a 304 keeps what's stored and counts as read. Listings that share a guide have it downloaded and scanned once a pass for all their channels; a large guide (gzipped, or over 5 MB) running dry is read at most every 30 minutes, not every 2. The fetch of a schedule address leaves its fragment off (it says how to read the answer). Anything else is read as before (its first 5 MB).
+- How older builds tolerate it: the new values and fields are on what only the Network desk reads (`ListedSource`, `SchedulePreview`), and the desk is web-only and ships with the API (a desk built before would reject a listing with a new `calendarSync`, so they go out together). The TV and native apps read `ExternalInfo.schedule`, unchanged. No app calls the new endpoint but this desk.
+
+## 2026-10-06: Schedules from spreadsheets (A248)
+
+Additive: two new endpoints (request and response both new), new values on desk-only enums, optional fields on `ListedSource.schedule`, an optional `timeZone` and one new variant on `ListedScheduleInput`. `ExternalInfo` (the dial, the guide, the station page, every app) is unchanged: an uploaded spreadsheet reads there as `feed`. Migration **0052** (after 0051, written by hand and checked with `drizzle-kit generate`, which reports no changes after it): `network.listed_sources.schedule_time_zone` (text), `sheet_read` and `sheet_file` (jsonb), all nullable and null for every existing row; the new enum values are text, as the columns' others are, so no type changes.
+
+- `network.ts`: `ScheduleFormat` gains `sheet` (a Google Sheet, read as its CSV export with its tab kept, or a .csv, .tsv, .xlsx or .ods link; `#sheet=<name>` picks a workbook's tab). `ListedScheduleSource` gains `file` (an uploaded spreadsheet). `ListedSource.calendarSync` gains `not_public` (a Google Sheet that answers with a sign-in page or "not found": not published, nor shared with anyone with the link; its airings stay, as with `calendar_not_found`); a spreadsheet with no times it can read is `no_event_data`. `ListedSource.schedule` gains optional `timeZone` (the listing's own zone for times given without one, or null), `sheet` (`SheetRead`: kind, tab or `gid`, a workbook's tabs, layout, shows read, weekly, the first and last day in the sheet's words and as dates, the zone used and why, the zones named when several, the first 20 cells skipped with why, how many, when it was read) and `file` (`SheetFile`: name, kind, bytes, uploaded at and by). `ListedScheduleInput`'s `feed` and `guide_data` gain optional `timeZone` (`TimeZoneName`, an IANA name; null works it out), and a new variant `{ source: "file", timeZone? }` keeps an uploaded spreadsheet with its zone changed (409 `no_file` without one; 400 on `addListedSource`: a file is uploaded once it's listed). `ListedField` gains `scheduleFile` ("week.xlsx, 152 shows") and `scheduleTimeZone`. New: `isTimeZone`, `TimeZoneName`, `SheetLayout` (`week_grid`, `time_grid`, `list`), `SheetKind`, `SheetRead`, `SheetFile`, `SchedulePreview`, `SHEET_FILE_MAX_BYTES` (2 MB).
+- New endpoints: `previewListedSchedule` (`POST /admin/listed-sources/schedule-preview`, admins, multipart: `calendarUrl` or `file`, with `calendarFormat?`, `timeZone?`, `sheet?`, `marketId?` or `sourceId?`): reads it now and saves nothing; answers `SchedulePreview` (`format`, `sheet`, `upcoming`, the first 8 `airings`, `timeZone`); 400 without an address or a file, 422 `not_public`, `calendar_not_found`, `no_event_data`, `not_a_spreadsheet`, `old_excel`, `too_big`, `no_tab`. `uploadListedSchedule` (`POST /admin/listed-sources/:sourceId/schedule-file`, admins, multipart `file` with `timeZone?` and `sheet?`): the listing's schedule from the file, kept as what was read (the file isn't kept), made into airings at once and hourly; answers `ListedSource`; 400 without a file, 422 `too_big`, `not_a_spreadsheet`, `old_excel`, `no_tab`, `no_event_data`, 409 `removed`.
+- Behaviour: a schedule address that's a spreadsheet (its address, its content type, a workbook's bytes, or comma- or tab-separated text) is read hourly like a feed, and a webpage's times without an offset are read in the listing's `timeZone` when it has one (else the market's, as before). A dated sheet airs on its dates; one whose days have no dates repeats every week (the next 14 days, as a schedule entered by hand).
+- How older builds tolerate it: the new values are on fields only the Network desk reads (`ListedSource`, `ListedChange`), and the desk is web-only and ships with the API (a desk built before would reject a listing with `sheet`, `file` or `not_public`, so they go out together). The TV and native apps read `ExternalInfo.schedule`, which keeps its three values. No app calls the new endpoints but this desk.
+
+## 2026-10-04: When breaks come: every N programs, clock times, inside long programs (A247)
+
+Additive: three optional fields on `BreakRule` and one new shape. No enum value: `mode` keeps `after_every_program`, `every_n_minutes` and `none`, so every build reads every rule. Migration **0051** (after 0050, written by hand and checked with `drizzle-kit generate`, which reports no changes after it): `broadcast.break_rules.every_programs` (smallint), `clock_minutes` and `long_programs` (jsonb), all nullable and null for every existing row, with two checks every existing row passes.
+
+- `stations.ts`: `BreakRule.everyPrograms` (2 to 12, nullable; with `after_every_program`, a break after every Nth program, counted again each broadcast day, after off air time and at a programming block's edge; live programs aren't counted), `BreakRule.clockMinutes` (1 to 6 minutes past the hour, 0 to 59, nullable; with `every_n_minutes`, whose `everyMinutes` then reads 60 over how many; sorted and without repeats when saved; at least 10 minutes and the break's length plus 5 apart, around the hour too), `BreakRule.longPrograms` (`LongProgramBreaks`, new: `{ overMs, everyMs }`, whole minutes, `everyMs` 10 to 60 minutes, `overMs` longer than it and 24 hours at most; nullable; not with every N minutes). `getBreakRule` always answers the three (null when not set); `previewBreakRule` takes and answers them as `setBreakRule` does.
+- `setBreakRule` and `previewBreakRule` refuse (400): every N programs with another mode ("Breaks after every N programs go with breaks after every program."), clock times with another mode ("Breaks at set times each hour go with mode every_n_minutes."), clock times too close ("Leave at least {10} minutes between break times."), inside long programs with every N minutes ("Every N minutes already breaks inside every program."), and long programs' lengths out of range ("Breaks inside long programs come every 10 to 60 minutes.", "A long program is longer than how often it breaks, and 24 hours at most.").
+- Behaviour: the log's walk (`generateAll`, shared by `getLog`, the preview and playout's `breakPlan`) places clock breaks and breaks inside long programs out of the time a program leaves in its slot (a program is never cut for one), skips one with less than 5 minutes of program since the break before it or before its program ends, follows the maker's break points and barter shares as every N minutes does, places none inside live blocks or programs carried live only, and leaves the break after a program to every Nth with every N programs. Nothing changes for a rule without the fields. The sign-on check's hourly station ID counts the station ID open time airs between programs with every N programs.
+- How older builds tolerate it: apps drop the three fields (zod strips them) and send rules without them. Left out, every N programs stays while the body's mode is after every program, the clock times stay while the body keeps the mode and minutes it read (so changing only the length keeps them, and choosing other minutes replaces them), and inside long programs stays unless the body chooses every N minutes. An app from before shows clock breaks as "Every {60 / how many} minutes" and every N programs as "After every program", which is what it would save back. The TV and native apps never read the break rule.
+
+## 2026-10-03: Reset a date to its template; block changes' lines say who joins or leaves (A246, Phase 4)
+
+Additive: one new endpoint (request and response both new) and one type export. No published response changes shape. No migration: an edited date is `day_template_dates.edited_at`, already there; `drizzle-kit generate` reports no changes.
+
+- `log.ts`: `resetTemplateDate` (`POST /stations/:stationId/log/templates/:templateId/dates/:date/reset`, owners and operators, no body): one date a template made, and that was edited by hand since, made again from the template. What's on that broadcast day from now on that the template didn't make comes off (entries and blocks put there by hand; an entry with spots held in its break stays, as when a template changes); the template's entries and blocks go back on (kept where they're already as it makes them); the date is no longer an exception. Answers `{ template: DayTemplate, generated: TemplateGeneration }` (`generated.removed` counts what came off). A date that wasn't edited is left as it is (`generated` all zeros). 409 `date_started` for today or before ("Oct 26 has started. Only dates from tomorrow on can be reset to their template."); 404 when the date isn't one the template made. `DayTemplateEntryInput` is exported as a type too (it was a schema only).
+- Behaviour, no shape change: `applyLogChanges`' line for a block change says who it takes in or lets go, by the log's start-time rule with the batch's own moves and inserts, and what it was: "Late Crate Nights now ends at 12:30 am, was 1:00 am. Crate Session 01 is no longer part of it"; "… now starts at 9:00 pm, was 9:30 pm. Late Crate joins it" (a block added says only when it is). It's the same `line` string, so the change history records it too. G17 (the same as fields) stays open.
+- Behaviour, no shape change: the dead-air warning (30 and 12 minutes before) links to `/stations/:id/schedule?day=<broadcast day>&fill=<gap start>` (was `/stations/:id/log`), and a notice's email link maps `log`, `as-run`, `breaks` and `schedule` to master control's Schedule (`/control/<slug>/schedule`, with the query). The old `/log` and `/breaks` pages still redirect there.
+- How older builds tolerate it: apps built before never call the new endpoint; master control built before reads the longer lines as any line; an old link in a notice already sent still lands (the old pages redirect).
+
+## 2026-10-03: The break rule's preview, and Up next with its own cadence (A246, S20)
+
+Additive: one new endpoint (request and response both new), one new shape, and one optional field. No published response changes shape. No migration: `cadence.upNext` lives in `broadcast.break_rules.cadence` (jsonb), as `spots` does; `drizzle-kit generate` reports no changes.
+
+- `log.ts`: `previewBreakRule` (`POST /stations/:stationId/break-rule/preview`, owners and operators, as `setBreakRule`): body `{ rule: BreakRule, from, to }` (`to` after `from`, three hours at most: 400 otherwise); answers `BreakRulePreview` (new): `{ rule, from, to, entries: LogEntry[], breaks: (BreakSlot & { keeps })[], blocks? }`. `rule` is the rule as `setBreakRule` would save it (the same checks and 400s, the same merging of what's left out); `entries` and `breaks` are what `getLog` answers for the window after saving it, each break with its rows. `keeps`: the break keeps what it has (spots placed in it, or it has started). Nothing is saved, stored, placed or sent, and template dates aren't made (a window `getLog` hasn't generated yet can differ by those). The contract's own checks name the body's field under `rule` (`rule.cadence.stationId.every`); `setBreakRule`'s name it without.
+- `stations.ts` (S20): `BreakRule.cadence` gains optional `upNext` (`BreakCadence`, `never` allowed; nullable on the way in). Left out, as before: Up next airs as often as the bumper position holding the `up_next` role. Set, Up next airs at that cadence in the first position with its role (`open`, `close`, then `between`), or between programs, last, with its role in no position; that position's `every` governs only its other roles; `never` takes it off. During a programming block with its own bumper order, the block's sequences decide, as before. `getBreakRule` answers it only once set. Left out of `setBreakRule` with the rest of `cadence` sent, it stays as set; `null` clears it.
+- Behaviour: the log's walk (`generateAll`, which playout's `breakPlan` and `getLog` share) decides Up next by its own cadence when set, from the as-run log for once an hour and every N programs, as the between sequence does; a break and the boundary right after it are one chance. `setBreakRule`'s checks and merging moved into one function shared with the preview (`resolveBreakRule`); what it saves is unchanged.
+- How older builds tolerate it: apps drop `cadence.upNext` (zod strips it) and send `cadence` without it, which keeps it. A station that never sets it airs exactly as before. Older apps never call the preview.
+
+## 2026-10-03: Keep at this time (G18, A246)
+
+Additive: optional fields and one new `LogChange` op (request side). No log code, enum value or field a response already carries changes shape. Migration **0050** (after 0049, written by hand: the journal's gap at 0038 makes drizzle-kit number wrong): `broadcast.log_entries.keep_time` and `broadcast.day_template_entries.keep_time` (boolean, not null, default false).
+
+- `log.ts`: `LogEntry` gains optional `keepTime` (the station marked it "Keep at this time": a fixed point when rows move around it in master control; left out, false). `DayTemplateEntry`, `DayTemplateEntryInput` (`updateTemplate.entries`) and `EntryInput` (`addEntry`, `updateEntry` (left out: as it is), and `LogChange`'s `insert`) gain optional `keepTime`. `LogChange` gains `{ op: "keep", entryId, keep }` (its line "Saturday Reel keeps its time" or "… no longer keeps its time"); `LogChangesResult.changes[].op` takes `keep` (only batches that send one get it back). A `move` of an entry kept at its time, as the batch has left it so far, is the problem `kept` ("Saturday Reel is kept at its time. Turn off Keep at this time to move it."), unless the batch clears the mark first.
+- Behaviour: getLog returns `keepTime` on every entry. Making a template from a day copies the mark into its entries, and generating a date copies it onto the entries made (a template's change of the mark reaches dates already made that weren't edited). Ending a live block early moves the programs after it up as before, stopping at one kept at its time too. A batch that only sets or clears marks changes nothing that airs: it doesn't replan an on-air station and is never the overlap. The window's version (`ProgramLog.version`) doesn't include the mark.
+- How older builds tolerate it: apps drop `keepTime` (zod strips it) and never send `keep`, so never get its `op` back; their moves of a kept entry are refused with `kept` in their words, as any other problem.
+
+## 2026-10-03: External stations' schedule feeds (no shape change)
+
+- Behaviour: a feed's show that's on now is kept (a feed that lists only what's on now showed nothing), so `DialRow.now` and the guide have it. Feeds are read hourly and every 2 minutes while a listing's guide is about to run dry (A212). A re-read keeps a listed airing's `id` when the show is the same (same start, same external id or title), so reminders on it stay; a reminder on a show that moves goes with it (the same show within a day, reminded again at its start), and one on a show gone from the source's schedule is deleted. A JSON feed keyed by channel is read for the station's own channel.
+
 ## 2026-10-02: Programming blocks (A244)
 
 Additive: one new module (`blocks.ts`, endpoints under `/stations/:stationId/blocks`), two new shapes in `common.ts`, optional fields, three new `LogChange` ops (request side) and one new optional query and upload field. No log code and no enum value is added anywhere a response already carries: block items keep `BMP`, `SID`, `OPN` and `CLS` (an intro or outro reads `SID` with `identCode`, as A242's), `BreakContent.kind` and `BreakRow.code` keep their values, and `BreakRow.element.role` stays `BumperRole`. Migration 0049.

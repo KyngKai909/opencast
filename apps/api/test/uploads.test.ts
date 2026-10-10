@@ -22,6 +22,7 @@ let kai: User;
 let jess: User;
 let dana: User;
 let beatId: string;
+let marketId: string;
 let wave: string;
 let clip: string;
 
@@ -75,7 +76,7 @@ async function complete(user: User, id: string, etags: Map<number, string>) {
 
 beforeAll(async () => {
   h = await createHarness();
-  const marketId = (await market(h)).id;
+  marketId = (await market(h)).id;
   kai = await h.signIn("Kai");
   jess = await h.signIn("Jess");
   dana = await h.signIn("Dana");
@@ -182,6 +183,19 @@ describe("direct uploads", () => {
     // One object on disk for both.
     const stored = (await fs.readdir(objectsDir())).filter((n) => n.startsWith("b"));
     expect(stored.filter((n) => n === cid)).toHaveLength(1);
+  }, 60_000);
+
+  it("finishes for an admin on a station Opencast runs, where they have no membership (2026-10-04)", async () => {
+    // The upload is checked again when it finishes, as the person is now: an admin's role on a
+    // catalog station comes from being an admin, which that check used to leave out ("That station
+    // wasn't found" after the bytes had all arrived).
+    const ada = await h.signIn("Ada", { admin: true });
+    const retro = await stationFixture(h, { kind: "catalog", callSign: "RETRO", name: "Retro Rerun", marketId, tenths: 41 });
+    const sent = await send(ada, { kind: "library_item", stationId: retro.id, fields: { title: "Catalog clip" } }, clip);
+    await complete(ada, sent.session.id, sent.etags).then((r) => expect(r.status).toBe(200));
+    const upload = await ada.get(`/v1/uploads/${sent.session.id}`).expect(200);
+    expect(upload.body.state).not.toBe("failed");
+    expect(upload.body).toMatchObject({ result: { stationId: retro.id, itemId: expect.any(String) } });
   }, 60_000);
 
   it("refuses a file that can't be read, as the old upload did, keeping nothing", async () => {

@@ -12,12 +12,10 @@ import { useNow } from "./useNow";
 export type ControlPage =
   | "monitor"
   | "audience"
-  | "program-log"
+  | "schedule"
   | "live-sources"
-  | "breaks"
   | "market"
   | "library"
-  | "blocks"
   | "listings"
   | "spot-market"
   | "sponsors"
@@ -33,9 +31,9 @@ export const CONTROL_RAIL = [
     items: [
       { id: "monitor", label: "Monitor" },
       { id: "audience", label: "Audience" },
-      { id: "program-log", label: "Program log" },
-      { id: "live-sources", label: "Live sources" },
-      { id: "breaks", label: "Breaks" }
+      // A246: the Schedule workspace (the log, templates, blocks and break rules) replaces Program log and Breaks.
+      { id: "schedule", label: "Schedule" },
+      { id: "live-sources", label: "Live sources" }
     ]
   },
   { label: "Market", items: [{ id: "market", label: "Syndication market" }] },
@@ -43,8 +41,7 @@ export const CONTROL_RAIL = [
     label: "Programming",
     items: [
       { id: "library", label: "Library" },
-      // A244: programming blocks.
-      { id: "blocks", label: "Blocks" },
+      // A246: Blocks is a tab of the Schedule now.
       { id: "listings", label: "Listings" }
     ]
   },

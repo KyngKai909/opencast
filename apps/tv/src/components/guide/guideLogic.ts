@@ -4,7 +4,7 @@
 
 import type { BlockBand } from "@opencast/contracts";
 import type { Command } from "@opencast/player";
-import { clock, clockRange } from "@opencast/ui";
+import { clock, clockRange, GUIDE_UNIT_MS } from "@opencast/ui";
 import type { AiringX, StationIdentX } from "../../api/ext";
 import { callSignLabel } from "../../lib/stationRef";
 import { matchChannel } from "../search/searchLogic";
@@ -110,10 +110,25 @@ export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
         ? { key: `${id}@live@${new Date(start).toISOString()}`, stationId: id, start, end, airing: null, signOnAt: null, nothingListed: true }
         : { key: `${id}~off~${start}`, stationId: id, start, end, airing: null, signOnAt }
     );
+  // As the grid draws them (guideCells): whole five-minute columns. A cell that rounds to none
+  // isn't drawn, so it isn't a cell to focus either.
+  const col = (t: number) => Math.round((Math.min(Math.max(t, from), to) - from) / GUIDE_UNIT_MS);
+  const drawn = (c: { start: number; end: number }) => col(c.end) > col(c.start);
   for (const a of airings) {
-    const s = ms(a.startsAt);
+    let s = ms(a.startsAt);
     const e = ms(a.endsAt);
     if (e <= cursor) continue; // overlaps what's already placed
+    if (s < cursor && a.kind !== "off_air" && cells.length > 0) {
+      // An outside guide overlapping itself (2026-10-06): the earlier program ends where this one
+      // starts; cut down to nothing, it goes, and this one takes its place.
+      const prev = cells[cells.length - 1]!;
+      prev.end = s;
+      if (!drawn(prev)) {
+        cells.pop();
+        s = Math.min(s, prev.start);
+      }
+      cursor = s;
+    }
     if (a.kind === "off_air") {
       // From the gap it closes (or its own start, before the window's first cell) to its end.
       offAir(cursor === from ? Math.min(s, from) : cursor, e, ms(a.backAt ?? a.endsAt));
@@ -121,7 +136,15 @@ export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
       continue;
     }
     if (s > cursor) offAir(cursor, s, s);
-    cells.push({ key: airingKey(id, a), stationId: id, start: s, end: e, airing: a, signOnAt: null });
+    const cell: Cell = { key: airingKey(id, a), stationId: id, start: s, end: e, airing: a, signOnAt: null };
+    const last = cells[cells.length - 1];
+    if (!drawn(cell) && last) {
+      // Shorter than the grid draws (a two-minute filler): what's before it runs on over it.
+      last.end = e;
+      cursor = e;
+      continue;
+    }
+    cells.push(cell);
     cursor = e;
   }
   if (cursor < to) offAir(cursor, to, null);

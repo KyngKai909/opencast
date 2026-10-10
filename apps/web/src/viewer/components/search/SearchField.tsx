@@ -17,7 +17,7 @@ export interface SearchFieldProps {
 export function SearchField({ value, onChange, phone }: SearchFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const tuneTo = useTuneTo(value);
-  const tuneIn = useTuneIn();
+  const tuneIn = useTuneIn("search");
   useEffect(() => input.current?.focus({ preventScroll: true }), []);
   return (
     <div className={phone ? "vw-bigfield vw-bigfield--phone" : "vw-bigfield"} onClick={() => input.current?.focus()}>

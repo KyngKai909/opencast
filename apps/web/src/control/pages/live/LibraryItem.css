@@ -33,4 +33,10 @@
 .cc-item__role { display: grid; gap: 8px; padding: 12px 0 4px; }
 .cc-item__airsform { display: grid; gap: 4px; padding: 8px 0 4px; }
 .cc-item__airsform > .oc-btn { justify-self: start; margin-top: 8px; }
+/* Programming Phase 2: season, episode, part of, part. */
+.cc-item__eps { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 12px; align-items: start; }
 .cc-item__pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 12px; align-items: start; padding: 4px 0 8px 28px; }
+/* Programming Phase 4: suggested break points, each heard in the preview from two seconds before. */
+.cc-item__preview { padding: 8px 0 4px; }
+.cc-item__preview video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; }
+.cc-item__preview--audio video { aspect-ratio: auto; height: 44px; background: none; }

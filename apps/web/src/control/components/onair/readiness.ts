@@ -4,15 +4,17 @@
 // ready for the next 48 hours; Late Crate, ep. 15 at 10:00 pm is being prepared"), counting items,
 // not log entries (G13), with the item named linked to its airing on the log; the pre-flight offers
 // "Go to library" only when an item couldn't be prepared (G14); a library item's "Prepared for air"
-// says where its own preparation stands, in place of the old cache line.
+// says where its own preparation stands, in place of the old cache line, and (cleaner pictures,
+// programming Phase 1) what preparing did to its picture: "Converted from HDR", "Deinterlaced".
 
 import type { ItemHistory, PlayoutStatus, SignOnCheck } from "@opencast/contracts";
 import { STATION_TZ } from "../../../lib/clock";
-import { broadcastDay, isoDate, timeOn, viewWindow } from "./time";
+import { broadcastDay, isoDate, timeOn } from "./time";
 
 type Readiness = NonNullable<PlayoutStatus["readiness"]>;
 type NotReady = NonNullable<Readiness["firstNotReady"]>;
 export type PreparationStatus = NonNullable<ItemHistory["preparation"]>["status"];
+type Conversion = NonNullable<NonNullable<ItemHistory["preparation"]>["converted"]>[number];
 
 const HOUR = 3_600_000;
 
@@ -54,15 +56,12 @@ export function readinessLine(r: PlayoutStatus["readiness"], now: number, tz = S
 }
 
 /**
- * Where the program log shows an airing (G13): its broadcast day, the whole day when it's outside
- * the evening's 6 pm to 2 am, and the entry picked out (`?entry=`).
+ * Where the log shows an airing (G13): the Schedule's Log (A246) on its broadcast day, which shows
+ * the whole day, with the entry picked out (`?entry=`).
  */
 export function logEntryHref(base: string, entryId: string, airsAt: string, tz = STATION_TZ): string {
-  const day = broadcastDay(airsAt, tz);
-  const evening = viewWindow("evening", day, tz);
-  const inEvening = Date.parse(airsAt) >= Date.parse(evening.from) && Date.parse(airsAt) < Date.parse(evening.to);
-  const q = new URLSearchParams({ day: isoDate(day), ...(inEvening ? {} : { view: "day" }), entry: entryId });
-  return `${base}/log?${q}`;
+  const q = new URLSearchParams({ day: isoDate(broadcastDay(airsAt, tz)), entry: entryId });
+  return `${base}/schedule?${q}`;
 }
 
 /**
@@ -74,6 +73,14 @@ export function preparedFixHref(check: Pick<SignOnCheck, "key" | "passed" | "pre
   if (check.key !== "items_prepared" || check.passed) return null;
   const f = check.preparation?.firstFailed;
   return check.preparation?.failed && f ? `${libraryBase}/library/items/${f.itemId}` : null;
+}
+
+/** What preparing did to the picture ("Converted from HDR, deinterlaced"), or null when it did nothing. */
+export function conversionWords(converted: Conversion[] | undefined): string | null {
+  const words = (converted ?? []).map((c) => (c === "from_hdr" ? "converted from HDR" : "deinterlaced"));
+  if (!words.length) return null;
+  const line = words.join(", ");
+  return `${line[0]!.toUpperCase()}${line.slice(1)}`;
 }
 
 /** A library item's preparation, in the history's words. Null when nothing has asked for it yet. */

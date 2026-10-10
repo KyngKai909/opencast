@@ -20,6 +20,8 @@ interface Visit {
   path: string;
   /** Default true: Kai, signed in. */
   signedIn?: boolean;
+  /** Signed in as someone else (added 2026-10-07: new@invite.example waits for an invite code). */
+  as?: string;
   /** Default true: the Inland Empire is on this device. False is a first visit. */
   market?: boolean;
   only?: Width;
@@ -33,23 +35,30 @@ interface Visit {
 }
 
 const heading = (name: string | RegExp) => (p: Page) => p.getByRole("heading", { name }).first();
+/** The phone's home is the picture (A245, the swipe home): its Tune button is there whatever's on. */
+const swipeHome = (p: Page) => p.getByRole("button", { name: "Tune by number" });
+const onWeb = (web: (p: Page) => Locator) => (p: Page, width: Width) => (width === "web" ? web(p) : swipeHome(p));
 const dialog = (name: string | RegExp) => (p: Page) => p.getByRole("dialog", { name });
 
 const VISITS: Visit[] = [
-  { name: "home", path: "/", sees: heading(/Town Hall/) },
-  { name: "home, signed out", path: "/", signedIn: false, sees: heading(/Town Hall/) },
+  { name: "home", path: "/", sees: onWeb(heading(/Town Hall/)) },
+  { name: "home, signed out", path: "/", signedIn: false, sees: onWeb(heading(/Town Hall/)) },
   { name: "first visit", path: "/", signedIn: false, market: false, sees: dialog("Where are you tuning in from?") },
   { name: "market picker", path: "/?modal=market", sees: dialog("Where are you tuning in from?") },
-  { name: "radio band", path: "/radio", sees: heading("Radio band") },
+  { name: "radio band", path: "/radio", sees: (p, width) => (width === "web" ? heading("Radio band")(p) : p.getByRole("button", { name: "Radio", pressed: true })) },
   { name: "tuned in, TV", path: "/watch/civc", sees: heading(/Town Hall/) },
   { name: "tuned in, radio", path: "/watch/nite", sees: heading(/Radio dramas/) },
   {
     name: "carried from",
     path: "/watch/beat",
+    only: "web",
     open: async (p) => p.getByRole("button", { name: "Carried from REEL 24.1" }).first().click(),
     sees: dialog(/Saturday Reel|Carried/)
   },
+  // The phone's swipe home has no carried-from line to press: the modal by its address.
+  { name: "carried from, phone", path: `/watch/beat?modal=carried&program=${SATURDAY_REEL}`, only: "phone", sees: dialog(/Saturday Reel|Carried/) },
   { name: "pledge", path: "/watch/beat?modal=pledge&station=BEAT", sees: dialog("Pledge to Inland Beat") },
+  { name: "tune pad", path: "/watch/beat?sheet=tune", only: "phone", sees: dialog("Tune by number") },
   { name: "share", path: "/watch/beat?modal=share&station=BEAT", sees: dialog("Share") },
   { name: "watch on", path: "/watch/civc?sheet=watch-on", only: "phone", sees: dialog("Watch on") },
   { name: "guide", path: "/guide", sees: heading("Tonight") },
@@ -75,6 +84,9 @@ const VISITS: Visit[] = [
   { name: "replace key", path: `/presets?modal=replace-key&station=${PREP}`, sees: dialog("Where should PREP 31.1 go?") },
   { name: "you", path: "/you", sees: heading("Reminders") },
   { name: "you, signed out", path: "/you", signedIn: false, sees: (p) => p.getByRole("main") },
+  // Invite-only sign-ups (added 2026-10-07): waiting for a code, and an invite's link.
+  { name: "waiting for an invite", path: "/", as: "new@invite.example", sees: heading("Opencast is invite-only for now") },
+  { name: "invite link", path: "/join/OPEN-2026", signedIn: false, sees: heading("You're invited to Opencast") },
   {
     name: "sign in, email",
     path: "/you",
@@ -142,13 +154,13 @@ for (const width of ["web", "phone"] as const) {
         if (v.only && v.only !== width) continue;
         test(v.name, async ({ page, context }) => {
           await context.addInitScript(
-            ({ signedIn, market }) => {
+            ({ signedIn, market, as }) => {
               if (sessionStorage.getItem("oc-e2e-seeded")) return;
               sessionStorage.setItem("oc-e2e-seeded", "1");
-              if (signedIn) localStorage.setItem("oc-mock-signed-in", "kai@example.com");
+              if (signedIn) localStorage.setItem("oc-mock-signed-in", as);
               if (market) localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null }));
             },
-            { signedIn: v.signedIn !== false, market: v.market !== false }
+            { signedIn: v.signedIn !== false, market: v.market !== false, as: v.as ?? "kai@example.com" }
           );
           await useGround(page, ground);
           if (v.casting) {

@@ -42,7 +42,8 @@ export interface ShelfService {
 
 const EVIDENCE_TYPES = /^(application\/pdf|image\/(png|jpeg|gif|webp|heic)|text\/plain)$/;
 const EVIDENCE_EXTENSIONS = /\.(pdf|png|jpe?g|gif|webp|heic|txt)$/i;
-const EVIDENCE_MAX_BYTES = 20 * 1024 * 1024;
+export const EVIDENCE_MAX_BYTES = 20 * 1024 * 1024;
+export const EVIDENCE_TOO_BIG = "Attach a file of 20 MB or less.";
 const LINES: ChecklistLineName[] = ["source", "published", "renewal", "soundtrack", "trademarks"];
 /** Lines that count as answered: yes (with evidence), yes with a caution (with evidence), or not needed by the rules. */
 const ANSWERED = new Set<LineState>(["ok", "warn", "not_needed"]);
@@ -545,7 +546,7 @@ export function createShelfService({ deps, services }: ModuleContext): ShelfServ
       const item = await itemRow(itemId);
       if (item.state !== "checking") throw conflict("sent", "It's been sent: evidence is added before the first check.");
       if (!EVIDENCE_TYPES.test(file.mimeType) && !EVIDENCE_EXTENSIONS.test(file.originalName)) throw refused("wrong_file_type", "Attach a PDF, a picture or a text file.");
-      if (file.size > EVIDENCE_MAX_BYTES) throw refused("too_big", "Attach a file of 20 MB or less.");
+      if (file.size > EVIDENCE_MAX_BYTES) throw refused("too_big", EVIDENCE_TOO_BIG);
       const content = services.library.content;
       // Kept for as long as the item is in the catalog, read now and then: Infrequent Access.
       const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });

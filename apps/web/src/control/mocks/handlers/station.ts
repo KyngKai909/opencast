@@ -2,7 +2,7 @@
 // The Station area owns this file.
 
 import { http, type HttpHandler } from "msw";
-import { accountsApi, Me, networkApi, notificationsApi, stationsApi, trustApi, type BreakRule, type InvitePreview, type LogCode, type TeamMember } from "@opencast/contracts";
+import { accountsApi, logApi, Me, networkApi, notificationsApi, stationsApi, trustApi, type BreakRule, type InvitePreview, type LogCode, type TeamMember } from "@opencast/contracts";
 import { ClaimsX, ClaimX } from "../../api/ext/station";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
@@ -11,6 +11,8 @@ import { ALWAYS_ON, DEAD_AIR_AT, breakRuleOf, defaultPrefs, newId, saveStationSt
 import { fail, needsUser, path, personOf, reply } from "../respond";
 import { meView } from "../../../mocks/me";
 import { offAirFor } from "../schedule";
+import { applyRule, previewOf, resolveRule, RuleError } from "../breakRule";
+import { spanViews } from "../blocks";
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -315,30 +317,43 @@ const breakHandlers = [
     if (r instanceof Response) return r;
     const body = stationsApi.setBreakRule.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "invalid", "That break rule can't be saved.");
-    // Left out, the cadence stays as it was (added 2026-09-29), and so do spots when only they are.
-    const before = breakRuleOf(id);
-    const was = before.cadence;
-    let cadence = body.data.cadence ? { ...body.data.cadence, spots: body.data.cadence.spots ?? was?.spots } : was;
-    // A243, as the API: the sequences stay when left out, except that a body from before them that
-    // changes how often bumpers air changes the opening and closing ones; sent, the bumpers' cadence
-    // follows the opening one.
-    let bumperSequences = body.data.bumperSequences ?? before.bumperSequences;
-    if (body.data.bumperSequences) {
-      const twice = (["open", "close", "between"] as const).find((p) => new Set(body.data.bumperSequences![p].roles).size !== body.data.bumperSequences![p].roles.length);
-      if (twice) return fail(400, "bad_request", "Each bumper role can be in a position once.");
-      const open = body.data.bumperSequences.open;
-      if (cadence) cadence = { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } };
-    } else if (body.data.cadence && bumperSequences && JSON.stringify(body.data.cadence.bumpers) !== JSON.stringify(was?.bumpers)) {
-      const every = body.data.cadence.bumpers;
-      bumperSequences = { ...bumperSequences, open: { ...bumperSequences.open, ...every }, close: { ...bumperSequences.close, ...every } };
+    // As the API: what's left out stays (A243, S20); the checks are setBreakRule's (mocks/breakRule.ts).
+    let rule: BreakRule;
+    try {
+      rule = resolveRule(id, body.data);
+    } catch (e) {
+      if (e instanceof RuleError) return fail(400, "bad_request", e.message);
+      throw e;
     }
-    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence, bumperSequences };
-    if (rule.mode === "every_n_minutes" && !rule.everyMinutes) return fail(400, "invalid", "Say how often breaks come.");
-    if (rule.cadence && Object.values(rule.cadence).some((c) => c.every === "n_programs" && !c.n)) return fail(400, "bad_request", "Say after how many programs.");
-    if (rule.mode !== "every_n_minutes") rule.everyMinutes = null;
     stationState().breakRules[id] = rule;
     saveStationState();
-    return reply(stationsApi.setBreakRule.response, rule);
+    // A246: breaks not yet filled take the rule, as the API's next read of the log does.
+    applyRule(id, rule, now().getTime());
+    saveDb();
+    return reply(stationsApi.setBreakRule.response, breakRuleOf(id));
+  }),
+
+  // A246: the breaks in a window rebuilt with a rule that isn't saved; nothing is written.
+  http.post(path(logApi.previewBreakRule), async ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const id = String(params.stationId);
+    const r = roleOn(id, p, ["owner", "operator"], "Hosts don't set the break rule.");
+    if (r instanceof Response) return r;
+    const body = logApi.previewBreakRule.body.safeParse(await request.json().catch(() => null));
+    if (!body.success) return fail(400, "invalid", "That break rule can't be saved.");
+    const { from, to } = body.data;
+    if (Date.parse(to) <= Date.parse(from)) return fail(400, "bad_request", "The preview ends after it starts.");
+    if (Date.parse(to) - Date.parse(from) > 3 * 3_600_000) return fail(400, "bad_request", "Preview three hours at most.");
+    let rule: BreakRule;
+    try {
+      rule = { ...resolveRule(id, body.data.rule) };
+    } catch (e) {
+      if (e instanceof RuleError) return fail(400, "bad_request", e.message);
+      throw e;
+    }
+    const blocks = spanViews(id, from, to);
+    return reply(logApi.previewBreakRule.response, { rule, from, to, ...previewOf(id, rule, from, to, now().getTime()), ...(blocks.length ? { blocks } : {}) });
   })
 ];
 

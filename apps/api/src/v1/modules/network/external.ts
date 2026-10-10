@@ -24,7 +24,24 @@
 //   against its published schedule; with neither, the banner says Live and the source. A241: or a
 //   webpage's own event data (schema.org JSON-LD; a page with none is `no_event_data`, not an
 //   error), or a weekly schedule entered by hand and checked against the published schedule, made
-//   into airings for the next 14 days on every save and hourly.
+//   into airings for the next 14 days on every save and hourly. 2026-10-03: what's on now is kept
+//   from a feed too (one that lists only what's on now showed nothing), and a feed is read again
+//   every 2 minutes, not hourly, while its listing has nothing stored past the next 5 minutes.
+//   A read changes airings in place, so viewers' reminders on them stay (or follow the show).
+// - A248 (2026-10-06): or a spreadsheet. A link (a Google Sheet, read as its CSV export, or a .csv,
+//   .tsv, .xlsx or .ods file) is read like a feed, hourly; a Google Sheet that isn't public says so
+//   (`not_public`). An uploaded file (`schedule_source` `file`) is kept as what was read from it, and
+//   made into airings at once and hourly, as a schedule entered by hand is (a sheet without dates
+//   repeats weekly; one with dates airs on them). Its times are in the listing's own time zone
+//   when it has one, else the zone the sheet names, else the market's (lib/sheetSchedule.ts).
+// - A249 (2026-10-06): or a large guide. An XMLTV guide is read as it downloads, unzipped when it's
+//   gzip (lib/guideStream.ts), for the station's channel only (`#channel=`, else its name exactly;
+//   a guide of several channels with neither is `pick_channel`, never mixed), within limits on its
+//   size, a channel's airings and time (`too_big`). Its ETag and Last-Modified are kept
+//   (`guide_read`) and sent back, so an unchanged guide isn't downloaded again; stations sharing a
+//   guide have it read once a pass for all their channels, and a large one running dry is read at
+//   most every 30 minutes. "Find this channel's guide" (lib/guideFinder.ts) looks a name up in
+//   iptv-org's public lists for the guide files that can be read as they are.
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
 //   request with a timeout, never a segment. Down 5 minutes, it leaves the dial, the guide and the
 //   swipe order until it's back; the Network desk hears both times (`external.station`).
@@ -39,17 +56,24 @@
 //   the family's (the old one held a year for it), X.1 moves only on its own, and taking X.1 off
 //   the dial takes its family with it (A231), when the desk says so; "Put back" brings them back.
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, isSubchannel, parseChannelNumber, type Band, type ChannelNumber } from "@opencast/domain";
-import { manualScheduleProblems, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type StreamPermission } from "@opencast/contracts";
+import { GUIDE_LIMITS, manualScheduleProblems, SHEET_FILE_MAX_BYTES, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type GuideOption, type GuideRead, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type SchedulePreview, type StreamPermission } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { StationProfile } from "../stations/service.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
-import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../lib/schedules.js";
+import { promises as fs } from "node:fs";
+import { detectScheduleFormat, parseSchedule, type ChannelHints, type ScheduleFormat } from "../../lib/schedules.js";
+import { GUIDE_CAPS, guideBody, GuideTooBig, LARGE_GUIDE_BYTES, scanGuide, XmltvScanner, type GuideLimit, type GuideWant } from "../../lib/guideStream.js";
+import { channelIdOf, findGuides, guideLists, guideUrl, IPTV_ORG_CHANNELS, IPTV_ORG_GUIDES, jsonArrayItems, listChannel, listGuide, type GuideLists, type ListChannel, type ListGuide } from "../../lib/guideFinder.js";
+import type { CalendarEvent } from "../../lib/ics.js";
 import { manualAirings, manualWindow } from "../../lib/manualSchedule.js";
+import { googleSheet, googleSheetCsvUrl, kindFromName, kindFromType, readSheet, SheetError, sheetFragment, type SheetTable } from "../../lib/sheetFiles.js";
+import { readSheetSchedule, sheetAirings, type SheetSchedule } from "../../lib/sheetSchedule.js";
+import type { UploadedFile } from "../../http.js";
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
 import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
@@ -77,6 +101,19 @@ const LIST_TIMEOUT_MS = 15_000;
  * settings). Its call sign stays its own, held a year on the waitlist's side like one's.
  */
 export const REMOVED_CHANNEL_HOLD_MS = CHANNEL_HOLD_AFTER_SIGN_OFF_MS;
+/** How often a listing's schedule is read again. */
+export const SCHEDULE_REREAD_MS = 60 * 60_000;
+/**
+ * 2026-10-03: sooner, while what's stored for a feed runs out within RUNNING_DRY_MS (a feed that
+ * lists only what's on now goes stale when the show ends): it's read again this often until it
+ * lists what's next.
+ */
+export const RUNNING_DRY_REREAD_MS = 2 * 60_000;
+export const RUNNING_DRY_MS = 5 * 60_000;
+/** A249: a large guide (gzipped, or over 5 MB as read) running dry is read again at most this often. */
+export const LARGE_GUIDE_REREAD_MS = 30 * 60_000;
+/** A249: iptv-org's lists ("Find this channel's guide") are read again after this. */
+export const GUIDE_LISTS_MS = 24 * 60 * 60_000;
 
 export type Fetch = typeof fetch;
 type Row = typeof LS.$inferSelect;
@@ -125,6 +162,16 @@ export interface ExternalDial {
   playback: { kind: "hls" | "embed"; url: string; format?: "dash"; sourceUrl?: string } | null;
 }
 
+/** A248: what `previewListedSchedule` reads. */
+export interface PreviewScheduleInput {
+  calendarUrl?: string;
+  calendarFormat?: ScheduleFormat;
+  timeZone?: string;
+  sheet?: string;
+  marketId?: string;
+  sourceId?: string;
+}
+
 export interface ExternalCheckResult {
   checked: number;
   up: number;
@@ -169,11 +216,18 @@ export interface ExternalPart {
   /** The worker's minute: every listing that could be on the dial, checked. */
   checkExternalStations(options?: { fetch?: Fetch }): Promise<ExternalCheckResult>;
   /**
-   * Hourly: each listing's feed read again, and (A215) the channels of listings taken off the dial
+   * Each minute (2026-10-03): the listings that are due read again (hourly, or every 2 minutes while
+   * a feed's guide is about to run dry), and (A215) the channels of listings taken off the dial
    * 90 days ago freed; (A223) full stations' too, 90 days after they signed off for good.
    */
   syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number; releasedStations?: number }>;
   previewIptvList(input: { m3u?: string; url?: string }, fetchFn?: Fetch): Promise<{ listUrl: string | null; channels: Array<IptvChannel & { already: "lead" | "external" | null }>; skipped: number }>;
+  /** A248: read a schedule address (or an uploaded spreadsheet) now, and say what it would give. Nothing is saved. */
+  previewListedSchedule(input: PreviewScheduleInput, file: UploadedFile | null, fetchFn?: Fetch): Promise<SchedulePreview>;
+  /** A249: "Find this channel's guide": the guide files iptv-org's lists give for a channel's name, each checked for the channel. */
+  findListedGuides(input: { name: string; sourceId?: string; creatorId?: string }, fetchFn?: Fetch): Promise<{ channels: Array<{ id: string; name: string }>; guides: GuideOption[]; skipped: number }>;
+  /** A248: a listing's schedule from an uploaded spreadsheet, kept as what was read from it. */
+  uploadListedSchedule(user: CurrentUser | null, sourceId: string, input: { timeZone?: string; sheet?: string }, file: UploadedFile | null): Promise<ListedSource>;
   importIptvLeads(input: { marketId: string; listUrl?: string; channels: IptvChannel[] }): Promise<{ imported: Creator[]; skipped: number }>;
 }
 
@@ -204,6 +258,9 @@ const hostOf = (url: string) => {
 };
 
 type ManualSchedule = NonNullable<Row["manualSchedule"]>;
+type SheetReadRow = NonNullable<Row["sheetRead"]>;
+type GuideReadRow = NonNullable<Row["guideRead"]>;
+type SheetFileRow = NonNullable<Row["sheetFile"]>;
 
 /**
  * A241: a schedule entered by hand as it's kept: each slot's days once and in week order, the
@@ -235,21 +292,396 @@ export function manualHistoryText(m: ManualSchedule | null): string | null {
 /** A241: the schedule's skipped dates for the history ("2026-11-26, 2026-12-24"), or null. */
 const skipText = (m: ManualSchedule | null) => (m?.skipDates.length ? m.skipDates.join(", ") : null);
 
-/** A241: the columns that hold what's on, for a schedule as `addListedSource` and `updateListedSource` take it. */
+/**
+ * A241: the columns that hold what's on, for a schedule as `addListedSource` and `updateListedSource`
+ * take it. A248: and the listing's own time zone for it; `file` keeps the uploaded spreadsheet as it is.
+ */
 function scheduleColumns(sc: ListedScheduleInput) {
-  if (sc.source === "none") return { scheduleSource: "none" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null };
-  if (sc.source === "manual") {
-    return { scheduleSource: "manual" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: sc.checkedAgainst, guideCheckedOn: sc.checkedOn, manualSchedule: normalManual(sc) };
-  }
+  const none = { calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null, scheduleTimeZone: null };
+  if (sc.source === "none") return { ...none, scheduleSource: "none" as const };
+  if (sc.source === "manual") return { ...none, scheduleSource: "manual" as const, guideCheckedAgainst: sc.checkedAgainst, guideCheckedOn: sc.checkedOn, manualSchedule: normalManual(sc) };
+  if (sc.source === "file") return { ...none, scheduleSource: "file" as const, scheduleFormat: "sheet" as const, scheduleTimeZone: sc.timeZone ?? null };
   return {
     scheduleSource: sc.source,
     calendarUrl: sc.calendarUrl,
     scheduleFormat: sc.calendarFormat ?? null,
     guideCheckedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
     guideCheckedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null,
-    manualSchedule: null
+    manualSchedule: null,
+    scheduleTimeZone: sc.timeZone ?? null
   };
 }
+
+// ---- A248 (2026-10-06): schedules from spreadsheets ----
+
+/** Why a schedule address (or a spreadsheet) couldn't be read, with the desk's words. */
+export class ScheduleReadError extends Error {
+  constructor(
+    readonly code: "calendar_not_found" | "not_public" | "not_a_spreadsheet" | "old_excel" | "no_tab" | "pick_channel" | "not_in_guide" | "too_big",
+    message: string,
+    /** A249: what was read of an XMLTV guide before it stopped (its channels, its size, the limit). */
+    readonly guide: GuideReadRow | null = null
+  ) {
+    super(message);
+    this.name = "ScheduleReadError";
+  }
+}
+
+export const NOT_PUBLIC = "This Google Sheet isn't public. Publish it to the web (File, Share, Publish to web), or share it with anyone with the link, then try again.";
+const NOT_ANSWERED = "That address didn't answer with a schedule. Check the link and try again.";
+export const NO_SHOWS = "No shows with times were found in it. Each needs a title and a time (“Trigun 6:00 AM”) under a row of days, or columns like Date, Start and Title.";
+const NOT_A_SHEET = "That isn't a spreadsheet Opencast can read: use .xlsx, .ods, .csv or .tsv.";
+
+/**
+ * What a schedule address gave: a feed's events (A249: with what was read of an XMLTV guide), a
+ * spreadsheet's schedule, or (A249) "not changed since" the last read, so what's stored stays.
+ */
+type ScheduleAnswer =
+  | { format: Exclude<ScheduleFormat, "sheet">; events: CalendarEvent[]; guide?: GuideReadRow }
+  | { format: "sheet"; table: SheetTable; sheet: SheetSchedule; gid: string | null }
+  | { format: "unchanged" };
+
+// ---- A249 (2026-10-06): large and compressed XMLTV guides ----
+
+/** A schedule address without its fragment: what's fetched (`#channel=` and `#sheet=` say how to read it). */
+export const fetchedAddress = (url: string) => url.split("#")[0]!;
+
+/** The channel an address's fragment names (`#channel=<id>`), or null. */
+function channelFragment(url: string): string | null {
+  const named = /#channel=([^&]+)/.exec(url)?.[1];
+  if (!named) return null;
+  try {
+    return decodeURIComponent(named);
+  } catch {
+    return named;
+  }
+}
+
+/** A guide's `ETag` and `Last-Modified` from its last read that worked, to ask "changed since?". */
+export interface GuideValidators {
+  etag: string | null;
+  lastModified: string | null;
+}
+
+/**
+ * 2026-10-03: one read per address in a schedule pass. A249: by the address fetched (its fragment
+ * left off), for every listing on it: a guide is read once, in one streamed pass that keeps each
+ * listing's channel (`wants`), asking "changed since?" only when every one of them last read the
+ * same version of it (`validators`).
+ */
+export interface SharedReads {
+  wants: Map<string, GuideWant[]>;
+  validators: Map<string, GuideValidators | null>;
+  answers: Map<string, Promise<AddressRead>>;
+}
+
+/** What one address answered, before each listing reads it its own way. */
+type AddressRead =
+  | { kind: "unchanged" }
+  | { kind: "bytes"; type: string | null; bytes: Uint8Array }
+  | { kind: "guide"; wants: GuideWant[]; results: Awaited<ReturnType<typeof scanGuide>>; info: Omit<GuideReadRow, "channel" | "channelName" | "programmes"> };
+
+const wantKey = (w: GuideWant) => JSON.stringify([w.fragment, w.hints.name ?? null, w.hints.streamUrl ?? null]);
+
+/** A guide's limits, in the desk's words (and the API's refusals). */
+const MB = (n: number) => `${Math.round(n / 1_000_000)} MB`;
+export const GUIDE_LIMIT_WORDS: Record<GuideLimit, string> = {
+  compressed: `This guide is over ${MB(GUIDE_LIMITS.compressedBytes)} as it downloads, Opencast's limit, so it wasn't read. What it listed before stays.`,
+  bytes: `This guide is over ${MB(GUIDE_LIMITS.bytes)} unzipped, Opencast's limit, so it wasn't read. What it listed before stays.`,
+  programmes: `This guide lists over ${GUIDE_LIMITS.programmes.toLocaleString("en-US")} airings to come for the channel, Opencast's limit, so it wasn't read. What it listed before stays.`,
+  time: `This guide took over ${GUIDE_LIMITS.seconds} seconds to read, Opencast's limit, so it wasn't read. What it listed before stays.`
+};
+
+/** "This guide has 406 channels. Pick one: …" */
+export const pickChannelWords = (channels: number) =>
+  `This guide has ${channels.toLocaleString("en-US")} channels. Pick one: add #channel= and its id to the address (Find this channel's guide does it), so no other channel's shows are listed.`;
+
+/** "Channel 6793eaa4… isn't in this guide right now." */
+export const notInGuideWords = (channel: string, channels: number) =>
+  `Channel ${channel} isn't in this guide right now (it lists ${channels.toLocaleString("en-US")} ${channels === 1 ? "channel" : "channels"}). Find this channel's guide again, or check the address.`;
+
+/** Whether a listing may ask its guide "changed since?": its last read worked, of this same address. */
+function validatorsOf(row: Pick<Row, "calendarUrl" | "calendarSync" | "guideRead">): GuideValidators | null {
+  const g = row.guideRead;
+  if (!g || !row.calendarUrl || row.calendarSync !== "synced" || g.limit || g.url !== fetchedAddress(row.calendarUrl) || (!g.etag && !g.lastModified)) return null;
+  return { etag: g.etag, lastModified: g.lastModified };
+}
+
+/** One address read: "not changed", a guide scanned for every want on it, or (anything else) its first 5 MB. */
+async function readAddress(address: string, url: string, declared: ScheduleFormat | null, fetchFn: Fetch, google: boolean, wants: GuideWant[], validators: GuideValidators | null, now: Date): Promise<AddressRead> {
+  const control = new AbortController();
+  // 15 seconds for a feed, as before; a guide gets its own limit once it's known to be one.
+  let timer = setTimeout(() => control.abort(), 15_000);
+  try {
+    const headers: Record<string, string> = {};
+    if (validators?.etag) headers["if-none-match"] = validators.etag;
+    if (validators?.lastModified) headers["if-modified-since"] = validators.lastModified;
+    let response: Response;
+    try {
+      response = await fetchFn(address, { signal: control.signal, ...(Object.keys(headers).length ? { headers } : {}) });
+    } catch {
+      throw new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+    }
+    if (response.status === 304 && validators) {
+      await response.body?.cancel().catch(() => undefined);
+      return { kind: "unchanged" };
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      if (google && [401, 403, 404].includes(response.status)) throw new ScheduleReadError("not_public", NOT_PUBLIC);
+      throw new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+    }
+    const deadline = Date.now() + GUIDE_CAPS.ms;
+    let body: Awaited<ReturnType<typeof guideBody>> | null = null;
+    const info = () => ({
+      url: address,
+      etag: response.headers.get("etag"),
+      lastModified: response.headers.get("last-modified"),
+      gzip: body?.gzip ?? false,
+      compressedBytes: body?.counts.compressed ?? 0,
+      bytes: body?.counts.bytes ?? 0,
+      large: !!body && (body.gzip || body.counts.bytes > LARGE_GUIDE_BYTES),
+      readAt: now.toISOString(),
+      unchangedAt: null,
+      limit: null
+    });
+    /** A read past a limit, with what was read of it. */
+    const failed = (e: unknown) =>
+      e instanceof GuideTooBig
+        ? new ScheduleReadError("too_big", GUIDE_LIMIT_WORDS[e.limit], { ...info(), etag: null, lastModified: null, channels: 0, channel: null, channelName: null, programmes: 0, large: true, limit: e.limit })
+        : new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+    const head: Uint8Array[] = [];
+    let headSize = 0;
+    try {
+      body = await guideBody(response.body, GUIDE_CAPS, deadline, control.signal);
+      // Enough of the start to know what it is (gzipped: unzipped first).
+      while (headSize < 8192) {
+        const next = await body.chunks.next();
+        if (next.done) break;
+        head.push(next.value);
+        headSize += next.value.byteLength;
+      }
+    } catch (e) {
+      await body?.chunks.return(undefined).catch(() => undefined);
+      throw failed(e);
+    }
+    const first = joinBytes(head, headSize);
+    const type = response.headers.get("content-type");
+    const format = google ? "sheet" : (declared ?? detectScheduleFormat(url, type, new TextDecoder().decode(first)));
+    if (format !== "xmltv") {
+      // Anything but a guide: its first 5 MB, as before.
+      const bytes = [first];
+      let size = first.byteLength;
+      const rest = body.chunks;
+      try {
+        while (size < LIST_BYTES) {
+          const next = await rest.next();
+          if (next.done) break;
+          bytes.push(next.value);
+          size += next.value.byteLength;
+        }
+      } catch (e) {
+        if (!(e instanceof GuideTooBig)) throw new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+      } finally {
+        await rest.return(undefined).catch(() => undefined);
+      }
+      return { kind: "bytes", type, bytes: joinBytes(bytes, size).slice(0, LIST_BYTES) };
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => control.abort(), Math.max(0, deadline - Date.now()));
+    const scanner = new XmltvScanner(wants, { since: now });
+    try {
+      const results = await scanGuide(body, scanner, first);
+      return { kind: "guide", wants, results, info: { ...info(), channels: results.channels.length } };
+    } catch (e) {
+      throw failed(e);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function joinBytes(parts: Uint8Array[], size: number): Uint8Array {
+  if (parts.length === 1) return parts[0]!;
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) {
+    all.set(p, at);
+    at += p.byteLength;
+  }
+  return all;
+}
+
+/** A249: one pass's shared reads, for the listings due in it: by address, each one's want, and validators all of them agree on. */
+function sharedReadsFor(rows: Row[]): SharedReads {
+  const shared: SharedReads = { wants: new Map(), validators: new Map(), answers: new Map() };
+  const byAddress = new Map<string, Row[]>();
+  for (const row of rows) {
+    if (!row.calendarUrl || ownSchedule(row)) continue;
+    const google = row.scheduleFormat === null || row.scheduleFormat === "sheet" ? googleSheet(row.calendarUrl) : null;
+    const address = google ? googleSheetCsvUrl(row.calendarUrl)! : fetchedAddress(row.calendarUrl);
+    byAddress.set(address, [...(byAddress.get(address) ?? []), row]);
+  }
+  for (const [address, on] of byAddress) {
+    const wants = new Map<string, GuideWant>();
+    for (const row of on) {
+      const want = { fragment: channelFragment(row.calendarUrl!), hints: { name: row.name, streamUrl: row.streamUrl } };
+      wants.set(wantKey(want), want);
+    }
+    shared.wants.set(address, [...wants.values()]);
+    const all = on.map(validatorsOf);
+    const same = all.every((v) => v && v.etag === all[0]!.etag && v.lastModified === all[0]!.lastModified);
+    shared.validators.set(address, same ? all[0]! : null);
+  }
+  return shared;
+}
+
+/** The zone a sheet's times are read in: the listing's own setting, else the one the sheet names, else the market's. */
+export function sheetZone(listing: string | null | undefined, named: string | null | undefined, market: string): { tz: string; from: SheetReadRow["timeZoneFrom"] } {
+  if (listing) return { tz: listing, from: "listing" };
+  if (named) return { tz: named, from: "sheet" };
+  return { tz: market, from: "market" };
+}
+
+/** What was read, as it's kept (and shown on the desk). */
+function sheetReadRow(table: Pick<SheetTable, "kind" | "tab" | "tabs">, sheet: SheetSchedule, gid: string | null, zone: ReturnType<typeof sheetZone>, now: Date): SheetReadRow {
+  return {
+    kind: table.kind,
+    tab: table.tab,
+    gid,
+    tabs: table.tabs,
+    layout: sheet.layout,
+    shows: sheet.entries.length,
+    weekly: sheet.weekly,
+    firstDay: sheet.firstDay,
+    lastDay: sheet.lastDay,
+    firstDate: sheet.firstDate,
+    lastDate: sheet.lastDate,
+    zone: sheet.zone,
+    zonesNamed: sheet.zonesNamed.length > 1 ? sheet.zonesNamed : [],
+    timeZone: zone.tz,
+    timeZoneFrom: zone.from,
+    skipped: sheet.skipped,
+    skippedCount: sheet.skippedCount,
+    readAt: now.toISOString()
+  };
+}
+
+/** A sheet that couldn't be read, in the desk's words: a Google Sheet answering with a web page isn't public. */
+function sheetProblem(e: SheetError, google: boolean): ScheduleReadError {
+  if (e.code === "web_page") return google ? new ScheduleReadError("not_public", NOT_PUBLIC) : new ScheduleReadError("not_a_spreadsheet", "That address answered with a web page, not a spreadsheet.");
+  return new ScheduleReadError(e.code, e.message);
+}
+
+/**
+ * A schedule address read now: a feed's events, or (A248) a spreadsheet's schedule. A Google Sheet is
+ * fetched as its CSV export (its tab kept); one that answers "not found" or with a sign-in page isn't
+ * public. `timeZone`: for a webpage's times without an offset. A249: an XMLTV guide is read as it
+ * downloads (gzipped or not) for the listing's channel only; `validators` ask it "changed since?"
+ * (an answer of "not changed" is `unchanged`), and `shared` reads an address once for a pass's listings.
+ */
+export async function readScheduleAt(
+  url: string,
+  declared: ScheduleFormat | null,
+  fetchFn: Fetch,
+  hints: ChannelHints,
+  timeZone: string,
+  now: Date,
+  options: { validators?: GuideValidators | null; shared?: SharedReads } = {}
+): Promise<ScheduleAnswer> {
+  const google = declared === null || declared === "sheet" ? googleSheet(url) : null;
+  const address = google ? googleSheetCsvUrl(url)! : fetchedAddress(url);
+  const want: GuideWant = { fragment: channelFragment(url), hints };
+  const shared = options.shared;
+  let pending = shared?.answers.get(address);
+  if (!pending) {
+    const wants = shared?.wants.get(address) ?? [];
+    const all = wants.some((w) => wantKey(w) === wantKey(want)) ? wants : [...wants, want];
+    pending = readAddress(address, url, declared, fetchFn, !!google, all, shared ? (shared.validators.get(address) ?? null) : (options.validators ?? null), now);
+    shared?.answers.set(address, pending);
+  }
+  const read = await pending;
+  if (read.kind === "unchanged") return { format: "unchanged" };
+  if (read.kind === "guide") {
+    const i = read.wants.findIndex((w) => wantKey(w) === wantKey(want));
+    // A listing the pass didn't expect on this address: read on its own.
+    if (i < 0) return readScheduleAt(url, declared, fetchFn, hints, timeZone, now, { validators: null });
+    const got = read.results.wants[i]!;
+    const channels = read.results.channels.length;
+    const guide: GuideReadRow = { ...read.info, channel: got.channel, channelName: got.channelName, programmes: got.events.length };
+    if (got.problem === "pick_channel") throw new ScheduleReadError("pick_channel", pickChannelWords(channels), { ...guide, etag: null, lastModified: null });
+    if (got.problem === "not_in_guide") throw new ScheduleReadError("not_in_guide", notInGuideWords(want.fragment ?? "", channels), { ...guide, etag: null, lastModified: null });
+    return { format: "xmltv", events: got.events, guide };
+  }
+  const { bytes, type } = read;
+  const text = () => new TextDecoder().decode(bytes);
+  const format = google ? "sheet" : (declared ?? detectScheduleFormat(url, type, text()));
+  if (format !== "sheet") return { format, events: parseSchedule(text(), format, url, timeZone, hints) };
+  let table: SheetTable;
+  try {
+    const path = (() => {
+      try {
+        return new URL(url).pathname;
+      } catch {
+        return url;
+      }
+    })();
+    table = readSheet(bytes, { kind: google ? "google_sheet" : (kindFromName(path) ?? kindFromType(type)), tab: sheetFragment(url) });
+  } catch (e) {
+    if (e instanceof SheetError) throw sheetProblem(e, !!google);
+    throw e;
+  }
+  return { format: "sheet", table, sheet: readSheetSchedule(table.rows, table.continues, now), gid: google?.gid ?? null };
+}
+
+export const SHEET_FILE_TOO_BIG = "Use a file of 2 MB or less.";
+
+/** A249: what was read from a guide, as the desk sees it (the validators and address left out). */
+const guideView = (g: GuideReadRow): GuideRead => ({
+  channel: g.channel,
+  channelName: g.channelName,
+  channels: g.channels,
+  programmes: g.programmes,
+  compressedBytes: g.compressedBytes,
+  bytes: g.bytes,
+  gzip: g.gzip,
+  large: g.large,
+  readAt: g.readAt,
+  unchangedAt: g.unchangedAt,
+  limit: g.limit
+});
+
+/** An uploaded spreadsheet's bytes, checked: its size, and a spreadsheet's name or type. */
+async function sheetFileBytes(file: UploadedFile): Promise<{ bytes: Uint8Array; kind: ReturnType<typeof kindFromName> }> {
+  if (file.size > SHEET_FILE_MAX_BYTES) throw refused("too_big", SHEET_FILE_TOO_BIG);
+  const kind = kindFromName(file.originalName) ?? kindFromType(file.mimeType);
+  if (!kind) throw refused("not_a_spreadsheet", NOT_A_SHEET);
+  if (kind === "xls") throw refused("old_excel", "Older Excel files (.xls) aren't read. Save it as .xlsx or .csv and upload that.");
+  return { bytes: new Uint8Array(await fs.readFile(file.path)), kind };
+}
+
+/** A sheet read from a file, or the API's refusal: what it couldn't read, or that it found no shows. */
+function readSheetFile(bytes: Uint8Array, kind: ReturnType<typeof kindFromName>, tab: string | null, now: Date): { table: SheetTable; sheet: SheetSchedule } {
+  let table: SheetTable;
+  try {
+    table = readSheet(bytes, { kind, tab });
+  } catch (e) {
+    if (e instanceof SheetError) {
+      const p = sheetProblem(e, false);
+      throw refused(p.code, p.message);
+    }
+    throw e;
+  }
+  const sheet = readSheetSchedule(table.rows, table.continues, now);
+  if (!sheet.entries.length) throw refused("no_event_data", NO_SHOWS);
+  return { table, sheet };
+}
+
+/** One airing in a preview. */
+const previewAiring = (e: CalendarEvent) => ({ title: e.summary, startsAt: e.start.toISOString(), endsAt: e.end?.toISOString() ?? null });
+
+/** An uploaded spreadsheet in the change history's words: "week.xlsx, 152 shows". */
+const fileText = (f: SheetFileRow | null | undefined) => (f ? `${f.name}, ${f.entries.length} ${f.entries.length === 1 ? "show" : "shows"}` : null);
 
 /**
  * A241: a schedule entered by hand, checked before it's saved: where it was checked (the published
@@ -263,6 +695,9 @@ export function checkManual(sc: ListedScheduleInput | undefined) {
   const problems = manualScheduleProblems(sc.slots);
   if (problems.length) throw badRequest(problems[0]!.message, Object.fromEntries(problems.map((p) => [p.slot === null ? "slots" : `slots.${p.slot}.${p.field}`, p.message])));
 }
+
+/** A241, A248: a schedule kept here (entered by hand, or an uploaded spreadsheet), made into airings without a fetch. */
+const ownSchedule = (r: Pick<Row, "scheduleSource">) => r.scheduleSource === "manual" || r.scheduleSource === "file";
 
 /** The fields whose values are addresses (shown in full to admins only). */
 const ADDRESS_FIELDS: ReadonlySet<ListedField> = new Set(["streamUrl", "calendarUrl", "guideCheckedAgainst"]);
@@ -341,7 +776,12 @@ function corsBlocked(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: 
 
 /** Up to `limit` bytes of an answer's body as text, then the rest is let go unread. */
 async function readSome(res: Response, limit: number): Promise<string> {
-  if (!res.body) return "";
+  return new TextDecoder().decode(await readBytes(res, limit));
+}
+
+/** Up to `limit` bytes of an answer's body, then the rest is let go unread. */
+async function readBytes(res: Response, limit: number): Promise<Uint8Array> {
+  if (!res.body) return new Uint8Array();
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -363,7 +803,7 @@ async function readSome(res: Response, limit: number): Promise<string> {
     at += part.byteLength;
     if (at >= all.byteLength) break;
   }
-  return new TextDecoder().decode(all);
+  return all;
 }
 
 export interface StreamCheck {
@@ -527,7 +967,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // A229: the call-sign family each is in, if any.
       Promise.all(rows.map((r) => services.stations.callSignFamily(r.stationId)))
     ]);
-    const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy)].filter((v): v is string => !!v));
+    const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy), ...rows.map((r) => r.sheetFile?.uploadedBy)].filter((v): v is string => !!v));
     const permissionView = (p: (typeof permissions)[number]): StreamPermission => ({
       id: p.id,
       grantedBy: p.grantedBy,
@@ -581,7 +1021,16 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           checkedAgainst: r.guideCheckedAgainst,
           checkedOn: r.guideCheckedOn,
           // A241: the weekly schedule entered by hand, and the dates it doesn't air.
-          ...(r.scheduleSource === "manual" ? { slots: r.manualSchedule?.slots ?? [], skipDates: r.manualSchedule?.skipDates ?? [] } : {})
+          ...(r.scheduleSource === "manual" ? { slots: r.manualSchedule?.slots ?? [], skipDates: r.manualSchedule?.skipDates ?? [] } : {}),
+          // A248: the listing's own time zone for it, what was read from its spreadsheet, and the file uploaded.
+          timeZone: r.scheduleTimeZone,
+          sheet: r.sheetRead && (r.scheduleFormat === "sheet" || r.scheduleSource === "file") ? r.sheetRead : null,
+          file:
+            r.scheduleSource === "file" && r.sheetFile
+              ? { name: r.sheetFile.name, kind: r.sheetFile.kind, bytes: r.sheetFile.bytes, uploadedAt: r.sheetFile.uploadedAt, uploadedBy: r.sheetFile.uploadedBy ? (names.get(r.sheetFile.uploadedBy) ?? null) : null }
+              : null,
+          // A249: what was read from its XMLTV guide.
+          guide: r.guideRead && r.scheduleFormat === "xmltv" && r.scheduleSource !== "file" && r.scheduleSource !== "manual" ? guideView(r.guideRead) : null
         },
         onDial: !removed && waiting === null,
         waiting,
@@ -811,6 +1260,50 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
   }
 
   /**
+   * 2026-10-03: a listing's airings in `scope` (those not over yet) made into `events`, keeping ids
+   * (viewers' reminders point at them): an airing at the same start with the same external id (when
+   * both have one), else the same title, is updated in place; new ones are added; the rest go, their
+   * reminders moved to the same show read in at another time within a day, else deleted (the show
+   * is gone from the source's schedule). Reminders are the only thing that points at an airing.
+   */
+  async function replaceAirings(tx: Executor, sourceId: string, scope: SQL | undefined, events: CalendarEvent[]) {
+    const old = await tx.select().from(LA).where(and(eq(LA.listedSourceId, sourceId), scope));
+    const same = (a: { externalId: string | null; title: string }, e: CalendarEvent) => (a.externalId && e.uid ? a.externalId === e.uid : a.title === e.summary);
+    const used = new Set<string>();
+    const kept: Array<{ id: string; title: string; externalId: string | null; startsAt: Date }> = [];
+    const fresh: CalendarEvent[] = [];
+    for (const e of events) {
+      const match = old.find((a) => !used.has(a.id) && a.startsAt.getTime() === e.start.getTime() && same(a, e));
+      if (!match) {
+        fresh.push(e);
+        continue;
+      }
+      used.add(match.id);
+      kept.push({ id: match.id, title: e.summary, externalId: e.uid, startsAt: e.start });
+      if (match.title !== e.summary || match.endsAt?.getTime() !== e.end?.getTime() || match.externalId !== e.uid) {
+        await tx.update(LA).set({ title: e.summary, endsAt: e.end, externalId: e.uid }).where(eq(LA.id, match.id));
+      }
+    }
+    const added = fresh.length
+      ? await tx
+          .insert(LA)
+          .values(fresh.map((e) => ({ listedSourceId: sourceId, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })))
+          .returning({ id: LA.id, title: LA.title, externalId: LA.externalId, startsAt: LA.startsAt })
+      : [];
+    const gone = old.filter((a) => !used.has(a.id));
+    if (!gone.length) return;
+    const now = [...kept, ...added];
+    const moves = gone.map((a) => {
+      const to = now
+        .filter((n) => (a.externalId && n.externalId ? a.externalId === n.externalId : a.title === n.title) && Math.abs(n.startsAt.getTime() - a.startsAt.getTime()) <= 86_400_000)
+        .sort((x, y) => Math.abs(x.startsAt.getTime() - a.startsAt.getTime()) - Math.abs(y.startsAt.getTime() - a.startsAt.getTime()))[0];
+      return { from: a.id, to: to?.id ?? null };
+    });
+    await services.accounts.moveListedReminders(tx, moves);
+    await tx.delete(LA).where(inArray(LA.id, gone.map((a) => a.id)));
+  }
+
+  /**
    * A241: a schedule entered by hand, made into airings from now to 14 days ahead (the airings from
    * now on replaced, as a feed's are). The one on air now keeps its title as it was; when nothing
    * is, the slot on now is added, so the banner has it at once.
@@ -821,49 +1314,185 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     const { from, to } = manualWindow(now);
     const airings = row.manualSchedule ? manualAirings(row.manualSchedule, tz, from, to) : [];
     await db.transaction(async (tx) => {
-      await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
       const earlier = await tx
         .select({ startsAt: LA.startsAt, endsAt: LA.endsAt })
         .from(LA)
         .where(and(eq(LA.listedSourceId, row.id), lt(LA.startsAt, now), gte(LA.startsAt, new Date(now.getTime() - 86_400_000))));
       const onNow = earlier.some((a) => (a.endsAt ?? new Date(a.startsAt.getTime() + 3_600_000)) > now);
       const rows = airings.filter((a) => a.start >= now || !onNow);
-      if (rows.length) await tx.insert(LA).values(rows.map((e) => ({ listedSourceId: row.id, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
+      // 2026-10-03: ids kept, and reminders with them (replaceAirings).
+      await replaceAirings(tx, row.id, gte(LA.startsAt, now), rows);
       await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now }).where(eq(LS.id, row.id));
     });
     return true;
   }
 
-  async function sync(row: Row, fetchFn: Fetch): Promise<boolean> {
-    if (row.scheduleSource === "manual") return syncManual(row);
-    if (!row.calendarUrl) return false;
-    let events;
-    let format: ScheduleFormat;
+  /**
+   * 2026-10-03: when each listing's schedule was last tried in this process, read or not, so a
+   * feed that fails isn't tried every pass (lastSyncedAt is only set by a read that worked).
+   */
+  const lastTried = new Map<string, number>();
+
+  /** A249: iptv-org's lists, as kept for "Find this channel's guide": read at most once a day. */
+  let lists: { at: number; lists: GuideLists } | null = null;
+  let listsReading: Promise<GuideLists> | null = null;
+
+  /** One of iptv-org's JSON lists, its items as they download (25 MB for its guides; never one parse). */
+  async function* listItems(url: string, fetchFn: Fetch): AsyncGenerator<unknown> {
+    const res = await fetchFn(url, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => undefined);
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const body = await guideBody(res.body, { compressedBytes: 80_000_000, bytes: 80_000_000, programmes: 0, ms: 60_000 });
+    const decoder = new TextDecoder();
+    async function* text() {
+      for await (const chunk of body.chunks) yield decoder.decode(chunk, { stream: true });
+    }
+    yield* jsonArrayItems(text());
+  }
+
+  async function guideListsNow(fetchFn: Fetch): Promise<GuideLists> {
+    if (lists && deps.clock.now().getTime() - lists.at < GUIDE_LISTS_MS) return lists.lists;
+    listsReading ??= (async () => {
+      try {
+        const channels: ListChannel[] = [];
+        for await (const v of listItems(IPTV_ORG_CHANNELS, fetchFn)) {
+          const c = listChannel(v);
+          if (c) channels.push(c);
+        }
+        const guides: ListGuide[] = [];
+        for await (const v of listItems(IPTV_ORG_GUIDES, fetchFn)) {
+          const g = listGuide(v);
+          if (g) guides.push(g);
+        }
+        if (!channels.length || !guides.length) throw new Error("Empty lists");
+        const read = guideLists(channels, guides);
+        lists = { at: deps.clock.now().getTime(), lists: read };
+        return read;
+      } finally {
+        listsReading = null;
+      }
+    })();
     try {
-      const response = await fetchFn(row.calendarUrl, { signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await readSome(response, LIST_BYTES);
-      format = row.scheduleFormat ?? detectScheduleFormat(row.calendarUrl, response.headers.get("content-type"), text);
-      // A241: a webpage's event data without an offset is in the market's time zone.
-      const tz = format === "webpage" ? await services.stations.timezoneOf(row.stationId) : "UTC";
-      events = parseSchedule(text, format, row.calendarUrl, tz);
+      return await listsReading;
     } catch {
-      await db.update(LS).set({ calendarSync: "calendar_not_found" }).where(eq(LS.id, row.id));
+      // The day-old lists, when there are some, rather than nothing.
+      if (lists) return lists.lists;
+      throw new HttpError(502, "lists_unavailable", "iptv-org's lists couldn't be read just now. Try again in a minute.");
+    }
+  }
+
+  /**
+   * A249: which of a guide file's channels are there now: its channel list is read (it comes before
+   * the airings) and the rest let go. Null when the file couldn't be read.
+   */
+  async function guideChannels(file: string, fetchFn: Fetch): Promise<Array<{ id: string; names: string[] }> | null> {
+    try {
+      const res = await fetchFn(file, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        return null;
+      }
+      const body = await guideBody(res.body, { ...GUIDE_CAPS, ms: 20_000 });
+      const scan = await scanGuide(body, new XmltvScanner([], { channelsOnly: true }));
+      return scan.channels;
+    } catch {
+      return null;
+    }
+  }
+
+  async function sync(row: Row, fetchFn: Fetch, shared?: SharedReads): Promise<boolean> {
+    lastTried.set(row.id, deps.clock.now().getTime());
+    if (row.scheduleSource === "manual") return syncManual(row);
+    if (row.scheduleSource === "file") return syncFile(row);
+    if (!row.calendarUrl) return false;
+    const market = await services.stations.timezoneOf(row.stationId);
+    let answer: ScheduleAnswer;
+    try {
+      // A241: a webpage's event data without an offset is in the market's time zone (A248: or the
+      // listing's own). 2026-10-03: a feed keyed by channel is read for this listing's, found by its
+      // name or stream. A248: a spreadsheet's rows are read for its schedule. A249: a guide is asked
+      // "changed since?" when its last read worked, and read as it downloads.
+      answer = await readScheduleAt(row.calendarUrl, row.scheduleFormat, fetchFn, { name: row.name, streamUrl: row.streamUrl }, row.scheduleTimeZone ?? market, deps.clock.now(), {
+        validators: validatorsOf(row),
+        shared
+      });
+    } catch (e) {
+      // A248: a Google Sheet that isn't public says so; A249: a guide with no channel picked, without
+      // the one named, or past a limit, too (with what was read of it); anything else that can't be
+      // read isn't found. What was stored stays.
+      const code = e instanceof ScheduleReadError && ["not_public", "pick_channel", "not_in_guide", "too_big"].includes(e.code) ? (e.code as "not_public" | "pick_channel" | "not_in_guide" | "too_big") : "calendar_not_found";
+      const guide = e instanceof ScheduleReadError && e.guide ? { guideRead: e.guide, scheduleFormat: "xmltv" as const, sheetRead: null } : {};
+      await db
+        .update(LS)
+        .set({ calendarSync: code, ...guide })
+        .where(eq(LS.id, row.id));
       return false;
     }
     const now = deps.clock.now();
-    // A241: a page with no event data a computer can read says so, and isn't an error: what it
-    // listed before stays (a redesign that drops it for a day doesn't empty the guide).
-    if (format === "webpage" && !events.length) {
-      await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
+    // A249: not changed since its last read: what's stored stays, and it counts as read.
+    if (answer.format === "unchanged") {
+      await db
+        .update(LS)
+        .set({ calendarSync: "synced", lastSyncedAt: now, guideRead: row.guideRead ? { ...row.guideRead, unchangedAt: now.toISOString() } : null })
+        .where(eq(LS.id, row.id));
       return true;
     }
+    if (answer.format === "sheet") {
+      // A248: the zone its times are in, and what was read, kept for the desk.
+      const zone = sheetZone(row.scheduleTimeZone, answer.sheet.zone, market);
+      const sheetRead = sheetReadRow(answer.table, answer.sheet, answer.gid, zone, now);
+      // A sheet with no shows it can read says so, as a webpage without event data does: what it
+      // listed before stays.
+      if (!answer.sheet.entries.length) {
+        await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: "sheet", sheetRead, guideRead: null }).where(eq(LS.id, row.id));
+        return true;
+      }
+      const { from, to } = manualWindow(now);
+      await storeRead(row, sheetAirings(answer.sheet.entries, zone.tz, from, to), now, { scheduleFormat: "sheet", sheetRead, guideRead: null });
+      return true;
+    }
+    // A241: a page with no event data a computer can read says so, and isn't an error: what it
+    // listed before stays (a redesign that drops it for a day doesn't empty the guide).
+    if (answer.format === "webpage" && !answer.events.length) {
+      await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: answer.format, sheetRead: null, guideRead: null }).where(eq(LS.id, row.id));
+      return true;
+    }
+    await storeRead(row, answer.events, now, { scheduleFormat: answer.format, sheetRead: null, guideRead: answer.guide ?? null });
+    return true;
+  }
+
+  /**
+   * A read's events stored as the listing's airings. 2026-10-03: what's still on is kept with what's
+   * to come (a feed that lists only what's on now had nothing stored). When the read lists what's
+   * on now, it replaces what was stored for now, so nothing is doubled; when it doesn't (a feed of
+   * what's next only), what's stored for now stays, as before. Ids are kept, and reminders with them
+   * (replaceAirings).
+   */
+  async function storeRead(row: Row, events: CalendarEvent[], now: Date, set: Partial<typeof LS.$inferInsert> = {}) {
     await db.transaction(async (tx) => {
-      await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
-      const upcoming = events.filter((e) => e.start >= now);
-      if (upcoming.length) await tx.insert(LA).values(upcoming.map((e) => ({ listedSourceId: row.id, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
-      await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
+      const still = events.filter((e) => (e.end ? e.end > now : e.start >= now));
+      const listsNow = still.some((e) => e.start < now);
+      await replaceAirings(tx, row.id, listsNow ? or(gte(LA.startsAt, now), gt(LA.endsAt, now)) : gte(LA.startsAt, now), still);
+      await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now, ...set }).where(eq(LS.id, row.id));
     });
+  }
+
+  /**
+   * A248: an uploaded spreadsheet, made into airings as it was read: on its dates, or (a sheet whose
+   * days have no dates) every week from now to 14 days ahead, so it rolls forward hourly. Its zone is
+   * worked out afresh each time (the listing's own, the sheet's, the market's).
+   */
+  async function syncFile(row: Row): Promise<boolean> {
+    const file = row.sheetFile;
+    if (!file) return false;
+    const market = await services.stations.timezoneOf(row.stationId);
+    const zone = sheetZone(row.scheduleTimeZone, row.sheetRead?.zone, market);
+    const now = deps.clock.now();
+    const { from, to } = manualWindow(now);
+    const sheetRead = row.sheetRead ? { ...row.sheetRead, timeZone: zone.tz, timeZoneFrom: zone.from } : null;
+    await storeRead(row, sheetAirings(file.entries, zone.tz, from, to), now, { sheetRead });
     return true;
   }
 
@@ -923,6 +1552,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         throw badRequest("Give what's on as its schedule, or as its calendar address and guide data, not both.", { schedule: "Not with calendarUrl or guideData" });
       }
       checkManual(input.schedule);
+      // A248: a spreadsheet file is uploaded to the listing once it's listed (uploadListedSchedule).
+      if (input.schedule?.source === "file") throw badRequest("Upload the spreadsheet once it's listed.", { schedule: "A file is uploaded to a listing" });
       const what = input.schedule
         ? scheduleColumns(input.schedule)
         : {
@@ -931,7 +1562,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             scheduleFormat: input.calendarFormat ?? null,
             guideCheckedAgainst: input.guideData?.checkedAgainst ?? null,
             guideCheckedOn: input.guideData?.checkedOn ?? null,
-            manualSchedule: null
+            manualSchedule: null,
+            scheduleTimeZone: null
           };
       const creator = input.creatorId ? (await db.select().from(CR).where(eq(CR.id, input.creatorId)))[0] : null;
       if (input.creatorId && !creator) throw notFound("That lead");
@@ -1022,7 +1654,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That listed source");
       if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
-      if (!row.calendarUrl && row.scheduleSource !== "manual") throw refused("no_calendar", "Add the source's agenda calendar first.");
+      if (!row.calendarUrl && !ownSchedule(row)) throw refused("no_calendar", "Add the source's agenda calendar first.");
       await sync(row, fetchFn);
       return one(sourceId);
     },
@@ -1072,6 +1704,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // What's on (A241: a schedule entered by hand is checked first).
       const sc = input.schedule;
       checkManual(sc);
+      // A248: an uploaded spreadsheet kept as it is (its time zone changed) needs one uploaded.
+      if (sc?.source === "file" && (row.scheduleSource !== "file" || !row.sheetFile)) throw conflict("no_file", "Upload a spreadsheet first.");
       const format = sc && (sc.source === "feed" || sc.source === "guide_data") ? sc.calendarFormat : undefined;
       const schedule = sc ? scheduleColumns(sc) : null;
       const wasManual = row.scheduleSource === "manual" ? row.manualSchedule : null;
@@ -1083,6 +1717,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           (format !== undefined && schedule.scheduleFormat !== row.scheduleFormat) ||
           schedule.guideCheckedAgainst !== row.guideCheckedAgainst ||
           schedule.guideCheckedOn !== row.guideCheckedOn ||
+          schedule.scheduleTimeZone !== row.scheduleTimeZone ||
           manualChanged);
 
       // Channel and call sign: the rules for listing.
@@ -1138,6 +1773,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         // A241: the weekly schedule entered by hand, as one line, and the dates it skips.
         note("manualSchedule", manualHistoryText(wasManual), manualHistoryText(schedule.manualSchedule));
         note("skipDates", skipText(wasManual), skipText(schedule.manualSchedule));
+        // A248: an uploaded spreadsheet given up for another schedule, and the listing's time zone.
+        if (schedule.scheduleSource !== "file") note("scheduleFile", row.scheduleSource === "file" ? fileText(row.sheetFile) : null, null);
+        note("scheduleTimeZone", row.scheduleTimeZone, schedule.scheduleTimeZone);
       }
       if (channel) note("channel", ident.channel, channel);
       if (callSign) note("callSign", ident.callSign, callSign);
@@ -1147,7 +1785,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const effects: ListedChange["effects"] = [];
       if (basisFor(row) && !basis) effects.push("waits_for_evidence");
       if (restart) effects.push("checks_restart");
-      if (scheduleChanged && (schedule?.calendarUrl || schedule?.scheduleSource === "manual")) effects.push("schedule_reread");
+      if (scheduleChanged && schedule && (schedule.calendarUrl || ownSchedule(schedule))) effects.push("schedule_reread");
 
       await db.transaction(async (tx) => {
         await tx
@@ -1163,13 +1801,16 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             // A237: a new address (or way to play) is tried over https afresh, below; A238: and for
             // CORS, and matched against the platform feeds.
             ...(restart ? { httpsUrl: null, httpsCheckedAt: null, cors: null, corsDetail: null, corsCheckedAt: null, platformFeed: platformFeedOf(streamUrl) } : {}),
-            ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const } : {})
+            // A248: a spreadsheet read afresh (an uploaded one's file kept, for a new time zone).
+            // A249: and a guide's (its channel or address may be another), so it's downloaded afresh.
+            ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const, guideRead: null, ...(schedule.scheduleSource === "file" ? {} : { sheetFile: null, sheetRead: null }) } : {})
           })
           .where(eq(LS.id, sourceId));
         // A new address starts its health afresh: the old one's outage ends (kept in the history).
         if (restart) await endOutage(tx, sourceId, "address_changed");
         // The old feed's airings from now on go; the new feed is read below.
-        if (schedule && scheduleChanged) await tx.delete(LA).where(and(eq(LA.listedSourceId, sourceId), gte(LA.startsAt, deps.clock.now())));
+        // 2026-10-03: their reminders are deleted with them (a reminder never blocks the change).
+        if (schedule && scheduleChanged) await replaceAirings(tx, sourceId, gte(LA.startsAt, deps.clock.now()), []);
         if (name || description !== undefined || callSign || number) {
           await services.stations.changeManaged(tx, row.stationId, {
             ...(name ? { name } : {}),
@@ -1268,10 +1909,10 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         }
       }
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
-      if (after?.calendarUrl || after?.scheduleSource === "manual") await sync(after, fetchFn);
+      if (after && (after.calendarUrl || ownSchedule(after))) await sync(after, fetchFn);
       for (const member of family) {
         const [m] = await db.select().from(LS).where(eq(LS.id, member.id));
-        if (m && !m.removedAt && (m.calendarUrl || m.scheduleSource === "manual")) await sync(m, fetchFn);
+        if (m && !m.removedAt && (m.calendarUrl || ownSchedule(m))) await sync(m, fetchFn);
       }
       return one(sourceId);
     },
@@ -1322,7 +1963,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             removed: !!r.removedAt,
             // A241: a schedule entered by hand is guide data checked against the published schedule,
             // and reads so on the dial (ExternalSchedule keeps its three values for apps built before it).
-            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource === "manual" ? "guide_data" : r.scheduleSource },
+            // A248: an uploaded spreadsheet is the source's own schedule, as a file: a feed.
+            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource === "manual" ? "guide_data" : r.scheduleSource === "file" ? "feed" : r.scheduleSource },
             // Straight from the source: its embed, or its stream link in Opencast's player.
             // A201: a DASH stream link says so (`format: "dash"`); apps before it try it as HLS and stand by.
             // A237: an http:// stream link plays its https address, or the relay's (streamAddress).
@@ -1364,23 +2006,56 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
 
     async syncExternalSchedules(options = {}) {
       // A215: a listing taken off the dial isn't read any more. A241: a schedule entered by hand is
-      // made into airings again, so its two weeks roll forward.
+      // made into airings again, so its two weeks roll forward (A248: an uploaded spreadsheet's too).
       const rows = await db
         .select()
         .from(LS)
-        .where(and(or(isNotNull(LS.calendarUrl), eq(LS.scheduleSource, "manual")), isNull(LS.removedAt)));
+        .where(and(or(isNotNull(LS.calendarUrl), inArray(LS.scheduleSource, ["manual", "file"])), isNull(LS.removedAt)));
+      // 2026-10-03: the worker runs this pass every minute, but only the listings that are due are
+      // read: each hourly, and a feed whose last read worked every 2 minutes while nothing stored
+      // for it ends more than 5 minutes from now. Cheap: one small query over those few listings,
+      // and one read per address a pass (a brand's channels can share one feed).
+      const now = deps.clock.now().getTime();
+      const since = (row: Row) => now - Math.max(lastTried.get(row.id) ?? 0, row.lastSyncedAt?.getTime() ?? 0);
+      const hourly = rows.filter((row) => since(row) >= SCHEDULE_REREAD_MS);
+      // A249: a large guide (gzipped, or over 5 MB) at most every 30 minutes: one file can be a whole
+      // platform's channels, and it's asked "changed since?" first.
+      const sooner = rows.filter((row) => !hourly.includes(row) && !ownSchedule(row) && row.calendarSync === "synced" && since(row) >= (row.guideRead?.large ? LARGE_GUIDE_REREAD_MS : RUNNING_DRY_REREAD_MS));
+      const soon = new Date(now + RUNNING_DRY_MS);
+      const stocked = new Set(
+        sooner.length
+          ? (
+              await db
+                .selectDistinct({ id: LA.listedSourceId })
+                .from(LA)
+                // An airing without an end is taken as an hour long, as the guide takes it.
+                .where(and(inArray(LA.listedSourceId, sooner.map((r) => r.id)), or(gt(LA.endsAt, soon), and(isNull(LA.endsAt), gt(LA.startsAt, new Date(soon.getTime() - 3_600_000))))))
+            ).map((r) => r.id)
+          : []
+      );
+      const due = [...hourly, ...sooner.filter((row) => !stocked.has(row.id))];
+      const fetchFn = options.fetch ?? publicFetch;
+      // A249: one read per address, a guide's channels for every listing on it in one pass.
+      const shared = sharedReadsFor(due);
       let synced = 0;
       let failed = 0;
-      for (const row of rows) {
-        if (await sync(row, options.fetch ?? publicFetch)) synced++;
-        else failed++;
+      for (const row of due) {
+        // 2026-10-03: one listing that throws (not a feed that can't be read: sync says so) is
+        // counted as failed and logged; the others are still read.
+        try {
+          if (await sync(row, fetchFn, shared)) synced++;
+          else failed++;
+        } catch (error) {
+          failed++;
+          console.error(`[external] schedule read for ${row.name} (${row.id}) failed`, error);
+        }
       }
       // A215: 90 days after a listing was taken off the dial its channel is freed, as a full station's is.
-      const due = await db
+      const held = await db
         .select()
         .from(LS)
         .where(and(isNotNull(LS.removedAt), isNull(LS.channelReleasedAt), lte(LS.removedAt, new Date(deps.clock.now().getTime() - REMOVED_CHANNEL_HOLD_MS))));
-      for (const row of due) {
+      for (const row of held) {
         await db.transaction(async (tx) => {
           await services.stations.releaseChannel(tx, row.stationId);
           await tx.update(LS).set({ channelReleasedAt: deps.clock.now() }).where(eq(LS.id, row.id));
@@ -1388,7 +2063,110 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       }
       // A223: a full station that signed off for good 90 days ago lets its channel go too.
       const releasedStations = await services.stations.releaseSignedOffChannels();
-      return { synced, failed, released: due.length, releasedStations };
+      return { synced, failed, released: held.length, releasedStations };
+    },
+
+    async previewListedSchedule(input, file, fetchFn = externalFetch()) {
+      if (!!input.calendarUrl === !!file) throw badRequest("Give their schedule's address, or upload a spreadsheet.", { calendarUrl: "An address or a file" });
+      const now = deps.clock.now();
+      // The market's zone: the listing's, or the one it's being listed in.
+      const [row] = input.sourceId ? await db.select().from(LS).where(eq(LS.id, input.sourceId)) : [];
+      if (input.sourceId && !row) throw notFound("That external station");
+      const market = row
+        ? await services.stations.timezoneOf(row.stationId)
+        : input.marketId
+          ? ((await services.network.marketsByIds([input.marketId])).get(input.marketId)?.timezone ?? "America/Los_Angeles")
+          : "America/Los_Angeles";
+      let answer: ScheduleAnswer;
+      if (file) {
+        const { bytes, kind } = await sheetFileBytes(file);
+        answer = { format: "sheet", gid: null, ...readSheetFile(bytes, kind, input.sheet ?? null, now) };
+      } else {
+        try {
+          answer = await readScheduleAt(input.calendarUrl!, input.calendarFormat ?? null, fetchFn, { name: row?.name, streamUrl: row?.streamUrl }, input.timeZone ?? market, now);
+        } catch (e) {
+          if (e instanceof ScheduleReadError) throw refused(e.code, e.message);
+          throw refused("calendar_not_found", NOT_ANSWERED);
+        }
+      }
+      const { from, to } = manualWindow(now);
+      if (answer.format === "sheet") {
+        if (!answer.sheet.entries.length) throw refused("no_event_data", NO_SHOWS);
+        const zone = sheetZone(input.timeZone, answer.sheet.zone, market);
+        const airings = sheetAirings(answer.sheet.entries, zone.tz, from, to).filter((e) => (e.end ? e.end > now : e.start >= now));
+        return { format: "sheet", sheet: sheetReadRow(answer.table, answer.sheet, answer.gid, zone, now), upcoming: airings.length, airings: airings.slice(0, 8).map(previewAiring), timeZone: zone.tz };
+      }
+      if (answer.format === "unchanged") throw refused("calendar_not_found", NOT_ANSWERED);
+      if (answer.format === "webpage" && !answer.events.length) throw refused("no_event_data", "This page has no schedule data a computer can read.");
+      const airings = answer.events.filter((e) => (e.end ? e.end > now : e.start >= now)).sort((a, b) => a.start.getTime() - b.start.getTime());
+      // A249: a guide says which channel was read, of how many, and its size.
+      return { format: answer.format, sheet: null, upcoming: airings.length, airings: airings.slice(0, 8).map(previewAiring), timeZone: input.timeZone ?? market, guide: answer.guide ? guideView(answer.guide) : null };
+    },
+
+    async findListedGuides(input, fetchFn = externalFetch()) {
+      const [row] = input.sourceId ? await db.select().from(LS).where(eq(LS.id, input.sourceId)) : [];
+      if (input.sourceId && !row) throw notFound("That external station");
+      // A lead from an IPTV list has iptv-org's id for its channel (its tvg-id).
+      const creatorId = input.creatorId ?? row?.creatorId ?? null;
+      const [lead] = creatorId ? await db.select({ details: CR.leadDetails }).from(CR).where(eq(CR.id, creatorId)) : [];
+      const tvgId = channelIdOf(lead?.details?.tvgId);
+      const found = findGuides(await guideListsNow(fetchFn), input.name, tvgId);
+      // Each file's channel list read once (the first 12 files): an option the file no longer has isn't offered as one that works.
+      const files = [...new Set(found.guides.map((g) => g.file))].slice(0, 12);
+      const channelsIn = new Map<string, Awaited<ReturnType<typeof guideChannels>>>();
+      await inBatches(files, 4, async (file) => {
+        channelsIn.set(file, await guideChannels(file, fetchFn));
+      });
+      const inGuide = (file: string, channel: string): boolean | null => {
+        const channels = channelsIn.get(file);
+        if (!channels) return null;
+        // By id only (the reader's own rule, without names): the list's id, or one ending in it.
+        return channels.some((c) => c.id === channel || c.id.endsWith(`-${channel}`));
+      };
+      const rank = (v: boolean | null) => (v === true ? 0 : v === null ? 1 : 2);
+      const guides: GuideOption[] = found.guides
+        .filter((g) => files.includes(g.file))
+        .map((g) => ({ label: g.label, via: g.via, url: guideUrl(g), siteName: g.siteName, channelId: g.channelId, inGuide: inGuide(g.file, g.channel) }))
+        .sort((a, b) => rank(a.inGuide) - rank(b.inGuide));
+      return { channels: found.channels.slice(0, 10).map((c) => ({ id: c.id, name: c.name })), guides, skipped: found.skipped };
+    },
+
+    async uploadListedSchedule(user, sourceId, input, file) {
+      const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
+      if (!file) throw badRequest("Choose a spreadsheet file.", { file: "Required" });
+      const now = deps.clock.now();
+      const { bytes, kind } = await sheetFileBytes(file);
+      const { table, sheet } = readSheetFile(bytes, kind, input.sheet ?? null, now);
+      const market = await services.stations.timezoneOf(row.stationId);
+      const timeZone = input.timeZone ?? null;
+      const sheetFile: SheetFileRow = { name: file.originalName.slice(0, 200), kind: table.kind, bytes: file.size, uploadedAt: now.toISOString(), uploadedBy: user?.id ?? null, entries: sheet.entries };
+      const sheetRead = sheetReadRow(table, sheet, null, sheetZone(timeZone, sheet.zone, market), now);
+      // The history: what's on before, and the file (always: a new upload is a change, even of the same name).
+      const fields: ListedChange["fields"] = [];
+      const note = (field: ListedField, from: string | null, to: string | null) => {
+        if (from !== to) fields.push({ field, from, to });
+      };
+      note("schedule", row.scheduleSource, "file");
+      note("calendarUrl", row.calendarUrl, null);
+      note("guideCheckedAgainst", row.guideCheckedAgainst, null);
+      note("guideCheckedOn", row.guideCheckedOn, null);
+      note("manualSchedule", row.scheduleSource === "manual" ? manualHistoryText(row.manualSchedule) : null, null);
+      note("skipDates", row.scheduleSource === "manual" ? skipText(row.manualSchedule) : null, null);
+      fields.push({ field: "scheduleFile", from: row.scheduleSource === "file" ? fileText(row.sheetFile) : null, to: fileText(sheetFile) });
+      note("scheduleTimeZone", row.scheduleTimeZone, timeZone);
+      await db.transaction(async (tx) => {
+        await tx
+          .update(LS)
+          .set({ scheduleSource: "file", calendarUrl: null, scheduleFormat: "sheet", guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null, scheduleTimeZone: timeZone, sheetFile, sheetRead, guideRead: null, calendarSync: "not_set" })
+          .where(eq(LS.id, sourceId));
+        await recordChange(tx, user, sourceId, "changed", fields, ["schedule_reread"]);
+      });
+      // Made into airings at once: the airings from now on are the file's (ids kept where the same show stays).
+      const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (after) await sync(after, publicFetch);
+      return one(sourceId);
     },
 
     async previewIptvList(input, fetchFn = publicFetch) {

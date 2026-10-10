@@ -25,6 +25,7 @@ import { watchCommand } from "../../components/watching/watchCommands";
 import { useSavePreset } from "../../components/watching/useSavePreset";
 import { useNow } from "../../lib/clock";
 import { isAndroidApp, OpencastTv } from "../../native/plugin";
+import { exitTizenApp, isTizenApp } from "../../native/tizen";
 import { useCommandLayer } from "../../tv/commands";
 import { useMarketSlug, useSignedIn } from "../../tv/data";
 import { getDevice } from "../../tv/device";
@@ -36,8 +37,10 @@ const handled = new Set<string>();
 
 export default function Watching() {
   const mode = useTvMode();
-  // The Android TV and Fire TV app: Back with nothing to go back to leaves for the TV's home.
-  const nativeApp = mode === "tv" && isAndroidApp();
+  // The Android TV and Fire TV app, and the Samsung TV app: Back with nothing to go back to leaves
+  // for the TV's home.
+  const tizenApp = mode === "tv" && isTizenApp();
+  const nativeApp = (mode === "tv" && isAndroidApp()) || tizenApp;
   const [s, engine] = usePlayer();
   const navigate = useNavigate();
   const now = useNow(1000);
@@ -82,7 +85,7 @@ export default function Watching() {
   useEffect(() => {
     if (!due) return;
     handled.add(due.id);
-    if (due.airing.station.id !== s.currentId) void engine.tune(due.airing.station.id, { input: "app" });
+    if (due.airing.station.id !== s.currentId) void engine.tune(due.airing.station.id, { input: "app", via: "reminder" });
     // The program changes now: read the dial again so the banner says what's starting.
     void qc.invalidateQueries({ queryKey: [stationsApi.getDial.method, stationsApi.getDial.path] });
     setTick((t) => t + 1);
@@ -107,7 +110,8 @@ export default function Watching() {
           engine.sleep(30);
           break;
         case "exit":
-          void OpencastTv.exitToHome();
+          if (tizenApp) exitTizenApp();
+          else void OpencastTv.exitToHome();
           break;
         case "restart":
           window.location.reload();
@@ -115,7 +119,7 @@ export default function Watching() {
         case "switch":
           if (card) {
             wave(card);
-            void engine.tune(card.airing.station.id, source);
+            void engine.tune(card.airing.station.id, { input: "remote", ...source, via: "reminder" });
           }
           break;
         case "wave":
@@ -143,7 +147,7 @@ export default function Watching() {
   if (s.status === "stopped") return mode === "tv" ? <Stopped /> : null;
   return (
     <>
-      {showAir && row && air && <AirScreen kind={air} row={row} suggest={suggest} now={now} onTune={(id) => void engine.tune(id, { input: "remote" })} onGuide={() => navigate("/guide")} />}
+      {showAir && row && air && <AirScreen kind={air} row={row} suggest={suggest} now={now} onTune={(id) => void engine.tune(id, { input: "remote", via: "suggestion" })} onGuide={() => navigate("/guide")} />}
       {card && !s.entry && <ReminderCard text={cardText(card)} />}
     </>
   );

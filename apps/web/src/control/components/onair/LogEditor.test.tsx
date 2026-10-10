@@ -1,8 +1,10 @@
-// Edit mode on the program log (the user's request of 2026-09-29), on the mocks at the reference
-// Saturday, 8:42 pm: BEAT on air with Saturday Reel airing. "Edit log" for owners and operators;
-// moving a program by dragging it or typing a start (snapped with the 4-second rule), the draft
-// summed up with its problems and dead air before anything goes out, publishing it all at once or
-// discarding it, what's airing locked, a stale draft refused, and the history after.
+// Edit mode on the program log (the user's request of 2026-09-29; A246's rundown, tray and drawer),
+// on the mocks at the reference Saturday, 8:42 pm: BEAT on air with Saturday Reel airing. "Edit" for
+// owners and operators; moving a program by dragging it, the arrow keys or typing a start (snapped
+// with the 4-second rule), keeping one at its time (G18), the draft summed up in the tray with its
+// problems and dead air before anything goes out, publishing it all at once (with the change record)
+// or discarding it, what's airing locked, a draft from before someone else's change reloaded and
+// kept, and quick fill joining a draft.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -74,6 +76,16 @@ describe("the draft, worked out", () => {
     expect(changes[1]).toEqual({ op: "insert", key: "k1", entry: { kind: "program", startsAt: Z("06:30:00"), itemId: "i" } });
   });
 
+  it("keeps one mark per entry, and an insert takes its own (G18)", () => {
+    let changes: LogChange[] = withChange([], { op: "keep", entryId: "a", keep: true });
+    changes = withChange(changes, { op: "keep", entryId: "a", keep: false });
+    expect(changes).toEqual([{ op: "keep", entryId: "a", keep: false }]);
+    changes = withChange([{ op: "insert", key: "k1", entry: { kind: "program", startsAt: Z("06:00:00"), itemId: "i" } }], { op: "keep", entryId: "new:k1", keep: true });
+    expect(changes).toEqual([{ op: "insert", key: "k1", entry: { kind: "program", startsAt: Z("06:00:00"), itemId: "i", keepTime: true } }]);
+    const drafted = draftEntries([entry("a", Z("05:00:00"), Z("05:30:00"))], [{ op: "keep", entryId: "a", keep: true }], () => undefined);
+    expect([drafted[0].keepTime, drafted[0].change]).toEqual([true, undefined]);
+  });
+
   it("draws the draft: a move keeps the length, an insert takes its item's length in whole minutes", () => {
     const drafted = draftEntries(
       [entry("a", Z("05:00:00"), Z("05:30:00")), entry("b", Z("05:30:00"), Z("06:00:00"))],
@@ -96,8 +108,9 @@ describe("the draft, worked out", () => {
       { op: "move", entryId: "a", startsAt: Z("05:15:00") },
       { op: "move", entryId: "b", startsAt: Z("05:45:00") }
     ]);
-    // Something locked stays put.
+    // Something locked, or kept at its time, stays put.
     expect(rippleFrom(list, Z("05:00:00"), 15 * 60_000, (e) => e.id === "a")).toEqual([]);
+    expect(rippleFrom(list.map((e) => (e.id === "b" ? { ...e, keepTime: true } : e)), Z("05:00:00"), 15 * 60_000, () => false)).toEqual([{ op: "move", entryId: "a", startsAt: Z("05:15:00") }]);
   });
 
   it("locks what's airing and anything inside the lead, in the API's words", () => {
@@ -110,126 +123,203 @@ describe("the draft, worked out", () => {
   });
 });
 
-function page(canEdit = true) {
-  return renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" canEdit={canEdit} />, { path: "/?view=evening&day=sat" });
+function page(canEdit = true, path = "/?day=sat") {
+  return renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" canEdit={canEdit} />, { path });
 }
 
-/** A block on the edit timeline, by its title. */
-async function block(title: string) {
-  const tl = await screen.findByRole("list", { name: "The log, being edited" });
-  return within(tl).getByText(title).closest("button") as HTMLElement;
+const beat = (title: string) => getDb().log.find((e) => e.title === title && e.stationId === BEAT.id && e.localNote !== "Overnight repeat")!;
+
+/** The tray at the foot. */
+const tray = () => screen.findByRole("region", { name: "Your changes" });
+
+/** A row of the rundown being edited, by its title. */
+async function row(title: string) {
+  const list = await screen.findByRole("list", { name: "The rundown, being edited" });
+  return within(list).getAllByText(title, { selector: "b" })[0].closest("li") as HTMLElement;
 }
 
 async function edit() {
-  fireEvent.click(await screen.findByRole("button", { name: "Edit log" }));
-  await screen.findByText("Editing the log.");
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  await screen.findByRole("list", { name: "The rundown, being edited" });
+}
+
+async function publish(name: string) {
+  const t = await tray();
+  const button = within(t).getByRole("button", { name }) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  fireEvent.click(button);
 }
 
 describe("edit mode", () => {
   it("is for owners and operators", async () => {
     page(false);
-    await screen.findByText("Dead air from 11:40 pm to 2:00 am.");
-    expect(screen.queryByRole("button", { name: "Edit log" })).toBeNull();
+    await screen.findByText("Dead air at 11:40 pm, 2 hr 20 min");
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
   });
 
-  it("opens with nothing to publish yet", async () => {
+  it("opens with nothing to publish yet, and says how", async () => {
     page();
     await edit();
-    expect(screen.getByText("No changes yet. Drag a program to move it, or pick one to change it.")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Publish changes" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("region", { name: "Your changes" })).toBeNull();
+    expect(screen.getByText("Editing Saturday, Sep 26")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Done editing" })).toBeTruthy();
   });
 
-  it("moves a program to a typed start, sums it up with the dead air it leaves, and publishes it", async () => {
+  it("moves a program to a typed start, checks it with the dead air it leaves, and publishes it with the record", async () => {
     page();
     await edit();
-    fireEvent.click(await block("Slow Hours"));
+    fireEvent.click(within(await row("Slow Hours")).getByRole("button", { name: /^Slow Hours/ }));
     const start = await screen.findByLabelText("Starts at");
     expect((start as HTMLInputElement).value).toBe("22:30:28");
     fireEvent.change(start, { target: { value: "11:00 pm" } });
     fireEvent.blur(start);
-    expect(await screen.findByText("1 change: Slow Hours moves to 11:00 pm")).toBeTruthy();
-    expect(screen.getByText("Dead air from 10:30 pm to 11:00 pm (30 min).")).toBeTruthy();
-    const publish = screen.getByRole("button", { name: "Publish changes" }) as HTMLButtonElement;
-    await waitFor(() => expect(publish.disabled).toBe(false));
-    fireEvent.click(publish);
+    const t = await tray();
+    expect(await within(t).findByText("1 change, checked: nothing blocks publishing")).toBeTruthy();
+    expect(within(t).getByText("Slow Hours moves to 11:00 pm")).toBeTruthy();
+    expect(within(t).getByText("Dead air from 10:30 pm to 11:00 pm (30 min).")).toBeTruthy();
+    // The row says where it was.
+    expect(within(await row("Slow Hours")).getByText(/Moved from 10:30 pm/)).toBeTruthy();
+    await publish("Publish 1 change");
     expect(await screen.findByText("1 change published.")).toBeTruthy();
-    expect(getDb().log.find((e) => e.title === "Slow Hours" && e.stationId === BEAT.id)!.startsAt).toBe(Z("06:00:00"));
-    // Out of edit mode, with the history.
-    expect(await screen.findByText(/^Last changed by Kai M\. at 8:4\d pm$/)).toBeTruthy();
-    expect(screen.getByText("1 change: Slow Hours moves to 11:00 pm")).toBeTruthy();
-    expect(screen.queryByText("Editing the log.")).toBeNull();
+    expect(beat("Slow Hours").startsAt).toBe(Z("06:00:00"));
+    // Out of edit mode, with the change record.
+    expect(await screen.findByText(/^Published: 1 change, by Kai M\. at 8:4\d pm$/)).toBeTruthy();
+    expect(screen.getByText("Slow Hours moves to 11:00 pm", { selector: "li" })).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "The rundown, being edited" })).toBeNull();
   });
 
-  it("moves a program by dragging it, to the nearest minute", async () => {
+  it("moves a program a place with the arrow keys, and a live block stops what it pushes: the overlap blocks publishing", async () => {
     page();
     await edit();
-    const late = await block("Late Crate, ep. 15");
-    // 1.12 px a minute: 22.4 px down is 20 minutes.
-    fireEvent.pointerDown(late, { clientY: 100 });
-    fireEvent.pointerMove(late, { clientY: 110 });
-    fireEvent.pointerUp(late, { clientY: 122.4 });
-    expect(await screen.findByText("1 change: Late Crate, ep. 15 moves to 10:20 pm")).toBeTruthy();
-    // It now runs into Slow Hours: a problem, and nothing can be published.
-    expect(await screen.findByText("Late Crate, ep. 15 moves to 10:20 pm: Late Crate, ep. 15 would overlap Slow Hours at 10:30 pm.")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Publish changes" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(await screen.findByRole("button", { name: "Move Late Crate, ep. 15, 10:00 pm" }), { key: "ArrowUp" });
+    const t = await tray();
+    expect(await within(t).findByText("1 change, checked: 1 problem blocks publishing")).toBeTruthy();
+    expect(within(t).getByText("Late Crate, ep. 15 moves to 9:01 pm: Late Crate, ep. 15 would overlap Beat Tape Live at 9:01 pm.")).toBeTruthy();
+    expect((within(t).getByRole("button", { name: "Publish 1 change" }) as HTMLButtonElement).disabled).toBe(true);
     // Undo takes it back out.
-    fireEvent.click(screen.getByRole("button", { name: "Undo: Late Crate, ep. 15 moves to 10:20 pm" }));
-    expect(await screen.findByText("No changes yet. Drag a program to move it, or pick one to change it.")).toBeTruthy();
+    fireEvent.click(within(t).getByRole("button", { name: "Undo: Late Crate, ep. 15 moves to 9:01 pm" }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Your changes" })).toBeNull());
   });
 
-  it("puts something from the library on after a program, and what follows moves down to make room", async () => {
+  it("drags a program to after another, and the rows below shift down", async () => {
     page();
     await edit();
-    fireEvent.click(await block("Late Crate, ep. 15"));
-    fireEvent.click(await screen.findByRole("button", { name: "Put on after" }));
-    const dialog = await screen.findByRole("dialog");
-    const first = within(await within(dialog).findByRole("radiogroup", { name: "What goes on" })).getAllByRole("radio")[0];
-    fireEvent.click(first);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Put it on" }));
-    // Late Crate, ep. 1 is 29 minutes: Slow Hours moves from 10:30:28 to 10:57:28.
-    expect(await screen.findByText("2 changes: Late Crate, ep. 1 goes on at 10:28 pm, Slow Hours moves to 10:57 pm")).toBeTruthy();
+    const list = await screen.findByRole("list", { name: "The rundown, being edited" });
+    // jsdom lays nothing out: each row is 40 px, in order.
+    list.querySelectorAll<HTMLElement>("li[data-row]").forEach((li, i) => {
+      li.getBoundingClientRect = () => ({ top: i * 40, height: 40, bottom: i * 40 + 40, left: 0, right: 800, width: 800, x: 0, y: i * 40, toJSON: () => ({}) });
+    });
+    const rows = [...list.querySelectorAll<HTMLElement>("li[data-row]")];
+    const below = rows.findIndex((li) => li.textContent?.includes("Late Crate, ep. 12"));
+    const handle = screen.getByRole("button", { name: "Move Late Crate, ep. 13, 2:30 am" });
+    // Dragged up to just above Late Crate, ep. 12: right after the dead air's program, Slow Hours (carried, it stays).
+    fireEvent.pointerDown(handle, { clientY: (below + 1) * 40 + 20 });
+    fireEvent.pointerMove(handle, { clientY: below * 40 + 10 });
+    fireEvent.pointerMove(handle, { clientY: below * 40 + 5 });
+    fireEvent.pointerUp(handle, { clientY: below * 40 + 5 });
+    const t = await tray();
+    expect(await within(t).findByText("Late Crate, ep. 13 moves to Sat 11:40 pm")).toBeTruthy();
   });
 
-  it("discards the draft, and nothing changes", async () => {
+  it("keeps a program at its time: the tray says so, its start can't be typed, and it's published", async () => {
     page();
     await edit();
-    fireEvent.click(await block("Slow Hours"));
-    fireEvent.click(await screen.findByRole("button", { name: "Take off the log" }));
-    expect(await screen.findByText("1 change: Slow Hours at 10:30 pm comes off the log")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
-    await waitFor(() => expect(screen.queryByText("Editing the log.")).toBeNull());
+    fireEvent.click(await screen.findByRole("button", { name: "Keep Late Crate, ep. 15, 10:00 pm, at this time" }));
+    const t = await tray();
+    expect(await within(t).findByText("Late Crate, ep. 15 keeps its time")).toBeTruthy();
+    expect(within(await row("Late Crate, ep. 15")).getByText("Kept at this time")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Move Late Crate, ep. 15, 10:00 pm" })).toBeNull();
+    fireEvent.click(within(await row("Late Crate, ep. 15")).getByRole("button", { name: /^Late Crate, ep\. 15/ }));
+    expect(((await screen.findByLabelText("Starts at")) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText("Kept at this time. Turn it off to move it.")).toBeTruthy();
+    await publish("Publish 1 change");
+    expect(await screen.findByText("1 change published.")).toBeTruthy();
+    expect(beat("Late Crate, ep. 15").keepTime).toBe(true);
+  });
+
+  it("removes a row, struck through until it's published; Discard leaves the log as it was", async () => {
+    page();
+    await edit();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Slow Hours, 10:30 pm" }));
+    const t = await tray();
+    expect(await within(t).findByText("Slow Hours at 10:30 pm comes off the log")).toBeTruthy();
+    expect(within(await row("Slow Hours")).getByText("Coming off the log")).toBeTruthy();
+    fireEvent.click(within(t).getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(screen.queryByRole("list", { name: "The rundown, being edited" })).toBeNull());
     expect(getDb().log.some((e) => e.title === "Slow Hours" && e.stationId === BEAT.id)).toBe(true);
     expect(sessionStorage.getItem(`oc-log-draft:${BEAT.id}`)).toBeNull();
   });
 
-  it("locks what's airing now: no fields, and nothing moves when it's dragged", async () => {
+  it("locks what's airing now: no handle, no fields, and the reason on the row", async () => {
     page();
     await edit();
-    const reel = await block("Saturday Reel");
-    fireEvent.pointerDown(reel, { clientY: 100 });
-    fireEvent.pointerMove(reel, { clientY: 130 });
-    fireEvent.pointerUp(reel, { clientY: 130 });
-    fireEvent.click(reel);
-    expect(await screen.findByText("On air now, too late to change.")).toBeTruthy();
+    const reel = await row("Saturday Reel");
+    expect(within(reel).getByText("On air now, too late to change.")).toBeTruthy();
+    expect(within(reel).getByText("locked")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Move Saturday Reel, 8:30 pm" })).toBeNull();
+    fireEvent.click(within(reel).getByRole("button", { name: /^Saturday Reel/ }));
+    expect(await screen.findByText("On air now, too late to change.", { selector: ".cc-edit__lock" })).toBeTruthy();
     expect(screen.queryByLabelText("Starts at")).toBeNull();
-    expect(screen.getByText("No changes yet. Drag a program to move it, or pick one to change it.")).toBeTruthy();
   });
 
-  it("says when someone else changed the log since the draft began, and reloads", async () => {
+  it("when someone else changed the day meanwhile, reloads it and keeps the draft, checked again", async () => {
     page();
     await edit();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Slow Hours, 10:30 pm" }));
+    await within(await tray()).findByText("1 change, checked: nothing blocks publishing");
     // Someone else moves Late Crate, ep. 15 while the draft is open.
     await act(async () => {
-      const late = getDb().log.find((e) => e.title === "Late Crate, ep. 15" && e.stationId === BEAT.id)!;
+      const late = beat("Late Crate, ep. 15");
       late.localNote = "moved";
       late.startsAt = Z("05:00:04");
       saveDb();
     });
-    fireEvent.click(await block("Slow Hours"));
-    fireEvent.click(await screen.findByRole("button", { name: "Take off the log" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Keep Late Crate, ep. 15, 10:00 pm, at this time" }));
     expect(await screen.findByText("The log changed since you started editing.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
-    expect(await screen.findByText("No changes yet. Drag a program to move it, or pick one to change it.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reload and keep my changes" }));
+    const t = await tray();
+    expect(await within(t).findByText("2 changes, checked: nothing blocks publishing")).toBeTruthy();
+    expect(within(t).getByText("Slow Hours at 10:30 pm comes off the log")).toBeTruthy();
+    await publish("Publish 2 changes");
+    expect(await screen.findByText("2 changes published.")).toBeTruthy();
+    expect(getDb().log.some((e) => e.title === "Slow Hours" && e.stationId === BEAT.id)).toBe(false);
+  });
+});
+
+describe("the Add drawer", () => {
+  it("adds from the library into dead air, as a change in the draft", async () => {
+    page();
+    await edit();
+    fireEvent.click(await screen.findByRole("button", { name: /^Fill/ }));
+    const drawer = await screen.findByRole("dialog", { name: "Add at 11:40 pm" });
+    expect(within(drawer).getByText("2 hr 20 min free, until Late Crate, ep. 12 at 2:00 am")).toBeTruthy();
+    fireEvent.change(within(drawer).getByLabelText("Search your library"), { target: { value: "Late Crate, ep. 1" } });
+    fireEvent.click(within(drawer).getByRole("button", { name: /^Late Crate, ep\. 1 Never aired\. 29:00\. Leaves 1 hr 51 min Never aired/ }));
+    const t = await tray();
+    expect(await within(t).findByText("Late Crate, ep. 1 goes on at 11:40 pm")).toBeTruthy();
+  });
+
+  it("quick fill with nothing drafted is written at once", async () => {
+    page();
+    fireEvent.click(await screen.findByRole("button", { name: /^Fill/ }));
+    let drawer = await screen.findByRole("dialog", { name: "Add at 11:40 pm" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Sign off" }));
+    expect(await screen.findByText("Off air from 11:40 pm to 2:00 am.")).toBeTruthy();
+    expect(getDb().log.some((e) => e.kind === "off_air" && e.startsAt === Z("06:40:00"))).toBe(true);
+  });
+
+  it("with changes drafted, repeating from the library joins the draft as inserts", async () => {
+    page();
+    await edit();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Slow Hours, 10:30 pm" }));
+    await within(await tray()).findByText("1 change, checked: nothing blocks publishing");
+    fireEvent.click(screen.getAllByRole("button", { name: /^Fill/ })[0]);
+    const drawer = await screen.findByRole("dialog", { name: /^Add at 10:28 pm$/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Fill" }));
+    const t = await tray();
+    expect(await within(t).findByText(/^\d+ changes, checked/)).toBeTruthy();
+    expect(within(t).getAllByText(/goes on at/).length).toBeGreaterThan(0);
     expect(getDb().log.some((e) => e.title === "Slow Hours" && e.stationId === BEAT.id)).toBe(true);
   });
 });

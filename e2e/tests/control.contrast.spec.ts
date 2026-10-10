@@ -72,3 +72,25 @@ test("station settings: the swatches pass and a failing colour can't be saved", 
     await expect(page.getByRole("alert").filter({ hasText: `White text reads at ${label(c)}. Station colours need 4.5:1, so this one can't be saved.` })).toBeVisible();
   }
 });
+
+// A246 phase 4: a block's colour on its page, with the same picker: the swatches pass, and a
+// colour under 4.5:1 can't be chosen (the block's draft keeps the one it had).
+test("a block's colour: the swatches pass and a failing colour can't be saved", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule/blocks/00000000-0000-4000-8000-0000000b1001");
+  await expect(page.getByRole("radiogroup", { name: "Station colours" })).toBeVisible();
+  await settle(page);
+  const offered = await swatches(page, /^#[0-9A-F]{6}$/i);
+  expect(offered.length).toBeGreaterThanOrEqual(5);
+  for (const c of offered) expect(contrast(c, WHITE), `swatch ${c}`).toBeGreaterThanOrEqual(4.5);
+  const field = page.getByLabel("Colour, as a hex code");
+  for (const c of FAILING) {
+    await field.fill(c);
+    await expect(page.getByRole("alert").filter({ hasText: `White text reads at ${label(c)}. Station colours need 4.5:1, so this one can't be saved.` })).toBeVisible();
+  }
+  // Nothing passing was chosen: nothing to save.
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await field.fill(PASSING[0]!);
+  await expect(page.getByText(`White text reads at ${label(PASSING[0]!)}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+});

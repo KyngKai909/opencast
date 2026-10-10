@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   BandScale,
   BreakBar,
+  BreakStrip,
   BreakLegend,
   Bug,
   Button,
@@ -52,6 +53,7 @@ const STYLE = "brand/opencast-style.html";
 const HOME = "viewer/opencast-home.html";
 const PAGES = "viewer/opencast-station-pages.html";
 const MC = "control/opencast-master-control.html";
+const SCH = "control/opencast-schedule.html";
 const TV = "tv/opencast-tv.html";
 const MARKET = "control/opencast-market.html";
 const ORDERS = "business/opencast-production-orders.html";
@@ -977,6 +979,28 @@ export const broadcast = specimens([
         render: () => (
           <W w={358}>
             <Rundown items={RUNDOWN.slice(0, 5)} nowId="r1" variant="compact" timeZone={TZ} />
+          </W>
+        )
+      }
+    ]
+  },
+  {
+    id: "break-strip",
+    name: "Break strip",
+    group: "Broadcast",
+    from: [{ file: SCH, anchor: "break", frames: ["01", "02"] }],
+    notes: "A246: a break drawn to length by what fills it, in air order: bumpers, spots, the maker's barter, the thank-you credit, the station ID, open time (hatched) and up next, each a token on both grounds carrying white words at 4.5:1. The strip in the pane has words on its parts; the rundown's row has the thin bar.",
+    stacked: true,
+    states: [
+      {
+        label: "Strip and bar",
+        render: () => (
+          <W w={360}>
+            <div className="gal-col" style={{ alignItems: "stretch" }}>
+              <BreakStrip parts={[{ kind: "bumper", length: 5 * SEC, label: "Bumper" }, { kind: "open", length: 30 * SEC, label: "0:30 open" }, { kind: "credit", length: 10 * SEC, label: "Credit" }, { kind: "id", length: 5 * SEC, label: "ID" }]} />
+              <BreakStrip parts={[{ kind: "barter", length: 30 * SEC, label: "REEL's barter" }, { kind: "spots", length: 30 * SEC, label: "Spot" }, { kind: "upnext", length: 5 * SEC, label: "Up next" }, { kind: "id", length: 5 * SEC, label: "ID" }]} />
+              <BreakStrip variant="bar" label="2 spots, credit, ID" parts={[{ kind: "bumper", length: 5 * SEC }, { kind: "spots", length: 60 * SEC }, { kind: "credit", length: 10 * SEC }, { kind: "id", length: 5 * SEC }]} />
+            </div>
           </W>
         )
       }

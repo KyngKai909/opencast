@@ -37,6 +37,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { asLogCode } from "@opencast/contracts";
+import { clearance } from "@opencast/domain";
 import type { ModuleContext } from "../../../context.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
 import type { ItemRef } from "../../library/service.js";
@@ -546,6 +547,12 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         services.library.programsByIds(entries.map((e) => e.programId).filter((v): v is string => Boolean(v))),
         services.trust.offAirItems(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v)))
       ]);
+      // Programming Phase 6: an item whose network licence isn't in force when it starts is off the air.
+      const licensed = await services.licences.covering([...items.values()].map((i) => ({ id: i.id, programId: i.programId })));
+      const licenceOff = (itemId: string, at: Date) => {
+        const licences = licensed.get(itemId);
+        return Boolean(licences && !clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at, timeZone: tz }).cleared);
+      };
       const segments: Segment[] = [];
       // Catalog programs keep one credit an hour, thanking their series' sponsor in this market (or Clear).
       const programOfEntry = (entryId: string | null) => {
@@ -779,9 +786,9 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         } else {
           const item = entry.assetId ? items.get(entry.assetId) : undefined;
           const at = item ? fileAt(stationId, item) : null;
-          const playable = item && at && item.durationMs && !item.contentUnavailable && !offAir.has(item.id) && !item.archived;
+          const playable = item && at && item.durationMs && !item.contentUnavailable && !offAir.has(item.id) && !item.archived && !licenceOff(item.id, entry.startsAt);
           if (!playable) {
-            // Pulled by a claim, not ready, or not prepared: station ID and bumpers, never nothing.
+            // Pulled by a claim, its licence ended, not ready, or not prepared: station ID and bumpers, never nothing.
             const before = segments.length;
             await openTime(s, e);
             if (item?.contentId && !item.contentUnavailable && !at && segments[before]) {

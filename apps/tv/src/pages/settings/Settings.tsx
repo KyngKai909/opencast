@@ -17,6 +17,7 @@ import { PhoneRows } from "../../components/settings/PhoneRows";
 import { TvRow } from "../../components/settings/TvRow";
 import { useAccountSettingsSync, useTvSettings } from "../../components/settings/useTvSettings";
 import { isAndroidApp, nativeInfo } from "../../native/plugin";
+import { isTizenApp } from "../../native/tizen";
 import { useCommandLayer } from "../../tv/commands";
 import { useDial, useMe } from "../../tv/data";
 import { useDevice } from "../../tv/device";
@@ -181,7 +182,7 @@ function SectionRows({ section, steppers, focusRow }: RowsProps) {
           {stepRow("captionSize", "Caption size")}
           <ChannelUpRow render={(help) => stepRow("channelUp", "Channel up goes", { help })} dir={settings.channelUp} />
           {stepRow("bannerSeconds", "Banner stays for")}
-          {stepRow("tuningSound", "Tuning sound", { help: "A soft hiss when changing channel" })}
+          {stepRow("tuningSound", "Tuning sound", { help: "Static and a click when changing channel" })}
           {stepRow("numberWaitSeconds", "After typing a number, tune in", { help: "Or press OK to tune right away" })}
           {stepRow("includeRadioBand", "Include the radio band when changing channel", { asSwitch: true })}
           {err}
@@ -192,7 +193,7 @@ function SectionRows({ section, steppers, focusRow }: RowsProps) {
         <>
           {saved}
           {stepRow("othersOnWifiCanChange", "Who on the Wi-Fi can change the channel", { help: "While a phone is playing to this TV", fallback: true })}
-          <TvRow title="Open the menu" help="On a remote without a Menu key, hold Back" control={{ type: "value", label: "Menu" }} />
+          <TvRow title="Open the menu" help="On a remote without a Menu key, press ▶" control={{ type: "value", label: "Menu" }} />
           {err}
           <PhoneRows focusRow={focusRow} />
         </>
@@ -257,7 +258,7 @@ function AboutRows({ focusRow }: Pick<RowsProps, "focusRow">) {
   const tv = useDial("tv");
   const navigate = useNavigate();
   // Capacitor's core sets window.Capacitor in a browser too: ask it whether this is the app.
-  const isApp = isAndroidApp();
+  const isApp = isAndroidApp() || isTizenApp();
   return (
     <>
       <TvRow title="Version" control={{ type: "value", label: version }} />

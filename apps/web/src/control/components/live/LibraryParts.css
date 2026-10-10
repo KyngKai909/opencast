@@ -35,6 +35,10 @@ a.cc-lib-row__title:hover { text-decoration: underline; }
 
 .cc-rights__note { font-size: 13px; color: var(--ink-70); margin: 14px 0 0; line-height: 1.5; }
 .cc-rights__error { font-size: 13px; color: var(--standby); margin: 10px 0 0; }
+/* Programming Phase 6 (P6.13): where the owner allows it, under the owner's permission. */
+.cc-rights__outlets { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--hair); }
+.cc-rights__h { font: 600 14px var(--font-text); color: var(--ink); margin: 0; }
+.cc-rights__sub { font-size: 13px; color: var(--ink-70); margin: 4px 0 10px; line-height: 1.5; }
 
 /* The generated station ID's row (added 2026-09-29): laid out like the table's rows (picture, item, type, runs, status). */
 .cc-gensid { display: grid; grid-template-columns: 88px minmax(0, 1fr) 128px 64px 226px; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); margin-top: 8px; }

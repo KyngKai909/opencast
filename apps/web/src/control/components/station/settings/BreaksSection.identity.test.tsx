@@ -1,6 +1,7 @@
-// Settings, Breaks: signing off and on (A242, 2026-10-02), on the mocks. Beside the station ID's
+// Break rules: signing off and on (A242, 2026-10-02), on the mocks. Beside the station ID's
 // cadence: the sequence, "Air the station ID after the opener" and "Open each broadcast day with
-// the opener", both off to start with; each change is saved with the rest of the rule.
+// the opener", both off to start with; A246: each change joins the draft and is saved with the
+// rest of the rule.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
@@ -12,7 +13,7 @@ vi.mock("../../../../config", () => ({
 
 import { handlers } from "../../../mocks/handlers";
 import { resetDb } from "../../../mocks/db";
-import { breakRuleOf } from "../../../mocks/fixtures/station";
+import { resetStationState, breakRuleOf } from "../../../mocks/fixtures/station";
 import { BEAT } from "../../../mocks/fixtures/stations";
 import { renderWithApi, signInAs, stubMatchMedia } from "../../onair/testing";
 import { BreaksSection } from "./BreaksSection";
@@ -25,6 +26,7 @@ beforeAll(() => {
 afterAll(() => server.close());
 beforeEach(() => {
   resetDb();
+  resetStationState();
   signInAs("kai@example.com");
 });
 afterEach(() => server.resetHandlers());
@@ -32,7 +34,7 @@ afterEach(() => server.resetHandlers());
 const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", label: "BEAT 12.1", can: () => true };
 const toggle = (name: string) => screen.getByRole("switch", { name }) as HTMLInputElement;
 
-describe("Settings, Breaks: signing off and on", () => {
+describe("Break rules: signing off and on", () => {
   it("shows the sequence, both switches off", async () => {
     renderWithApi(<BreaksSection s={beat} />);
     expect(await screen.findByRole("heading", { name: "Signing off and on" })).toBeTruthy();
@@ -43,15 +45,16 @@ describe("Settings, Breaks: signing off and on", () => {
     expect(screen.getByRole("link", { name: "Openers and closers" }).getAttribute("href")).toBe("/control/beat/library/openers");
   });
 
-  it("saves the station ID after the opener, and the daily opener", async () => {
+  it("saves the station ID after the opener, and the daily opener, with the rest of the rule", async () => {
     renderWithApi(<BreaksSection s={beat} />);
     await screen.findByRole("heading", { name: "Signing off and on" });
     fireEvent.click(toggle("Air the station ID after the opener"));
-    await waitFor(() => expect(breakRuleOf(BEAT.id).stationIdAfterOpener).toBe(true));
     expect(await screen.findByText("Closer → Off-air card → off air → Opener → Station ID → first program")).toBeTruthy();
     fireEvent.click(toggle("Open each broadcast day with the opener"));
-    await waitFor(() => expect(breakRuleOf(BEAT.id).dailyOpener).toBe(true));
     expect(await screen.findByText(/^For a channel that never signs off: at the first program after 6:00 am/)).toBeTruthy();
+    expect(breakRuleOf(BEAT.id).stationIdAfterOpener).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Save break rules" }));
+    await waitFor(() => expect(breakRuleOf(BEAT.id)).toMatchObject({ stationIdAfterOpener: true, dailyOpener: true }));
     // The rest of the rule is unchanged.
     expect(breakRuleOf(BEAT.id).cadence?.stationId).toEqual({ every: "break" });
   });

@@ -1,4 +1,4 @@
-/* Tabs: underlined (the reference's .tabs, in the market, offering and production orders) and the program log's days (.days). */
+/* Tabs: underlined (the reference's .tabs, in the market, offering and production orders), the program log's days (.days) and the Schedule's pills (.sch-tabs). */
 .oc-tabs { display: flex; gap: 4px; }
 .oc-tabs__tab { margin: 0; background: none; cursor: pointer; }
 .oc-tabs__tab:disabled { opacity: .45; cursor: not-allowed; }
@@ -18,3 +18,12 @@
   font: 600 13px var(--font-text); color: var(--ink-70);
 }
 .oc-tabs--days .oc-tabs__tab--on { border-color: var(--ink); color: var(--ink); }
+
+/* A246: the Schedule's tabs (opencast-schedule .sch-tabs): pills, the one on raised with a line. */
+.oc-tabs--pill { gap: 2px; flex-wrap: wrap; }
+.oc-tabs--pill .oc-tabs__tab {
+  height: 34px; display: inline-flex; align-items: center; padding: 0 14px;
+  border: 0; border-radius: 999px;
+  font: 600 13.5px var(--font-text); color: var(--ink-70); white-space: nowrap;
+}
+.oc-tabs--pill .oc-tabs__tab--on { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }

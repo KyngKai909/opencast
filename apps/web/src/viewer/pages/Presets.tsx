@@ -20,7 +20,7 @@ export default function PresetsPage() {
   useShellOptions(phone ? { back: { title: "Presets", href: "/you" } } : {});
   const auth = useAuth();
   const toast = useToast();
-  const tune = useTune();
+  const tune = useTune("preset");
   const [, setParams] = useSearchParams();
   const editor = usePresetEditor();
   const keyed = editor.presets.filter((p) => p.key !== null);

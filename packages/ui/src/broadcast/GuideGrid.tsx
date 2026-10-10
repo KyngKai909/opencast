@@ -48,6 +48,11 @@ export interface GuideStation {
   name?: string;
   /** A244: the station's programming blocks in the window (the compact variant leaves them out). */
   blocks?: GuideBlock[];
+  /**
+   * The swipe home's guide (A245; swipe home 06): a heading row before this station, where a new
+   * part of the order starts ("Your presets", "The dial").
+   */
+  section?: string;
 }
 
 export interface GuideGridProps {
@@ -69,6 +74,10 @@ export interface GuideGridProps {
   scrollToNow?: boolean;
   /** For screen readers: "Tonight's guide". */
   label?: string;
+  /** The station being watched: its row is tinted (swipe home 06). */
+  tunedId?: string | null;
+  /** Tapping a station's column tunes it in (swipe home 06: "Tap a row to tune in"). */
+  onTune?: (station: GuideStation) => void;
   className?: string;
 }
 
@@ -87,25 +96,34 @@ export interface GuideCell {
   onNow: boolean;
 }
 
-/** Places programs on the grid: each spans its start to its end, clipped to the window. */
+/**
+ * Places programs on the grid: each spans its start to its end, clipped to the window, on one line.
+ * An outside guide can overlap itself or list programs shorter than a grid unit (2026-10-06: Fizz's
+ * "Cartoons" until 9:05 with "Batman Animated" at 9:00; HappyKids' 2-minute fillers): the grid would
+ * push those onto a line of their own. So a program ends where the next one starts, and one that
+ * comes to nothing at the grid's 5 minutes isn't drawn.
+ */
 export function guideCells(programs: GuideProgram[], from: TimeInput, to: TimeInput, now?: TimeInput): GuideCell[] {
   const a0 = ms(from);
   const b0 = ms(to);
   const t = now != null ? ms(now) : NaN;
   const cells: GuideCell[] = [];
-  for (const p of programs) {
+  const sorted = [...programs].sort((x, y) => ms(x.start) - ms(y.start));
+  for (const p of sorted) {
     const s = ms(p.start);
     const e = ms(p.end);
     const a = Math.max(s, a0);
     const b = Math.min(e, b0);
     if (b <= a) continue;
-    cells.push({
-      program: p,
-      colStart: Math.round((a - a0) / GUIDE_UNIT_MS) + 2,
-      colEnd: Math.round((b - a0) / GUIDE_UNIT_MS) + 2,
-      began: s < a0,
-      onNow: s <= t && t < e
-    });
+    const colStart = Math.round((a - a0) / GUIDE_UNIT_MS) + 2;
+    const colEnd = Math.round((b - a0) / GUIDE_UNIT_MS) + 2;
+    if (colEnd <= colStart) continue;
+    const prev = cells[cells.length - 1];
+    if (prev && prev.colEnd > colStart) {
+      prev.colEnd = colStart;
+      if (prev.colEnd <= prev.colStart) cells.pop();
+    }
+    cells.push({ program: p, colStart, colEnd, began: s < a0, onNow: s <= t && t < e });
   }
   return cells;
 }
@@ -145,7 +163,7 @@ function cellLine(c: GuideCell, timeZone: string | undefined): string {
  * The guide: stations down the side, half hours across the top, one line for the current time.
  * The program on air sits on the raised colour. Live is red text, never the tally.
  */
-export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", selectedId, onSelect, scrollToNow, label, className }: GuideGridProps) {
+export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", selectedId, onSelect, scrollToNow, label, tunedId, onTune, className }: GuideGridProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const units = Math.round((ms(to) - ms(from)) / GUIDE_UNIT_MS);
@@ -171,12 +189,13 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
     </div>
   );
 
-  const body = rows.map((r) => {
+  const body = rows.flatMap((r) => {
     // A244: a row with a programming block in the window has a band strip above its programs.
     const bands = compact ? [] : guideBands(r.blocks ?? [], from, to);
-    return (
-    <div key={r.id} className={cx("oc-guide__row", bands.length > 0 && "oc-guide__row--blocks")} role="group" aria-label={`${r.callSign} ${r.channel}${r.name ? `, ${r.name}` : ""}`}>
-      <div className="oc-guide__st">
+    const tuned = !!tunedId && r.id === tunedId;
+    const ident = `${r.callSign} ${r.channel}`;
+    const stInner = (
+      <>
         <span className="oc-cs">{r.callSign}</span>
         <span className="oc-ch">{r.channel}</span>
         {r.name && !compact && (
@@ -189,7 +208,23 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
             External
           </Tag>
         )}
+        {tuned && <span className="oc-sr-only">, watching</span>}
+      </>
+    );
+    const head = r.section ? (
+      <div key={`${r.id}:section`} className="oc-guide__sec" role="heading" aria-level={3}>
+        {r.section}
       </div>
+    ) : null;
+    const row = (
+    <div key={r.id} className={cx("oc-guide__row", bands.length > 0 && "oc-guide__row--blocks", tuned && "oc-guide__row--tuned")} role="group" aria-label={`${ident}${r.name ? `, ${r.name}` : ""}`}>
+      {onTune ? (
+        <button type="button" className="oc-guide__st oc-guide__st--tune" onClick={() => onTune(r)} aria-label={`Tune in to ${ident}`}>
+          {stInner}
+        </button>
+      ) : (
+        <div className="oc-guide__st">{stInner}</div>
+      )}
       {bands.map(({ block, colStart, colEnd, began }) => (
         <div
           key={`${block.id}:${ms(block.start)}`}
@@ -244,6 +279,7 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
       })}
     </div>
     );
+    return head ? [head, row] : [row];
   });
 
   const nowLine = now != null ? <NowLine at={now} from={from} to={to} timeZone={timeZone} variant={compact ? "compact" : "web"} /> : null;

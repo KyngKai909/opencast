@@ -162,7 +162,7 @@ export default function About() {
               primary
               label={`Tune to ${callSignLabel(station)} now`}
               onSelect={() => {
-                if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
+                if (station.id !== player.currentId) void engine.tune(station.id, { input: "app", via: "guide" });
                 navigate("/", { replace: true });
               }}
             />

@@ -3,7 +3,7 @@
 // station's night.
 
 import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { libraryApi, stationsApi } from "@opencast/contracts";
 import { usePlayer } from "@opencast/player";
 import { StationPageX, type DialRowX } from "../../api/ext";
@@ -11,15 +11,18 @@ import { useChannels, useDial, useMarketSlug } from "../../data/viewer";
 import { useNowPlaying, useTune } from "../../player/PlayerRoot";
 import { useApiAs } from "./overlay";
 import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, watchKey, withOutsideStation } from "./logic";
+import type { TuneVia } from "@opencast/contracts";
 
-export function useWatch(stationRef: string | undefined) {
+export function useWatch(stationRef: string | undefined, o: { arrows?: boolean } = {}) {
+  const arrows = o.arrows !== false;
   const [s, engine] = usePlayer();
   const channels = useChannels();
   const slug = useMarketSlug();
   const tvDial = useDial("tv");
   const radioDial = useDial("radio");
   const dialReady = !!slug && tvDial.isSuccess && radioDial.isSuccess;
-  const tune = useTune();
+  const tune = useTune("link");
+  const location = useLocation();
   const navigate = useNavigate();
   const np = useNowPlaying();
 
@@ -68,7 +71,8 @@ export function useWatch(stationRef: string | undefined) {
     if (!target) return;
     const id = tuneForUrl(target.station.id, playingNow());
     lastSynced.current = target.station.id;
-    if (id) void tune(id);
+    // A251: how it was tuned, when the app said (starting on the last channel); else a link.
+    if (id) void tune(id, (location.state as { via?: TuneVia } | null)?.via ?? "link");
     // Only when the URL changes (or the dial first arrives), not on every channel change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.station.id]);
@@ -86,17 +90,17 @@ export function useWatch(stationRef: string | undefined) {
   }, [playingId, engineChannels, navigate]);
 
   // Arrow keys change channel on this page, and only here; the space bar (or k) pauses and resumes;
-  // l (or End) goes back to live (watchKey).
+  // l (or End) goes back to live (watchKey). The swipe home (A245) moves with its own arrow keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const cmd = watchKey(e);
-      if (!cmd) return;
+      if (!cmd || (!arrows && cmd.type === "channel")) return;
       e.preventDefault();
       engine.handle(cmd, { input: "keyboard" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [engine]);
+  }, [engine, arrows]);
 
   // The page shows the station the URL names; the URL follows the channel.
   const shown = target ?? inDial ?? outside;

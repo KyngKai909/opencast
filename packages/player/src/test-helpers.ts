@@ -166,7 +166,7 @@ export interface FakeNode {
   element?: HTMLMediaElement;
   /** Linear ramps, in order (the hiss's envelope). */
   ramps?: Array<{ param: string; value: number }>;
-  /** A buffer source: when it was started and stopped (context seconds). */
+  /** A buffer source or oscillator: when it was started and stopped (context seconds; the last call). */
   started?: number;
   stopped?: number;
 }
@@ -190,6 +190,10 @@ export function stubWebAudio() {
         n.params[name] = { value: v, ramped: true };
       },
       linearRampToValueAtTime(v: number) {
+        n.params[name] = { value: v, ramped: true };
+        n.ramps = [...(n.ramps ?? []), { param: name, value: v }];
+      },
+      exponentialRampToValueAtTime(v: number) {
         n.params[name] = { value: v, ramped: true };
         n.ramps = [...(n.ramps ?? []), { param: name, value: v }];
       }
@@ -219,6 +223,11 @@ export function stubWebAudio() {
       const s = node("bufferSource");
       const n = s.__node as FakeNode;
       return Object.assign(s, { buffer: null as unknown, onended: null as unknown, start: (t = 0) => (n.started = t), stop: (t = 0) => (n.stopped = t) });
+    }
+    createOscillator() {
+      const o = node("oscillator", { frequency: 440 });
+      const n = o.__node as FakeNode;
+      return Object.assign(o, { type: "sine", onended: null as unknown, start: (t = 0) => (n.started = t), stop: (t = 0) => (n.stopped = t) });
     }
     createBiquadFilter() {
       return Object.assign(node("biquad", { frequency: 350, Q: 1 }), { type: "lowpass" });

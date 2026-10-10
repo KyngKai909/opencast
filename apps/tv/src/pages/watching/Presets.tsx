@@ -65,7 +65,7 @@ export default function Presets() {
   const tune = (slot: Slot, source?: CommandSource) => {
     if (!slot.stationId) return;
     used(slot.key);
-    void engine.tune(slot.stationId, source ?? { input: "remote" });
+    void engine.tune(slot.stationId, { input: "remote", ...source, via: "preset" });
     navigate("/", { replace: true });
   };
   const store = (slot: Slot) => {

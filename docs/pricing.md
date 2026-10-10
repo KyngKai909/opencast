@@ -67,7 +67,7 @@ Since Phase 3, a station's relay is **one push**, from the relay service (`apps/
 
 - **Viewers**: segments come straight from R2, which charges no egress, only reads: at 4-second segments a viewer-hour is 900 reads at $0.36 a million, **about $0.0003** (and R2's first 10 million reads a month are free). The playlists come from the worker on Railway: a refresh every segment, a few KB each, about 2 MB a viewer-hour at $0.05 a GB, **under $0.0001**. So 1,000 viewer-hours cost about **$0.40**, on any station, prerecorded or live.
 - **Uploads** go from the browser straight to R2 (follow-up Phase 4): nothing passes through Railway, so there's no Railway egress for them, and a file already on the platform is stored once.
-- **External stations** (follow-up Phase 6): one small request per listing a minute, and a schedule feed read hourly; nothing stored or served.
+- **External stations** (follow-up Phase 6): one small request per listing a minute, and a schedule feed read hourly (2026-10-03: and every 2 minutes while its guide is about to run dry, one read per address a pass); nothing stored or served. A249: a large XMLTV guide (a platform's, about 1 MB gzipped) is asked "changed since?" first and downloaded only when it has changed, once a pass for every station on it, and at most every 30 minutes while running dry; it's read as it downloads (a few MB of memory, well under a second for 7 MB), never held whole.
 - **External stations' `http://` stream links through the HTTPS relay** (A237, docs/stream-relay.md; check current prices): a Cloudflare Worker, about **1,200 requests per viewer-hour** at 6-second segments (playlist refreshes and segments) and no bandwidth charge. The free plan's 100,000 requests a day cover about 80 viewer-hours a day; the paid plan is $5 a month with 10 million requests (about 8,000 viewer-hours), then $0.30 a million, **about $0.0004 a viewer-hour**. Nothing is stored. A238: https stream links whose server blocks browsers (no CORS header) go through it too, at the same cost per request (all of their segments). Links that answer over https, https links browsers can load and embeds cost nothing here.
 - **Before production**: `R2_PUBLIC_BASE` on staging is the bucket's `r2.dev` address, which Cloudflare rate-limits and meant for development. Production should have a custom domain on the bucket (docs/deploy.md, step 3), which Cloudflare's cache sits in front of, saving reads too; without one, files go out by signed URLs.
 
@@ -94,6 +94,18 @@ And a busy TV station as Phase 5 assumed it (300 hours kept prepared, 1,440 GB; 
 | Recommendations 1 and 2 (flat $25 a month) | $57.20 + $25.00 + $11.25 = **$93.45** | **$45.01** | $48.44 |
 
 So recommendation 1 alone cuts the relay's cost by about 85% and removes the Livepeer risk; recommendation 2 passes most of that saving on to stations. The other examples at recommendation 2's $0.05: BEAT's 186 relay hours would be $9.30 instead of $37.20, and REEL's 744 hours $37.20 instead of $148.80 (or $25 flat).
+
+## What running Opencast costs (the Costs rules)
+
+The desk's Analytics, Money, "Cost to run, estimated" multiplies what was used by the Costs rules (Settings, Rules, Costs). Their first set versions, from October 1, 2026 (migration 0058, A251), every number for review:
+
+| Rule | Cost | From |
+|---|---|---|
+| `costs.storage` | **$0.015** a GB-month | R2 Standard. Preparing is its own line here, so it isn't spread over storage as in the sheet's $0.018 |
+| `costs.preparing` | **$0.0048** a minute of preparing | A minute of the worker's wall clock: 2.0 vCPU-hours per media hour in about 1,046 s at $0.0278 ($0.0032), R2's segment writes ($0.0012) and memory ($0.0005) |
+| `costs.relays` | **$0.085** an hour | On Railway, if Livepeer doesn't charge the split ($0.415 if it does) |
+| `costs.live` | **$0.48** an hour | Livepeer $0.33 plus the R2 copies $0.15 |
+| `costs.platform` | **$5.77** a week | An estimate, about $25 a month: Railway Pro's $20 with its included usage, and the Cloudflare Worker's $5. Not Livepeer's Growth minimum. Replace it with the real bill |
 
 ## How billing works
 

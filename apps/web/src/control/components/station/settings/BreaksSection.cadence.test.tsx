@@ -1,7 +1,8 @@
-// Settings, Breaks: "How often" (added 2026-09-29), on the mocks. Spots, the thank-you credit,
-// the station ID and (A243) each bumper sequence get a choice; the station ID can't be never; a change is saved
-// with the rest of the rule, and the mock answers it back. The ladder draws a bumper into the break
-// and one out of it (A143).
+// Break rules (A246 phase 3): how often each part airs, as chips, on the mocks. Spots, the
+// thank-you credit, bumpers, the station ID (which can't be never: that chip is crossed out and
+// can't be chosen) and Up next; "Every N programs" with N beside it; the Bumpers chips set the
+// opening and closing sequences together; Up next's chips set its own cadence (S20) and never the
+// between-programs sequence. Changes wait in the draft until "Save break rules".
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -13,7 +14,7 @@ vi.mock("../../../../config", () => ({
 
 import { handlers } from "../../../mocks/handlers";
 import { resetDb } from "../../../mocks/db";
-import { breakRuleOf } from "../../../mocks/fixtures/station";
+import { resetStationState, breakRuleOf, saveStationState, stationState } from "../../../mocks/fixtures/station";
 import { BEAT } from "../../../mocks/fixtures/stations";
 import { renderWithApi, signInAs, stubMatchMedia } from "../../onair/testing";
 import { BreaksSection } from "./BreaksSection";
@@ -26,62 +27,103 @@ beforeAll(() => {
 afterAll(() => server.close());
 beforeEach(() => {
   resetDb();
+  resetStationState();
   signInAs("kai@example.com");
 });
 afterEach(() => server.resetHandlers());
 
 const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", label: "BEAT 12.1", can: () => true };
-const select = (name: string) => screen.getByRole("combobox", { name }) as HTMLSelectElement;
-const labels = (s: HTMLSelectElement) => within(s).getAllByRole("option").map((o) => o.textContent);
+const chips = (part: string) => screen.getByRole("radiogroup", { name: `How often: ${part}` });
+const chip = (part: string, name: string | RegExp) => within(chips(part)).getByRole("radio", { name });
+const chosen = (part: string) => within(chips(part)).queryByRole("radio", { checked: true })?.textContent ?? null;
+const save = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Save break rules" }));
+  expect(await screen.findByText("Break rules saved.")).toBeTruthy();
+};
 
-describe("Settings, Breaks: How often", () => {
-  it("has a choice for spots, the credit and the station ID, and one per bumper sequence (A243), every break to start with", async () => {
+describe("Break rules: how often, as chips", () => {
+  it("has the five choices for each part, every break to start with; Up next never (no bumper holds its role)", async () => {
     renderWithApi(<BreaksSection s={beat} />);
-    expect(await screen.findByRole("heading", { name: "How often" })).toBeTruthy();
-    for (const name of ["How often: Spots", "How often: Station ID", "How often: Opening the break", "How often: Closing the break", "How often: Thank-you credit"]) expect(select(name).value).toBe("break");
-    expect(screen.queryByRole("combobox", { name: "How often: Bumpers" })).toBeNull();
-    expect(select("How often: Between programs").value).toBe("program");
-    expect(labels(select("How often: Station ID"))).not.toContain("Never");
-    expect(labels(select("How often: Opening the break"))).toContain("Never");
-    expect(labels(select("How often: Spots"))).toEqual(["In every break", "After every program", "After every 2 programs", "After every 3 programs", "After every 4 programs", "Once an hour", "Never"]);
-    expect(screen.getByText("Last in every break")).toBeTruthy();
-    expect(screen.getByText("In every break, up to the hourly cap")).toBeTruthy();
+    await screen.findByRole("radiogroup", { name: "How often: Spots" });
+    for (const part of ["Spots", "Thank-you credit", "Bumpers", "Station ID"]) expect(chosen(part)).toBe("Every break");
+    expect(chosen("Up next")).toBe("Never");
+    expect(within(chips("Spots")).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Every break", "After each program", "Every 2 programs", "Once an hour", "Never"]);
   });
 
-  it("draws the bumper sequences opening and closing the break, fixed, around the spots and the credit", async () => {
+  it("the station ID can't be never: its chip is crossed out and does nothing", async () => {
     renderWithApi(<BreaksSection s={beat} />);
-    const ladder = await screen.findByRole("list", { name: "In every break, in this order" });
-    const rows = within(ladder).getAllByRole("listitem").filter((r) => r.id.startsWith("cc-fill-"));
-    expect(rows.map((r) => r.id)).toEqual(["cc-fill-BMP-in", "cc-fill-SPT", "cc-fill-UND", "cc-fill-partners", "cc-fill-BMP", "cc-fill-SID"]);
-    expect(rows[0].textContent).toContain("Opening the break");
-    expect(rows[4].textContent).toContain("Closing the break");
-    // Only the spots and the credit move in the ladder (the sequences' chips move inside them).
-    expect(rows.filter((r) => r.getAttribute("draggable") === "true").map((r) => r.id)).toEqual(["cc-fill-SPT", "cc-fill-UND"]);
+    await screen.findByRole("radiogroup", { name: "How often: Station ID" });
+    const never = chip("Station ID", "Never") as HTMLButtonElement;
+    expect(never.disabled).toBe(true);
+    expect(never.closest(".cc-cad__set")).toBeTruthy();
+    fireEvent.click(never);
+    expect(chosen("Station ID")).toBe("Every break");
+    expect(screen.queryByText("Unsaved changes")).toBeNull();
+    // The others can be never.
+    expect((chip("Spots", "Never") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("saves a change with the rest of the rule", async () => {
+  it("every N programs: N chosen beside it, saved with the rest", async () => {
     renderWithApi(<BreaksSection s={beat} />);
-    await screen.findByRole("heading", { name: "How often" });
-    fireEvent.change(select("How often: Station ID"), { target: { value: "hour" } });
-    await waitFor(() => expect(breakRuleOf(BEAT.id).cadence?.stationId).toEqual({ every: "hour" }));
-    expect(await screen.findByText("Last in the first break after the top of the hour")).toBeTruthy();
-    fireEvent.change(select("How often: Opening the break"), { target: { value: "never" } });
-    await waitFor(() => expect(breakRuleOf(BEAT.id).bumperSequences?.open.every).toBe("never"));
-    // The bumpers' cadence (for apps from before) follows the opening sequence.
-    expect(breakRuleOf(BEAT.id).cadence).toEqual({ stationId: { every: "hour" }, bumpers: { every: "never" }, underwriting: { every: "break" }, spots: { every: "break" } });
-    expect(breakRuleOf(BEAT.id).bumperSequences?.close.every).toBe("break");
-    fireEvent.change(select("How often: Thank-you credit"), { target: { value: "n:3" } });
-    await waitFor(() => expect(breakRuleOf(BEAT.id).cadence?.underwriting).toEqual({ every: "n_programs", n: 3 }));
+    await screen.findByRole("radiogroup", { name: "How often: Thank-you credit" });
+    fireEvent.click(chip("Thank-you credit", "Every 2 programs"));
+    const n = screen.getByRole("combobox", { name: "How many programs: Thank-you credit" }) as HTMLSelectElement;
+    fireEvent.change(n, { target: { value: "3" } });
+    expect(chosen("Thank-you credit")).toBe("Every 3 programs");
+    await save();
+    expect(breakRuleOf(BEAT.id).cadence?.underwriting).toEqual({ every: "n_programs", n: 3 });
   });
 
-  it("saves how often spots air", async () => {
+  it("the Bumpers chips set the opening and closing sequences together", async () => {
     renderWithApi(<BreaksSection s={beat} />);
-    await screen.findByRole("heading", { name: "How often" });
-    fireEvent.change(select("How often: Spots"), { target: { value: "n:2" } });
-    await waitFor(() => expect(breakRuleOf(BEAT.id).cadence?.spots).toEqual({ every: "n_programs", n: 2 }));
-    expect(await screen.findByText("Up to the hourly cap. Other breaks are only as long as the rest needs")).toBeTruthy();
-    fireEvent.change(select("How often: Spots"), { target: { value: "never" } });
-    await waitFor(() => expect(breakRuleOf(BEAT.id).cadence?.spots).toEqual({ every: "never" }));
-    expect(await screen.findByText("Breaks are only as long as the rest needs. Nothing is sold in them")).toBeTruthy();
+    await screen.findByRole("radiogroup", { name: "How often: Bumpers" });
+    fireEvent.click(chip("Bumpers", "Once an hour"));
+    await save();
+    const rule = breakRuleOf(BEAT.id);
+    expect(rule.bumperSequences?.open).toEqual({ roles: ["into_break"], every: "hour" });
+    expect(rule.bumperSequences?.close).toEqual({ roles: ["out_of_break"], every: "hour" });
+    expect(rule.cadence?.bumpers).toEqual({ every: "hour" });
+  });
+
+  it("says so when the opening and closing sequences differ (none of the chips is theirs)", async () => {
+    const rule = breakRuleOf(BEAT.id);
+    stationState().breakRules[BEAT.id] = { ...rule, bumperSequences: { ...rule.bumperSequences!, close: { roles: ["out_of_break"], every: "program" } } };
+    saveStationState();
+    renderWithApi(<BreaksSection s={beat} />);
+    await screen.findByRole("radiogroup", { name: "How often: Bumpers" });
+    expect(chosen("Bumpers")).toBeNull();
+    expect(screen.getByText("Opening and closing differ. Set each in the bumper order below")).toBeTruthy();
+  });
+
+  it("S20: Up next's chips set its own cadence and leave the between-programs sequence (and the sting in it) alone", async () => {
+    const rule = breakRuleOf(BEAT.id);
+    stationState().breakRules[BEAT.id] = { ...rule, bumperSequences: { ...rule.bumperSequences!, between: { roles: ["up_next", "any"], every: "program" } } };
+    saveStationState();
+    renderWithApi(<BreaksSection s={beat} />);
+    await screen.findByRole("radiogroup", { name: "How often: Up next" });
+    // Left out, Up next goes as often as its position: between every program.
+    expect(chosen("Up next")).toBe("After each program");
+    fireEvent.click(chip("Up next", "Once an hour"));
+    expect(await screen.findByText("Which bumpers air, in order. Up next goes by its own choice above; here it only sets its place")).toBeTruthy();
+    await save();
+    const saved = breakRuleOf(BEAT.id);
+    expect(saved.cadence?.upNext).toEqual({ every: "hour" });
+    expect(saved.bumperSequences?.between).toEqual({ roles: ["up_next", "any"], every: "program" });
+    // Never takes it off, still without touching the sequence.
+    fireEvent.click(chip("Up next", "Never"));
+    await save();
+    expect(breakRuleOf(BEAT.id).cadence?.upNext).toEqual({ every: "never" });
+    expect(breakRuleOf(BEAT.id).bumperSequences?.between.roles).toEqual(["up_next", "any"]);
+  });
+
+  it("spots and the station ID save with the rest of the rule, in one Save", async () => {
+    renderWithApi(<BreaksSection s={beat} />);
+    await screen.findByRole("radiogroup", { name: "How often: Spots" });
+    fireEvent.click(chip("Spots", "After each program"));
+    fireEvent.click(chip("Station ID", "Once an hour"));
+    // Nothing is saved until Save.
+    expect(breakRuleOf(BEAT.id).cadence?.spots).toEqual({ every: "break" });
+    await save();
+    await waitFor(() => expect(breakRuleOf(BEAT.id).cadence).toMatchObject({ spots: { every: "program" }, stationId: { every: "hour" }, underwriting: { every: "break" } }));
   });
 });

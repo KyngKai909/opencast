@@ -5,17 +5,22 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import express, { type NextFunction, type Request, type Response, type Router } from "express";
-import multer from "multer";
 import { z } from "zod";
 import type { Body, EndpointDef, Params, Query, Response as ContractResponse } from "@opencast/contracts";
 import { tokenFrom } from "./auth.js";
 import type { Deps, Services } from "./context.js";
 import { badRequest, forbidden, fromDatabaseError, HttpError, unauthorized } from "./errors.js";
+import { ConnectionGone, fileName, FormUploads, removeTempFiles, type FormUploadLimits } from "./formUploads.js";
 
 export interface CurrentUser {
   id: string;
   privyDid: string | null;
   isAdmin: boolean;
+  /**
+   * Let in (added 2026-10-07, invite-only sign-ups). False while they wait: only endpoints marked
+   * `beforeAdmitted` answer them. Absent means in (TV sessions, tests).
+   */
+  admitted?: boolean;
   /** Set when a TV session acts as the person (endpoints marked `tvSession`). */
   viaTv?: { tvId: string; sessionId: string };
 }
@@ -99,6 +104,15 @@ export interface HandlerContext<E extends EndpointDef> {
 
 export type Handler<E extends EndpointDef> = (ctx: HandlerContext<E>) => Promise<ContractResponse<E>> | ContractResponse<E>;
 
+/**
+ * A form upload's endpoint (`multipart`, added 2026-10-06): its own limits, and who may send one,
+ * both checked before the file is read. `authorize` is the endpoint's role check (throwing is the
+ * answer, and nothing of the file is read); the handler then gets the file.
+ */
+export interface FormUpload<E extends EndpointDef> extends FormUploadLimits {
+  authorize?: (ctx: Omit<HandlerContext<E>, "body" | "file">) => Promise<unknown> | unknown;
+}
+
 /** An event-stream handler: checks what it needs (throwing is a JSON error), then `open()`s the stream. */
 export type StreamHandler<E extends EndpointDef> = (ctx: HandlerContext<E>, open: () => EventStream) => Promise<void> | void;
 
@@ -111,7 +125,7 @@ const SSE_HEARTBEAT_MS = 25_000;
 export type Guard = (input: { params: Record<string, unknown>; query: Record<string, unknown>; body: unknown }) => Promise<void>;
 
 export class RouteRegistrar {
-  private upload: multer.Multer;
+  private uploads: FormUploads;
   private guards = new Map<EndpointDef, Guard[]>();
 
   constructor(
@@ -119,7 +133,7 @@ export class RouteRegistrar {
     private deps: Deps,
     private services: Services
   ) {
-    this.upload = multer({ dest: path.join(deps.config.storageRoot, "uploads", "tmp"), limits: { fileSize: 8 * 1024 ** 3 } });
+    this.uploads = new FormUploads(path.join(deps.config.storageRoot, "uploads", "tmp"));
   }
 
   /** Runs `check` before each of these endpoints' handlers (whenever they're registered). */
@@ -127,28 +141,42 @@ export class RouteRegistrar {
     for (const endpoint of endpoints) this.guards.set(endpoint, [...(this.guards.get(endpoint) ?? []), check]);
   }
 
-  handle<E extends EndpointDef>(endpoint: E, handler: Handler<E>) {
+  /** A `multipart` endpoint takes `upload`: its limits, and its role check before the file is read. */
+  handle<E extends EndpointDef>(endpoint: E, handler: Handler<E>, upload?: FormUpload<E>) {
     const method = endpoint.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
-    const middleware = endpoint.multipart ? [this.upload.single("file")] : [];
-    this.router[method](endpoint.path, ...middleware, async (req: Request, res: Response, next: NextFunction) => {
+    if (!endpoint.multipart !== !upload) throw new Error(`${endpoint.path}: ${upload ? "isn't a form upload" : "a form upload needs its limits"}`);
+    const form = upload ? this.uploads.middleware(upload) : null;
+    this.router[method](endpoint.path, async (req: Request, res: Response, next: NextFunction) => {
+      let reading = false;
       try {
+        // Who's calling, and (for a form upload) whether they may send it, before the body is read.
         const callers = await this.authenticate(endpoint, req);
         const params = parse(endpoint.params, req.params, "params") as Params<E>;
         const query = parse(endpoint.query, req.query, "query") as Query<E>;
+        if (form) {
+          await upload!.authorize?.({ params, query, user: callers.user as never, device: callers.device as never, phone: callers.phone, req });
+          reading = true;
+          await form.run(req, res);
+        }
         const body = parse(endpoint.body, endpoint.multipart ? req.body ?? {} : req.body, "body") as Body<E>;
         const file = req.file
-          ? { path: req.file.path, originalName: req.file.originalname, size: req.file.size, mimeType: req.file.mimetype }
+          ? { path: req.file.path, originalName: fileName(req.file.originalname), size: req.file.size, mimeType: req.file.mimetype }
           : null;
         for (const check of this.guards.get(endpoint) ?? []) await check({ params: params as Record<string, unknown>, query: query as Record<string, unknown>, body });
         const result = await handler({ params, query, body, user: callers.user as never, device: callers.device as never, phone: callers.phone, file, req });
         const output = endpoint.response.parse(result);
         res.status(endpoint.status ?? 200).json(output);
       } catch (error) {
+        if (error instanceof ConnectionGone) return;
+        // Refused before the form was read: answered, and the connection closed, so the rest of a
+        // file isn't read either.
+        if (form && !reading && !req.complete) res.set("connection", "close");
         next(error);
       } finally {
         if (req.file) {
           await fs.unlink(req.file.path).catch(() => undefined);
         }
+        if (form) await removeTempFiles(req);
       }
     });
   }
@@ -252,6 +280,12 @@ export class RouteRegistrar {
       // Signed out everywhere, or the account deleted: say so (`signed_out`, `account_deleted`).
       if (error instanceof HttpError && error.status === 401) throw error;
       throw unauthorized("Your sign-in has expired. Sign in again.");
+    }
+    // Added 2026-10-07: someone signed in who hasn't been let in yet is signed out to `optional`
+    // and `public` endpoints, and refused by the rest except those marked `beforeAdmitted`.
+    if (user.admitted === false && !endpoint.beforeAdmitted) {
+      if (endpoint.auth === "public" || endpoint.auth === "optional") return callers;
+      throw new HttpError(403, "invite_required", "Opencast is invite-only for now. Enter an invite code to come in.");
     }
     if (endpoint.auth === "admin" && !user.isAdmin) {
       throw forbidden();

@@ -2,7 +2,9 @@
 // and forgotten: never stored, never logged. The lookup is pluggable: GEOIP_URL is a URL with
 // `{ip}` in it (an ip-to-postal service), answering a ZIP as plain text or JSON with a ZIP
 // (`postal`, `zip`, `postal_code`, `zip_code`) and/or coordinates (`latitude`/`lat`,
-// `longitude`/`lon`/`lng`). With nothing configured there's no lookup.
+// `longitude`/`lon`/`lng`). With nothing configured there's no lookup. Programming Phase 6: the same
+// answer's country, when it has one (`country_code`, `countryCode`, or a two-letter `country`), for
+// the territories a network licence clears other apps in (`countryOf`).
 
 import { isIP } from "node:net";
 import type { Request } from "express";
@@ -10,6 +12,8 @@ import type { Request } from "express";
 export interface GeoResult {
   zip: string | null;
   point: { lat: number; lng: number } | null;
+  /** ISO 3166-1 alpha-2, upper case, when the lookup says (added 2026-10-10). */
+  country?: string;
 }
 
 export interface GeoLookup {
@@ -55,7 +59,34 @@ export function parseGeo(text: string): GeoResult | null {
   const lat = Number(body.latitude ?? body.lat);
   const lng = Number(body.longitude ?? body.lon ?? body.lng);
   const point = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
-  return zip || point ? { zip, point } : null;
+  const code = [body.country_code, body.countryCode, body.country].find((v) => typeof v === "string" && /^[A-Za-z]{2}$/.test(v)) as string | undefined;
+  const country = code?.toUpperCase();
+  return zip || point || country ? { zip, point, ...(country ? { country } : {}) } : null;
+}
+
+/** How long a connection's country is remembered (in memory only), and for how many connections. */
+const COUNTRY_KEPT_MS = 10 * 60_000;
+const COUNTRIES_KEPT = 20_000;
+const countries = new WeakMap<GeoLookup, Map<string, { at: number; country: Promise<string | null> }>>();
+
+/**
+ * Programming Phase 6: the connection's country (ISO 3166-1 alpha-2), or null when it can't be told
+ * (no lookup configured, a private address, or an answer without one). Remembered in memory for ten
+ * minutes, so a player polling its playlist every few seconds is looked up once; never stored.
+ */
+export function countryOf(geo: GeoLookup, ip: string | null, now = Date.now()): Promise<string | null> {
+  if (!ip || isPrivateAddress(ip) || !geo.configured) return Promise.resolve(null);
+  let kept = countries.get(geo);
+  if (!kept) countries.set(geo, (kept = new Map()));
+  const hit = kept.get(ip);
+  if (hit && now - hit.at < COUNTRY_KEPT_MS) return hit.country;
+  const country = geo
+    .lookup(ip)
+    .then((found) => found?.country ?? null)
+    .catch(() => null);
+  if (kept.size >= COUNTRIES_KEPT) kept.clear();
+  kept.set(ip, { at: now, country });
+  return country;
 }
 
 export function geoFromEnv(env: NodeJS.ProcessEnv): GeoLookup {

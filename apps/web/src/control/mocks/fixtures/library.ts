@@ -41,6 +41,9 @@ function item(o: Partial<LibraryItem> & Pick<LibraryItem, "title" | "code">): Li
     programId: null,
     folderId: null,
     episodeNumber: null,
+    seasonNumber: null,
+    partOf: null,
+    partNumber: null,
     episodeDescription: null,
     source: "upload",
     sourceUrl: null,
@@ -90,6 +93,10 @@ const crateSessions = [
 const crateTalk = [1, 2, 3, 4, 5, 6].map((i) =>
   item({ title: `Crate Talk, ep. ${i}`, code: "PGM", programId: PROGRAM_IDS.crateTalk, folderId: FOLDERS.crateTalk, episodeNumber: i, durationMs: ms(44, 20), mediaKind: i > 4 ? "audio" : "video", picture: i > 4 ? null : { width: 1280, height: 720 } })
 );
+// Programming Phase 4: break points suggested as the file was prepared, from its chapter marks
+// (ep. 1) and where it fades to black and silence (ep. 2, an old tape). Never applied on their own.
+crateTalk[0].suggestedBreakPoints = { source: "chapter", pointsMs: [ms(8), ms(22, 10), ms(33, 40)], previewUrl: "/mock-hls/beat/master.m3u8" };
+crateTalk[1].suggestedBreakPoints = { source: "fade", pointsMs: [ms(11, 24), ms(29, 51)], previewUrl: null };
 
 const spotsIds = [
   item({ title: "BEAT station ID", code: "SID", folderId: FOLDERS.spotsIds, durationMs: ms(0, 5), createdAt: at("12:00") }),

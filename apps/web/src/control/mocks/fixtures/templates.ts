@@ -111,7 +111,12 @@ export function toTemplateEntry(e: DbLogEntry, id: string): DbTemplateEntry {
     episodeTitle: e.episodeTitle,
     episodeDescription: e.episodeDescription ?? null,
     localNote: e.localNote,
-    carriedFrom: e.carriedFrom
+    carriedFrom: e.carriedFrom,
+    // G18: a fixed point stays one on every date the template makes.
+    ...(e.keepTime ? { keepTime: true } : {}),
+    // Programming Phase 3: a slot from the start, airing this episode.
+    slotId: id,
+    whatAirs: "this_episode"
   };
 }
 
@@ -140,8 +145,38 @@ export function entryOn(te: DbTemplateEntry, date: string, stationId: string, te
     carriageAgreementId: te.carriageAgreementId,
     repeatGroupId: templateId,
     localNote: te.localNote,
+    ...(te.keepTime ? { keepTime: true } : {}),
     ...placeOn(te, date)
   };
+}
+
+/** Programming Phase 3: what a walking slot walks, in order: its programs' episodes (season, episode, title). */
+export function slotEpisodes(items: LibraryItem[], programIds: string[]): LibraryItem[] {
+  const n = (v: number | null | undefined) => (v == null ? Infinity : v);
+  return items
+    .filter((i) => i.code === "PGM" && i.programId && programIds.includes(i.programId) && i.durationMs)
+    .sort((a, b) => programIds.indexOf(a.programId!) - programIds.indexOf(b.programId!) || n(a.seasonNumber) - n(b.seasonNumber) || n(a.episodeNumber) - n(b.episodeNumber) || a.title.localeCompare(b.title));
+}
+
+/**
+ * Programming Phase 3: a walking slot's episodes on a date, the mocks' plain walk: from how many
+ * times it aired before (`position`), in order, round again at the end (or none, stopped). Next
+ * episode one; Fill the slot as many as fit its length. The API's walker does every order.
+ */
+export function slotAirings(te: Pick<DbTemplateEntry, "whatAirs" | "atEnd" | "lengthMs">, episodes: LibraryItem[], position: number): LibraryItem[] {
+  if (!episodes.length) return [];
+  const out: LibraryItem[] = [];
+  let room = te.lengthMs;
+  for (let p = position; out.length < 200; p++) {
+    if (te.atEnd === "stop" && p >= episodes.length) break;
+    const ep = episodes[p % episodes.length];
+    const len = Math.ceil((ep.durationMs ?? 0) / 60_000) * 60_000;
+    if (te.whatAirs !== "fill") return [ep];
+    if (len > room) break;
+    out.push(ep);
+    room -= len;
+  }
+  return out;
 }
 
 export const TEMPLATE_IDS = { saturdays: uid(447001), weekdays: uid(447002) };

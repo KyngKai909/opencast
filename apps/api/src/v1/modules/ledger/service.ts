@@ -115,6 +115,31 @@ export interface LedgerService extends BusinessMoney {
   withdraw(businessId: string, input: { amountMicros: number; fundingSourceId: string }): Promise<{ payoutId: string; balance: BalanceView }>;
   statements(accountOwner: { businessId?: string; stationId?: string }): Promise<StatementView[]>;
   stationEarnings(stationId: string, period: "week" | "month" | "year"): Promise<StationEarningsView>;
+  /**
+   * A251: what each station earned in a span, after card fees: settlements, pledges, card fees and
+   * reversals posted to its earnings (or, a claimable station's, to what's owed into escrow).
+   * Carriage moves money between stations and isn't in it; nor are payouts.
+   */
+  earnedBetween(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /**
+   * A251 Phase 6: stations' earnings in a span, per station per Pacific day, by kind (spots,
+   * sponsors with production orders, pledges, carriage in, card fees), as posted to each station's
+   * earnings (or, claimable, what's owed into escrow).
+   */
+  earningRows(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; day: string; spots: number; sponsors: number; pledges: number; carriageIn: number; cardFees: number }>>;
+  /** A251 Phase 6: pay-as-you-go in a span (closed days), charged and measured, by type: storage (charge, GB-days), relays and live (charge, hours). */
+  usageTotals(stationIds: string[] | null, from: Date, to: Date): Promise<{ storage: { chargeMicros: number; gbDays: number }; relays: { chargeMicros: number; hours: number }; live: { chargeMicros: number; hours: number } }>;
+  /** A251 Phase 6: what Opencast's share took in a span (its account's postings). */
+  opencastShareBetween(from: Date, to: Date): Promise<number>;
+  /** A251 Phase 6: when each claimable station's money first went into escrow (owed or held). */
+  escrowSince(stationIds: string[]): Promise<Map<string, Date>>;
+  /** A251 Phase 6: carriage in a span, network-wide: cash fees and barter splits paid to makers, and how many agreements paid. */
+  carriageVolume(from: Date, to: Date): Promise<{ cashMicros: number; barterMicros: number; agreements: number }>;
+  /**
+   * A251: one station's earnings in a span by kind (Ref. 12d 03's "Earned"): spots, sponsors (and
+   * production orders), pledges and how many, carriage in, card fees, and the total after them.
+   */
+  earnedBreakdown(stationId: string, from: Date, to: Date): Promise<{ spotsMicros: number; sponsorsMicros: number; pledgesMicros: number; pledgeMembers: number; carriageInMicros: number; cardFeesMicros: number; totalMicros: number; held: boolean }>;
   moveToBank(stationId: string, micros: number): Promise<{ payoutId: string; scheduledFor: string }>;
   pledge(userId: string, stationId: string, input: { cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean }): Promise<{ pledge: PledgeView; checkoutUrl: string | null }>;
   pledges(userId: string): Promise<PledgeView[]>;
@@ -279,6 +304,8 @@ const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.sl
 
 /** Relay viewers' settlements and returns (2026-09-30): `source_type` on their entries. */
 export const RELAY_VIEWERS = "relay_viewers";
+/** Other apps viewers' settlements and returns (2026-10-10, programming Phase 5, P5.1): `source_type` on their entries. */
+export const OTHER_APP_VIEWERS = "other_app_viewers";
 
 /** Pay-as-you-go's line on a station's statement: usage paid from its earnings. */
 const USAGE_FROM_EARNINGS = "Usage, taken from earnings";
@@ -332,13 +359,13 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       .from(E)
       .innerJoin(P, eq(P.entryId, E.id))
       .leftJoin(H, eq(H.id, P.holdId))
-      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), inArray(E.sourceType, ["as_run", RELAY_VIEWERS])));
+      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), inArray(E.sourceType, ["as_run", RELAY_VIEWERS, OTHER_APP_VIEWERS])));
     let micros = 0;
     const entries = new Set<string>();
     for (const r of rows) {
       if ((r.holdAdvertiser === businessId || r.accountId === available) && r.amount < 0) {
         micros += -r.amount;
-        // Relay viewers are part of an airing already counted.
+        // Relay viewers and Other apps viewers are part of an airing already counted.
         if (r.sourceType === "as_run") entries.add(r.entryId);
       }
     }
@@ -412,7 +439,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       );
       const [payout] = await tx
         .insert(schema.payouts)
-        .values({ accountId: account, amountMicros: micros, destination: toWallet ? where.destination.label : "bank", scheduledFor, status: "scheduled", entryId })
+        .values({ accountId: account, amountMicros: micros, destination: toWallet ? where.destination.label : "bank", scheduledFor, status: "scheduled", entryId, createdAt: deps.clock.now() })
         .returning();
       return { payoutId: payout.id, entryId: entryId! };
     });
@@ -566,7 +593,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           sponsorshipId: input.sponsorshipId ?? null,
           productionOrderId: input.productionOrderId ?? null,
           amountMicros: input.amountMicros,
-          isEstimate: input.isEstimate ?? false
+          isEstimate: input.isEstimate ?? false,
+          // The injected clock, not the database's: a spot's daily cap counts the holds made since its midnight.
+          createdAt: deps.clock.now()
         })
         .returning({ id: H.id });
       // Checked now, not at commit, so a caller can try the next spot instead.
@@ -825,8 +854,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             label = entry.memo ?? "Returned";
             break;
           case "settle":
-            // Relay viewers (2026-09-30) are part of an airing: "Relay viewers, as reported by YouTube".
-            kind = entry.sourceType === "as_run" || entry.sourceType === RELAY_VIEWERS ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
+            // Relay viewers (2026-09-30) are part of an airing: "Relay viewers, as reported by YouTube"; so are Other apps viewers (P5.1), "Other apps".
+            kind = entry.sourceType === "as_run" || entry.sourceType === RELAY_VIEWERS || entry.sourceType === OTHER_APP_VIEWERS ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
             label = entry.memo ?? "Aired";
             break;
           default:
@@ -905,7 +934,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       // The deposit exists first, so the provider can report back against it.
       const [deposit] = await db
         .insert(schema.deposits)
-        .values({ advertiserId: businessId, fundingSourceId: source.id, amountMicros: input.amountMicros, feeMicros, status: "pending" })
+        .values({ advertiserId: businessId, fundingSourceId: source.id, amountMicros: input.amountMicros, feeMicros, status: "pending", createdAt: deps.clock.now() })
         .returning();
       let started;
       try {
@@ -957,7 +986,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.fundingSources.advertiserId, businessId), eq(schema.fundingSources.clearLinkId, link.id), sql`${schema.fundingSources.removedAt} is null`));
       const [deposit] = await db
         .insert(D)
-        .values({ advertiserId: businessId, fundingSourceId: source?.id ?? null, amountMicros: input.amountMicros, feeMicros: 0, status: "pending", txHash, fromAddress: link.address, providerRef: `tx:${txHash}` })
+        .values({ advertiserId: businessId, fundingSourceId: source?.id ?? null, amountMicros: input.amountMicros, feeMicros: 0, status: "pending", txHash, fromAddress: link.address, providerRef: `tx:${txHash}`, createdAt: deps.clock.now() })
         .onConflictDoNothing()
         .returning();
       if (!deposit) {
@@ -1065,7 +1094,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         );
         const [payout] = await tx
           .insert(schema.payouts)
-          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "scheduled", entryId })
+          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "scheduled", entryId, createdAt: deps.clock.now() })
           .returning();
         return { payoutId: payout.id, entryId: entryId! };
       });
@@ -1114,6 +1143,128 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       });
     },
 
+    async earnedBreakdown(stationId, from, to) {
+      const kind = await stationAccountKind(stationId);
+      const [account] = await db.select({ id: L.id }).from(L).where(and(eq(L.kind, kind), eq(L.stationId, stationId)));
+      const out = { spotsMicros: 0, sponsorsMicros: 0, pledgesMicros: 0, pledgeMembers: 0, carriageInMicros: 0, cardFeesMicros: 0, totalMicros: 0, held: kind === "escrow_owed" };
+      if (!account) return out;
+      const rows = await db
+        .select({ kind: E.kind, sourceType: E.sourceType, amount: P.amountMicros })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .where(and(eq(P.accountId, account.id), gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      for (const r of rows) {
+        const a = Number(r.amount);
+        if (r.kind === "settle" && r.sourceType === "as_run") out.spotsMicros += a;
+        else if (r.kind === "settle" && (r.sourceType === "sponsorship_month" || r.sourceType === "production_order")) out.sponsorsMicros += a;
+        else if (r.kind === "settle") out.spotsMicros += a;
+        else if (r.kind === "pledge") {
+          out.pledgesMicros += a;
+          if (a > 0) out.pledgeMembers++;
+        } else if ((r.kind === "carriage_fee" || r.kind === "barter_split") && a > 0) out.carriageInMicros += a;
+        else if (r.kind === "card_fee") out.cardFeesMicros += a;
+        else if (r.kind === "reversal") out.spotsMicros += a;
+        else continue;
+      }
+      out.totalMicros = out.spotsMicros + out.sponsorsMicros + out.pledgesMicros + out.carriageInMicros + out.cardFeesMicros;
+      return out;
+    },
+
+    async earningRows(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const day = sql<string>`to_char(${E.occurredAt} at time zone 'America/Los_Angeles', 'YYYY-MM-DD')`;
+      const rows = await db
+        .select({
+          stationId: L.stationId,
+          day,
+          spots: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} in ('settle', 'reversal') and coalesce(${E.sourceType}, '') not in ('sponsorship_month', 'production_order')), 0)::float`,
+          sponsors: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'settle' and ${E.sourceType} in ('sponsorship_month', 'production_order')), 0)::float`,
+          pledges: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'pledge'), 0)::float`,
+          carriageIn: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} in ('carriage_fee', 'barter_split') and ${P.amountMicros} > 0), 0)::float`,
+          cardFees: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'card_fee'), 0)::float`
+        })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(inArray(L.stationId, stationIds), inArray(L.kind, ["station_earnings", "escrow_owed"]), gte(E.occurredAt, from), lt(E.occurredAt, to)))
+        .groupBy(L.stationId, day);
+      return rows.map((r) => ({ stationId: r.stationId!, day: r.day, spots: Math.round(r.spots), sponsors: Math.round(r.sponsors), pledges: Math.round(r.pledges), carriageIn: Math.round(r.carriageIn), cardFees: Math.round(r.cardFees) }));
+    },
+
+    async usageTotals(stationIds, from, to) {
+      const U = schema.usageDays;
+      const dayOf = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(d);
+      const rows = await db
+        .select({ type: U.usageType, charge: sql<number>`coalesce(sum(${U.chargeMicros}), 0)::float`, quantity: sql<number>`coalesce(sum(${U.quantity}), 0)::float` })
+        .from(U)
+        .where(and(gte(U.day, dayOf(from)), lt(U.day, dayOf(to)), ...(stationIds ? [inArray(U.stationId, stationIds.length ? stationIds : ["00000000-0000-0000-0000-000000000000"])] : [])))
+        .groupBy(U.usageType);
+      const of = (types: string[]) => rows.filter((r) => types.includes(r.type)).reduce((t, r) => ({ charge: t.charge + r.charge, quantity: t.quantity + r.quantity }), { charge: 0, quantity: 0 });
+      const storage = of(["storage"]);
+      const relays = of(["relay_everything", "relay_live_only"]);
+      const live = of(["live_hours", "radio_live"]);
+      return {
+        storage: { chargeMicros: Math.round(storage.charge), gbDays: storage.quantity },
+        relays: { chargeMicros: Math.round(relays.charge), hours: relays.quantity },
+        live: { chargeMicros: Math.round(live.charge), hours: live.quantity }
+      };
+    },
+
+    async opencastShareBetween(from, to) {
+      const [r] = await db
+        .select({ micros: sql<number>`coalesce(sum(${P.amountMicros}), 0)::float` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(eq(L.kind, "opencast_share"), gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      return Math.round(r?.micros ?? 0);
+    },
+
+    async escrowSince(stationIds) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: L.stationId, at: sql<Date>`min(${E.occurredAt})` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(inArray(L.stationId, stationIds), inArray(L.kind, ["escrow_owed", "escrow"]), sql`${P.amountMicros} > 0`))
+        .groupBy(L.stationId);
+      return new Map(rows.map((r) => [r.stationId!, new Date(r.at)]));
+    },
+
+    async carriageVolume(from, to) {
+      const [r] = await db
+        .select({
+          cash: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'carriage_fee'), 0)::float`,
+          barter: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'barter_split'), 0)::float`,
+          agreements: sql<number>`count(distinct ${E.sourceId})::int`
+        })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .where(and(inArray(E.kind, ["carriage_fee", "barter_split"]), sql`${P.amountMicros} > 0`, gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      return { cashMicros: Math.round(r?.cash ?? 0), barterMicros: Math.round(r?.barter ?? 0), agreements: r?.agreements ?? 0 };
+    },
+
+    async earnedBetween(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: L.stationId, micros: sql<number>`coalesce(sum(${P.amountMicros}), 0)::float` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(
+          and(
+            inArray(L.stationId, stationIds),
+            inArray(L.kind, ["station_earnings", "escrow_owed"]),
+            inArray(E.kind, ["settle", "pledge", "card_fee", "reversal"]),
+            gte(E.occurredAt, from),
+            lt(E.occurredAt, to)
+          )
+        )
+        .groupBy(L.stationId);
+      return new Map(rows.map((r) => [r.stationId!, Math.round(r.micros)]));
+    },
+
     async stationEarnings(stationId, period) {
       const now = deps.clock.now();
       const from =
@@ -1130,7 +1281,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .innerJoin(P, eq(P.entryId, E.id))
         .where(and(eq(P.accountId, account), gte(E.occurredAt, from), lt(E.occurredAt, now)));
       const sum = (pred: (e: typeof E.$inferSelect, amount: number) => boolean) => rows.filter((r) => pred(r.entry, r.amount)).reduce((s, r) => s + r.amount, 0);
-      const spots = sum((e) => e.kind === "settle" && e.sourceType === "as_run");
+      // Other apps viewers (P5.1) are Opencast's own audience: in Spots until the station's pages show them apart (P5.11).
+      const spots = sum((e) => e.kind === "settle" && (e.sourceType === "as_run" || e.sourceType === OTHER_APP_VIEWERS));
       // Relay viewers (2026-09-30): their own lines, one per platform.
       const relayRows = rows.filter((r) => r.entry.kind === "settle" && r.entry.sourceType === RELAY_VIEWERS);
       const relayViewers = (["youtube", "twitch"] as const).flatMap((platform) => {

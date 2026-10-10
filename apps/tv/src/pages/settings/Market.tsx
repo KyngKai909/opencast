@@ -112,7 +112,7 @@ function MarketScreen() {
 function tuneWhenReady(engine: PlayerEngine, stationId: string, tries = 20) {
   const s = engine.getState();
   if (s.currentId === stationId || s.pendingId === stationId || tries <= 0) return;
-  void engine.tune(stationId, { input: "app" });
+  void engine.tune(stationId, { input: "app", via: "dial" });
   setTimeout(() => tuneWhenReady(engine, stationId, tries - 1), 250);
 }
 

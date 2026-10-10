@@ -29,6 +29,7 @@ import {
 } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { conflict, notFound } from "../../errors.js";
+import { weightedSeconds } from "../audience/service.js";
 import { PlatformAuthError, providersFromEnv, type GeographyResult, type OAuthClient, type OAuthTokens, type PlatformProviders } from "./providers.js";
 import { secretBoxFromEnv, secretContext, SecretsUnavailable, type SecretBox } from "./secrets.js";
 
@@ -92,6 +93,10 @@ export interface PlatformsService extends PlatformsSeam {
   /** Re-seals anything under an old key with the current one (key rotation). */
   resealSecrets(): Promise<number>;
   tick(): Promise<PlatformsTick>;
+  /** Programming Phase 6: the platforms a station relays to, by name ("YouTube", or a custom one's own name), for the log's quiet notes. */
+  relayPlatformNames(stationId: string): Promise<string[]>;
+  /** Programming Phase 6: relay viewer-seconds reported during these spans of a station's air (every platform), for the licensor's minutes. Null when nothing was reported. */
+  viewerSeconds(stationId: string, spans: Array<{ from: Date; to: Date }>): Promise<number | null>;
 }
 
 const C = schema.platformConnections;
@@ -557,6 +562,22 @@ export function createPlatformsService({ deps, services }: ModuleContext): Platf
         const l = last.get(r.id);
         return { platformId: r.id, name: r.name, viewers: l && l.at.getTime() >= recent ? l.viewers : 0 };
       });
+    },
+
+    async relayPlatformNames(stationId) {
+      const rows = (await activeRows(stationId)).filter((r) => r.streamKeyEnc);
+      return [...new Set(rows.map((r) => (r.kind === "custom" ? r.name : PLATFORM_NAMES[r.kind])))];
+    },
+
+    async viewerSeconds(stationId, spans) {
+      if (!spans.length) return null;
+      const from = minuteOf(new Date(Math.min(...spans.map((s) => s.from.getTime()))));
+      const to = new Date(Math.max(...spans.map((s) => s.to.getTime())));
+      const rows = await db
+        .select({ minute: VS.minute, count: VS.viewers })
+        .from(VS)
+        .where(and(eq(VS.stationId, stationId), gte(VS.minute, from), lt(VS.minute, to)));
+      return weightedSeconds(rows.filter((r) => spans.some((s) => r.minute.getTime() + MINUTE > s.from.getTime() && r.minute < s.to)), spans);
     },
 
     async geography(platformId, broadcastRef, day) {

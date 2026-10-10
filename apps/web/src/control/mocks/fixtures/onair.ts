@@ -133,10 +133,16 @@ export function rowsOfBreak(b: DbBreak): BreakRow[] {
     title: f.title,
     lengthMs: f.lengthMs,
     whose: f.kind === "producer" ? "producer" : /backup/i.test(f.note ?? "") ? "backup" : "station",
-    note: f.note ?? null
+    note: f.note ?? null,
+    ...(f.element ? { element: { ...f.element, fits: true } } : {})
   });
   const bumpers = b.fills.filter((f) => f.kind === "bumper").map(row);
-  const [into, ...outOf] = bumpers;
+  // A246: bumpers placed by their sequences (the rule's preview, and breaks rebuilt when it's saved).
+  const placed = b.fills.some((f) => f.element);
+  const at = (p: "open" | "close" | "between") => b.fills.filter((f) => f.kind === "bumper" && f.element?.position === p).map(row);
+  const opening = placed ? at("open") : bumpers.slice(0, 1);
+  const closing = placed ? at("close") : bumpers.slice(1);
+  const between = placed ? at("between") : [];
   const producer = b.fills.filter((f) => f.kind === "producer").map(row);
   const station = b.fills.filter((f) => f.kind !== "producer" && f.kind !== "station_id" && f.kind !== "open" && f.kind !== "bumper").map(row);
   const ids = b.fills.filter((f) => f.kind === "station_id").map(row);
@@ -145,7 +151,7 @@ export function rowsOfBreak(b: DbBreak): BreakRow[] {
   const openRow: BreakRow = b.noSpots
     ? { code: "OPEN", title: "Station ID slate", lengthMs: open, whose: "station", note: null }
     : { code: "OPEN", title: "Open", lengthMs: open, whose: "station", note: "Holds on the station ID slate" };
-  return [...(into ? [into] : []), ...producer, ...station, ...outOf, ...(open >= 1000 ? [openRow] : []), ...ids];
+  return [...opening, ...producer, ...station, ...closing, ...(open >= 1000 ? [openRow] : []), ...ids, ...between];
 }
 
 // ---- Filling a gap (A.4, P.2) ----

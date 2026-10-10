@@ -337,6 +337,49 @@ export const relayCharges = spots.table(
   ]
 );
 
+/**
+ * Added 2026-10-10 (programming Phase 5, P5.1): one airing's Other apps viewers (TiviMate, Jellyfin,
+ * Kodi, VLC, from the channel list), billed apart from Opencast's own: the sessions whose playlist
+ * polls ran from before the spot to after it (online businesses: all; local businesses: those
+ * placed in a market inside the area). Settled once the polls after the spot are in, two minutes on.
+ */
+export const otherAppCharges = spots.table(
+  "other_app_charges",
+  {
+    id: id(),
+    airingId: uuid("airing_id")
+      .notNull()
+      .unique()
+      .references(() => airings.id),
+    audience: text("audience", { enum: ["online", "local"] }).notNull(),
+    /** As aired (the as-run log): the sessions are read over this window. */
+    startedAt: at("started_at").notNull(),
+    endedAt: at("ended_at").notNull(),
+    /** How much of the spot aired (a short airing is prorated). */
+    fraction: real("fraction").notNull(),
+    /** The most it can cost: the per-airing maximum left after Opencast's viewers. Null: no maximum. */
+    capMicros: micros("cap_micros"),
+    status: text("status", { enum: ["counting", "settled", "not_billed"] }).notNull().default("counting"),
+    /** Why it isn't billed: `no_sessions`, `none_in_area`. */
+    reason: text("reason"),
+    /** Sessions that watched through the spot. */
+    sessions: integer("sessions"),
+    /** Of those, the ones billed (local businesses: placed inside the area). */
+    billedSessions: integer("billed_sessions"),
+    costMicros: micros("cost_micros").notNull().default(0),
+    /** What's still held for it while it counts (0 once it's resolved). */
+    heldMicros: micros("held_micros").notNull().default(0),
+    working: text("working"),
+    resolvedAt: at("resolved_at"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    index("other_app_charges_open").on(t.status, t.endedAt),
+    check("other_app_charges_fraction", sql`${t.fraction} >= 0 and ${t.fraction} <= 1`),
+    check("other_app_charges_cost", sql`${t.costMicros} >= 0 and ${t.heldMicros} >= 0`)
+  ]
+);
+
 /** Minimum a month, and the most sponsors, for the whole station or one program. */
 export const sponsorshipSettings = spots.table(
   "sponsorship_settings",

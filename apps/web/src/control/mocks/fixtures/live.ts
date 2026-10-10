@@ -158,12 +158,13 @@ export function weekEntries(items: LibraryItem[]): DbLogEntry[] {
 export function ensureLiveSeed() {
   const db = getDb();
   let changed = false;
-  const have = new Set(db.log.map((e) => e.id));
-  for (const e of weekEntries(db.library.items)) {
-    if (!have.has(e.id)) {
-      db.log.push(e);
-      changed = true;
-    }
+  // Once: an entry of the week taken off the log since (an edit, a date reset to its template)
+  // isn't put back.
+  if (!db.liveWeekSeeded) {
+    const have = new Set(db.log.map((e) => e.id));
+    for (const e of weekEntries(db.library.items)) if (!have.has(e.id)) db.log.push(e);
+    db.liveWeekSeeded = true;
+    changed = true;
   }
   const studio = db.liveSources.find((s) => s.id === LIVE_SOURCE_IDS.studioA);
   if (studio && studio.name === "Studio A, OBS") {

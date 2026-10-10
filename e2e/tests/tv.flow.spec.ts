@@ -60,11 +60,10 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   await expect(page.locator(".oc-numpad")).toBeHidden();
   await onChannel(page, "24.1", "REEL");
 
-  // ▶ opens the guide on the channel that's on; Back closes it.
+  // ▶ opens the menu (Samsung's TVs take a held Return for themselves); Back closes it.
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/\/guide$/);
-  await expect(page.getByText("Now on REEL 24.1")).toBeVisible();
-  await expect(page.getByText("Close guide")).toBeVisible();
+  await expect(page).toHaveURL(/\/menu$/);
+  await expect(page.getByRole("menuitem", { name: "Guide" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/$/);
 
@@ -75,6 +74,8 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   await expect(banner(page)).toContainText("Guide");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/guide$/);
+  await expect(page.getByText("Now on REEL 24.1")).toBeVisible();
+  await expect(page.getByText("Close guide")).toBeVisible();
 
   // In the guide, ▲ moves up a row, and OK on what's on now tunes to it and closes the guide.
   await expect(focused(page)).toContainText("Cartoons from 1928 to 1934");
@@ -247,7 +248,7 @@ test("TV settings: Tuning sound, on until turned off, and kept on this TV (tv-up
   // Captions, Caption size, Channel up goes, Banner stays for, then Tuning sound.
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
   await expect(row).toContainText("Tuning sound");
-  await expect(row).toContainText("A soft hiss when changing channel");
+  await expect(row).toContainText("Static and a click when changing channel");
   await expect(row.locator(".tvs-row__val")).toContainText("On");
   await page.keyboard.press("ArrowLeft");
   await expect(row.locator(".tvs-row__val")).toContainText("Off");

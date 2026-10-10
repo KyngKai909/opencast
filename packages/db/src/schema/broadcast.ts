@@ -86,6 +86,13 @@ export const stations = broadcast.table(
     status: stationStatus("status").notNull().default("setting_up"),
     firstSignedOnAt: at("first_signed_on_at"),
     signedOffAt: at("signed_off_at"),
+    /**
+     * Taken off the air by Opencast (added 2026-10-07, the desk's station file): while set, the
+     * station can't sign on again; the desk lifts it. Who and why, for the station and the desk.
+     */
+    heldAt: at("held_at"),
+    heldReason: text("held_reason"),
+    heldBy: uuid("held_by").references(() => users.id),
     /** Stable number used as the station's key in the escrow contract. */
     escrowId: serial("escrow_id").notNull().unique(),
     bugMode: text("bug_mode", { enum: ["off", "call_sign_and_channel", "logo"] })
@@ -228,6 +235,15 @@ export const assets = broadcast.table(
     folderId: uuid("folder_id").references(() => assetFolders.id),
     title: text("title").notNull(),
     episodeNumber: integer("episode_number"),
+    /** Programming Phase 2 (migration 0062): its season, beside the episode number. Guessed from the file's name at upload. */
+    seasonNumber: integer("season_number"),
+    /**
+     * Programming Phase 2 (migration 0062): a multi-part episode. What its parts share ("The Long
+     * Night"; the same in one program, any case, is one episode) and this part's number. Parts
+     * always air together, in part order. Guessed from the title at upload.
+     */
+    partOf: text("part_of"),
+    partNumber: integer("part_number"),
     episodeDescription: text("episode_description"),
     code: logCode("code").notNull(),
     source: assetSource("source").notNull(),
@@ -250,6 +266,9 @@ export const assets = broadcast.table(
     legacyId: text("legacy_id").unique(),
     /** Deleted from the library. Kept, because the as-run log and claims still point at it. */
     archivedAt: at("archived_at"),
+    /** Archived by Opencast from the desk (added 2026-10-07), not by the station: who and why. Null when the station archived it. */
+    archivedBy: uuid("archived_by").references(() => users.id),
+    archivedReason: text("archived_reason"),
     createdAt: createdAt(),
     /**
      * A243 (migration 0048): a bumper's role (`into_break`, `out_of_break`, `up_next`, `any`). Null
@@ -270,7 +289,13 @@ export const assets = broadcast.table(
      * (`SID`) or one of its bumpers (`BMP`, by role). Null: the station's own. A block's items are
      * never in the station's pools; they air only during the block.
      */
-    programBlockId: uuid("program_block_id").references((): AnyPgColumn => programBlocks.id)
+    programBlockId: uuid("program_block_id").references((): AnyPgColumn => programBlocks.id),
+    /**
+     * Programming Phase 4 (migration 0063): the file (content ID) whose suggested break points the
+     * station answered, used or dismissed (`break_suggestions`). A new file's suggestions are asked
+     * about again.
+     */
+    breakSuggestionsAnswered: text("break_suggestions_answered")
   },
   (t) => [
     check("link_has_url", sql`${t.source} <> 'link' or ${t.sourceUrl} is not null`),
@@ -510,6 +535,24 @@ export const assetBreakPoints = broadcast.table(
 );
 
 /**
+ * Programming Phase 4 (migration 0063): break points suggested for a file, found while it was
+ * prepared, kept apart from a maker's own (`asset_break_points`). One row per file (content ID),
+ * once it's been looked at: its chapter marks (`chapter`), or without them, where it's both black
+ * and silent (`fade`). No points (and no source) when nothing qualified or the file couldn't be
+ * read (`error`). A station sees them on its own library's programs, and they become the item's
+ * break points only when it says Use these.
+ */
+export const breakSuggestions = broadcast.table("break_suggestions", {
+  contentId: text("content_id")
+    .primaryKey()
+    .references(() => contents.cid),
+  source: text("source", { enum: ["chapter", "fade"] }),
+  offsetsMs: integer("offsets_ms").array().notNull().default(sql`'{}'::integer[]`),
+  error: text("error"),
+  checkedAt: at("checked_at").notNull().defaultNow()
+});
+
+/**
  * One per asset. A log entry can only reference an asset that has one: the
  * foreign key from log_entries goes here, not to assets.
  */
@@ -524,7 +567,14 @@ export const rightsConfirmations = broadcast.table(
     confirmedAt: at("confirmed_at").notNull().defaultNow(),
     note: text("note"),
     permissionRecordId: uuid("permission_record_id").references(() => permissionRecords.id),
-    licenceRecordId: uuid("licence_record_id").references(() => licenceRecords.id)
+    licenceRecordId: uuid("licence_record_id").references(() => licenceRecords.id),
+    /**
+     * Programming Phase 6 (migration 0067): where it may air besides the station (contracts'
+     * `Outlet`), for `owner_permission`, `permission_record` and `licence_record` (`made_it` and
+     * `public_domain` clear every outlet whatever this says; so do CC0, CC BY and CC BY-SA). Rows
+     * made before it have `opencast` and `relays`, since relays already carried them.
+     */
+    outlets: text("outlets").array().notNull().default(sql`'{opencast,relays}'::text[]`)
   },
   (t) => [
     check("permission_record_basis", sql`${t.basis} <> 'permission_record' or ${t.permissionRecordId} is not null`),
@@ -577,8 +627,10 @@ export const breakRules = broadcast.table(
      * Added 2026-09-29 (migration 0024): how often the station ID, bumpers and credit air in breaks,
      * `{ stationId, bumpers, underwriting, spots? }`, each `{ every, n? }`. Null: every break for all
      * of them. `spots` was added later the same day, in the same column (no migration); without it, every break.
+     * S20 (2026-10-03, A246): `upNext`, Up next's own cadence, in the same column (no migration);
+     * without it, Up next airs as often as the bumper position holding its role.
      */
-    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow }>(),
+    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow; upNext?: BreakCadenceRow }>(),
     /** A242 (migration 0047): at sign-on, the opener and then the station ID (off: the opener replaces it). */
     stationIdAfterOpener: boolean("station_id_after_opener").notNull().default(false),
     /** A242 (migration 0047): the opener at the start of each broadcast day (6:00 am local), for a channel that never goes off air. */
@@ -589,10 +641,18 @@ export const breakRules = broadcast.table(
      * `cadence.bumpers`; none between programs). Stored only once the station changes them.
      */
     bumperSequences: jsonb("bumper_sequences").$type<BumperSequencesRow>(),
+    /** A247 (migration 0051): with `after_every_program`, a break after every this many programs (2 to 12). Null: every program. */
+    everyPrograms: smallint("every_programs"),
+    /** A247 (migration 0051): clock breaks, minutes past the hour (sorted, 1 to 6), with `every_n_minutes` (`every_minutes` is 60 over how many). Null: none. */
+    clockMinutes: jsonb("clock_minutes").$type<number[]>(),
+    /** A247 (migration 0051): breaks inside programs longer than `overMs`, every `everyMs`. Null: off. */
+    longPrograms: jsonb("long_programs").$type<{ overMs: number; everyMs: number }>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [
     check("every_minutes_set", sql`${t.mode} <> 'every_n_minutes' or ${t.everyMinutes} > 0`),
+    check("every_programs_range", sql`${t.everyPrograms} is null or (${t.mode} = 'after_every_program' and ${t.everyPrograms} between 2 and 12)`),
+    check("clock_minutes_mode", sql`${t.clockMinutes} is null or (${t.mode} = 'every_n_minutes' and jsonb_typeof(${t.clockMinutes}) = 'array')`),
     check("sid_last", sql`${t.fillOrder}->>(jsonb_array_length(${t.fillOrder}) - 1) = 'SID'`)
   ]
 );
@@ -656,6 +716,18 @@ export const logEntries = broadcast.table(
      * entry for, with `repeat_group_id` the template. Null for entries made by hand and for G7 copies.
      */
     templateDate: date("template_date"),
+    /**
+     * G18 (migration 0050): "Keep at this time", a fixed point the station marked. Moving rows in
+     * master control stops here, and a live block ending early doesn't move it up.
+     */
+    keepTime: boolean("keep_time").notNull().default(false),
+    /**
+     * Programming Phase 3 (migration 0064): the template slot that made it (`day_template_entries.slot_id`),
+     * with `repeat_group_id` the template. No foreign key: a template's entries are written again on
+     * each save, and the slot id is what lasts. A slot's walk counts its entries: aired (as-run, by
+     * `log_entry_id`) or still to come.
+     */
+    templateSlotId: uuid("template_slot_id"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -664,7 +736,8 @@ export const logEntries = broadcast.table(
     check("program_has_asset", sql`${t.kind} <> 'program' or ${t.assetId} is not null`),
     check("live_has_source", sql`${t.kind} <> 'live' or ${t.liveSourceId} is not null`),
     check("episode_description_length", sql`char_length(${t.episodeDescription}) <= 160`),
-    index("log_entries_station_time").on(t.stationId, t.startsAt)
+    index("log_entries_station_time").on(t.stationId, t.startsAt),
+    index("log_entries_template_slot").on(t.templateSlotId, t.startsAt)
   ]
 );
 
@@ -748,6 +821,24 @@ export const dayTemplateEntries = broadcast.table(
     localNote: text("local_note"),
     episodeTitle: text("episode_title"),
     episodeDescription: text("episode_description"),
+    /** G18 (migration 0050): "Keep at this time", copied onto each date the template makes. */
+    keepTime: boolean("keep_time").notNull().default(false),
+    /**
+     * Programming Phase 3 (migration 0064): the slot's own id. The entries are deleted and written
+     * again on each save; the editor sends the slot id back, so a slot keeps it (and its walk).
+     */
+    slotId: uuid("slot_id").notNull().defaultRandom(),
+    /**
+     * What airs: `this_episode` (the item, every date, as before), `next_episode` (one step of its
+     * programs' walk each date it airs), `fill` (as many next episodes as fit), `same_as` (what an
+     * earlier slot aired that date). The walk's programs (`program_ids`, one or a mix), its order
+     * (contracts' `PlaybackOrder`) and what happens at the end (`start_over`, `stop`).
+     */
+    whatAirs: text("what_airs", { enum: ["this_episode", "next_episode", "fill", "same_as"] }).notNull().default("this_episode"),
+    programIds: uuid("program_ids").array(),
+    playbackOrder: text("playback_order", { enum: ["in_order", "newest_first", "shuffle", "shuffle_shows", "marathon"] }),
+    atEnd: text("at_end", { enum: ["start_over", "stop"] }),
+    sameAsSlotId: uuid("same_as_slot_id"),
     createdAt: createdAt()
   },
   (t) => [
@@ -782,6 +873,15 @@ export const dayTemplateBlocks = broadcast.table(
   ]
 );
 
+/** Programming Phase 3: a warning from making a template's date (contracts' `TemplateWarning`). */
+export interface TemplateNoteRow {
+  code: "last_episode" | "pushes_kept";
+  slotId: string;
+  message: string;
+  /** The airing it's about. */
+  startsAt: string;
+}
+
 /**
  * Day templates (added 2026-09-29): each date a template generated, one per station and date.
  * Generation is idempotent: a date made from the template since its last change is left alone,
@@ -803,7 +903,16 @@ export const dayTemplateDates = broadcast.table(
     editedAt: at("edited_at"),
     entries: integer("entries").notNull().default(0),
     /** Template entries that overlapped something already there, or can't air (rights, carriage). */
-    skipped: integer("skipped").notNull().default(0)
+    skipped: integer("skipped").notNull().default(0),
+    /**
+     * Programming Phase 3 (migration 0064): what the date's walking slots were made from (what each
+     * had aired or had on the log before it, and their programs' episodes). When that changes (an
+     * earlier date became an exception, an airing didn't happen, an episode was added), the date is
+     * made again.
+     */
+    walk: text("walk"),
+    /** Programming Phase 3: warnings from making it (a program's last new episode, a kept entry pushed). */
+    notes: jsonb("notes").$type<TemplateNoteRow[]>()
   },
   (t) => [primaryKey({ columns: [t.stationId, t.date] }), index("day_template_dates_template").on(t.templateId)]
 );
@@ -1148,6 +1257,12 @@ export const lowerThirds = broadcast.table("lower_thirds", {
  * picture and length; files from before content IDs use `loc-…`, made from their old location.
  * `renditions` is what's wanted (the union of the bands that air it); each one done is a row in
  * `prepared_renditions`.
+ *
+ * Cleaner pictures (programming prompt, Phase 1, migration 0061, 2026-10-09): `pipeline` is the
+ * picture pipeline the renditions were made with (1 before HDR tonemapping and deinterlacing, 2
+ * since), and `picture` what the probe found in the file. A file prepared under pipeline 1 that
+ * turns out to be HDR or interlaced is prepared again beside it, under `<key>-p2`, and airs from
+ * that once it's ready (`refKey` in playout/engine/prepare.ts).
  */
 export const preparedItems = broadcast.table(
   "prepared_items",
@@ -1172,7 +1287,25 @@ export const preparedItems = broadcast.table(
     bytes: bigint("bytes", { mode: "number" }),
     queuedAt: at("queued_at").notNull().defaultNow(),
     startedAt: at("started_at"),
-    preparedAt: at("prepared_at")
+    preparedAt: at("prepared_at"),
+    /** The picture pipeline its renditions were made with (1: before migration 0061). */
+    pipeline: smallint("pipeline").notNull().default(1),
+    /**
+     * What the probe found in the file's picture (null: not probed, or made before 0061): its
+     * colour, field order and rotation, and whether it's HDR (`pq`, `hlg`) or interlaced.
+     */
+    picture: jsonb("picture").$type<{
+      transfer: string | null;
+      primaries: string | null;
+      space: string | null;
+      fieldOrder: string | null;
+      rotation: number;
+      dolbyVision: boolean;
+      hdr: "pq" | "hlg" | null;
+      interlaced: boolean;
+      /** Which field comes first, when idet found it (the file didn't say). */
+      parity: "tff" | "bff" | null;
+    }>()
   },
   (t) => [index("prepared_items_queue").on(t.status, t.neededAt), index("prepared_items_content").on(t.contentId)]
 );

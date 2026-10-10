@@ -1,0 +1,13 @@
+/* You: Invite friends (added 2026-10-07). */
+.vw-inv__lede { margin-top: 10px; }
+.vw-inv { list-style: none; margin: 8px 0 0; padding: 0; }
+.vw-inv__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px 14px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.vw-inv__code { font: 600 15px var(--font-mono); letter-spacing: .04em; }
+.vw-inv__state { font-size: 13.5px; color: var(--ink-70); min-width: 0; }
+.vw-inv__acts { display: flex; gap: 6px; }
+.vw-inv__make { margin-top: 12px; }
+.vw-inv--phone { padding: 0 16px 8px; }
+@media (max-width: 560px) {
+  .vw-inv__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .vw-inv__state { grid-column: 1 / -1; grid-row: 2; }
+}
