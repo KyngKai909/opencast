@@ -40,8 +40,22 @@ Captions are in the stream (the subtitle rendition), so apps that read HLS subti
 - **Channels DVR**: Settings, Sources, Add Source, Custom Channels: the channel list as M3U, and the guide as XMLTV guide data.
 - **Kodi**: install the PVR IPTV Simple Client add-on; in its settings, the M3U playlist URL is the channel list and the XMLTV URL is the guide.
 - **VLC**: Media, Open Network Stream, with the channel list. VLC plays the channels from its playlist; it doesn't show a guide.
-- **Plex**: Plex has no M3U support of its own. Its Live TV reads channels from a tuner it recognises on the local network, not from an M3U address.
+- **Plex**: Plex has no M3U support of its own. Run Threadfin (xTeVe's maintained successor) on the same network as the Plex server, give it the channel list and the guide, then add it in Plex under Settings, Live TV & DVR, Set Up Plex DVR (if it isn't found, enter Threadfin's address, `<its IP>:34400`). Live TV & DVR needs Plex Pass. See below.
 
-## Plex
+## Plex (programming Phase 7, checked 2026-10-10)
 
-See Phase 7.
+**Can Plex add Opencast as a tuner at a public HTTPS address?** Not as anything Plex supports. Plex's Live TV & DVR finds tuners on its own network (HDHomeRun discovery over UDP 65001, and SSDP), and its "enter the address" field is documented, everywhere we looked, as a bare `IP:port` over HTTP. The Plex Media Server is what connects to the tuner, so "local" means reachable from the server; a tuner on another subnet works once firewalls allow it. Plex's own API adds a tuner from a full URL (`POST /media/grabbers/devices?uri=http://ip:port`), so an `https://` address might be accepted, but nothing shows it working, and the server would then pull every stream and recording from us over the internet. So we don't build an HDHomeRun address (`discover.json`, `lineup.json`, `lineup_status.json`) for Plex now.
+
+**What Plex users do instead:** Threadfin (or xTeVe) on their own network, pointed at the channel list and the guide, added in Plex as a network tuner. Plex allows one guide per DVR, so our guide is the one Plex shows for those channels. Live TV & DVR has needed Plex Pass since it launched (2017), and Plex's page still says so.
+
+**Recording, for Kai.** Plex records from such a tuner as from an HDHomeRun: one-offs and series, saved on the viewer's server. So the Threadfin route already lets viewers record our stream; a tuner of our own would make it a feature we offer. If one is built later, it carries only stations whose programs are all cleared for `recording` (programming Phase 6), or swaps the rest to the slate, as relays do.
+
+**Sources.** Plex's own support site and forums couldn't be opened from where this was checked; their lines below come from search results, not the pages read whole.
+- Plex support, "Live TV & DVR" (support.plex.tv/articles/225877347-live-tv-dvr/, current page): a premium feature that needs Plex Pass; the tuner is "connected to your Plex Media Server"; a link to manually specify the device's location.
+- Plex forums, "HDHomeRun Emulator" (forums.plex.tv/t/hdhomerun-emulator/156498, about 2017): emulators had to be discoverable like the hardware; manual entry came later.
+- Plex forums, "Unable to add tuner" (/t/883704, about 2024) and "Plex Can't Find HDHomeRun" (/t/904981, about 2025): "problem adding the device: 192.168.x.x"; the tuner must be on the server's network, or reachable through the firewall.
+- Plex forums, "Tuner setup loads forever" (/t/933610, 2025 to 2026): a Threadfin tuner added only through `POST /media/grabbers/devices` with `uri=http://ip:port`.
+- Telly wiki, "Adding Telly to Plex" (github.com/tellytv/telly/wiki): enter `TELLY_IP:TELLY_PORT`.
+- hdhriptv 1.1.1 (pkg.go.dev/github.com/arodd/hdhriptv, August 2026): found by Plex over UDP 65001, "also supports manual IP entry".
+- ErsatzTV Legacy's HDHomeRun page (a mirror of its docs): Network Tuner, with the address `ersatztv.local:8409`.
+- A Threadfin hosting guide (Bytesized Hosting): even behind a public HTTPS proxy, Plex is given Threadfin's internal address.

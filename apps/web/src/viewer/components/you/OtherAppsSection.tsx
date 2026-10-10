@@ -1,7 +1,7 @@
 // You: Watch in other apps (programming Phase 5). Opencast's channel list (M3U) and guide (XMLTV),
 // as two addresses with a copy button each, and a line for each app on where they go: TiviMate,
-// Jellyfin, Channels DVR, Kodi (PVR IPTV Simple) and VLC. Plex has no M3U support of its own, and
-// it says so. What those apps don't show (the bug, lower thirds, a spot's code and QR) is in docs/iptv.md.
+// Jellyfin, Channels DVR, Kodi (PVR IPTV Simple) and VLC. Plex has no M3U support of its own:
+// it says so, and points to Threadfin (programming Phase 7). What those apps don't show (the bug, lower thirds, a spot's code and QR) is in docs/iptv.md.
 
 import { Button, useToast } from "@opencast/ui";
 import { config } from "../../../config";
@@ -66,7 +66,7 @@ export function OtherAppsSection({ form, apiBase = config.apiBase, origin = type
           </li>
         ))}
         <li>
-          <b>Plex</b> Plex has no M3U support of its own, so these addresses don&rsquo;t go into Plex.
+          <b>Plex</b> Plex has no M3U support of its own. Run Threadfin on the same network as your Plex server, give it both addresses, then add it in Plex under Live TV &amp; DVR. Needs Plex Pass.
         </li>
       </ul>
       <p className="vw-y-quiet">Other apps show the programs, station IDs and spots, but not the bug, lower thirds, or a spot&rsquo;s code and QR.</p>
