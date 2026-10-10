@@ -49,6 +49,8 @@ export interface JobResults {
   platforms?: import("./modules/platforms/service.js").PlatformsTick | null;
   /** Relay viewers' parts of airings settled, not billed or returned this minute (added 2026-09-30). */
   relayViewers?: { settled: number; notBilled: number; returned: number } | null;
+  /** Other apps viewers' parts of airings settled or not billed this minute (added 2026-10-10, P5.1). */
+  otherAppViewers?: { settled: number; notBilled: number } | null;
   /** The old translators' plain stream keys moved to sealed storage (added 2026-09-30; hourly, and at the first tick). Null in other minutes. */
   translatorKeys?: { moved: number; waiting: number; failed: number } | null;
   /**
@@ -145,6 +147,11 @@ export function createJobs(deps: Deps, services: Services) {
       console.error("[jobs] relay viewers failed", error);
       return null;
     });
+    // Other apps viewers (P5.1): each airing's part, once the playlist polls after the spot are in.
+    const otherAppViewers = await services.spots.settleOtherApps().catch((error) => {
+      console.error("[jobs] other apps viewers failed", error);
+      return null;
+    });
     // The old translators' stream keys, out of plain text into the platforms module's sealed storage.
     let translatorKeys: JobResults["translatorKeys"] = null;
     if (now.getTime() - lastTranslatorKeys >= 3_600_000) {
@@ -224,7 +231,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, analyticsTotals, watchDataPurged, billing, platforms, relayViewers, translatorKeys, uploads };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, analyticsTotals, watchDataPurged, billing, platforms, relayViewers, otherAppViewers, translatorKeys, uploads };
   }
 
   let timer: NodeJS.Timeout | undefined;

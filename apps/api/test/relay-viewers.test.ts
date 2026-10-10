@@ -386,3 +386,38 @@ describe("the rest of the week, for the local business", () => {
     expect(week.lines).toContainEqual(expect.objectContaining({ label: "Spots", amountMicros: $(0.8 + 0.56 * 3 + 3) }));
   });
 });
+
+describe("relay viewers and Other apps viewers on one airing (P5.1)", () => {
+  it("each part keeps the other's share held until it settles, and nothing's left held after both", async () => {
+    // Last Monday evening, 70 sessions in other apps through the hour: 10 usual sessions a week.
+    await h.db.insert(schema.otherAppSessions).values(
+      Array.from({ length: 70 }, (_, i) => ({ stationId: beat.id, clientKey: `past-${i}`, startedAt: at("2026-10-12T03:00:00Z"), lastPollAt: at("2026-10-12T04:00:00Z"), polls: 1200 }))
+    );
+    h.clock.set("2026-10-13T03:00:10.000Z");
+    expect(await h.services.platforms.pollViewers()).toMatchObject({ samples: 2 });
+    // One app watching through the spot (its row as it stands when the spot ends).
+    const [viewer] = await h.db
+      .insert(schema.otherAppSessions)
+      .values({ stationId: beat.id, marketId: ie, clientKey: "tivimate", startedAt: at("2026-10-13T02:55:00Z"), lastPollAt: at("2026-10-13T03:00:28Z"), polls: 100 })
+      .returning();
+    h.clock.set("2026-10-05T19:00:00.000Z");
+    const brk = await breakAt("2026-10-13T03:00:00Z");
+    h.clock.set("2026-10-13T03:00:35.000Z");
+    const aired = await air("both", clickySpot, brk, "2026-10-13T03:00:00Z");
+    // $0.80 for Opencast's usual 100 (none tuned in tonight), $2.00 for relays, 10 in other apps $0.08.
+    expect(aired).toMatchObject({ holdMicros: $(2.88), costMicros: 0 });
+    const [part] = await h.db.select().from(schema.otherAppCharges).where(eq(schema.otherAppCharges.airingId, aired.airingId));
+    expect(part).toMatchObject({ status: "counting", heldMicros: $(0.88) });
+    expect(await open("both")).toBe($(2.88));
+    await h.db.update(schema.otherAppSessions).set({ lastPollAt: at("2026-10-13T03:02:00Z"), polls: 110 }).where(eq(schema.otherAppSessions.id, viewer.id));
+    h.clock.set("2026-10-13T03:03:00.000Z");
+    // The relay parts settle first: the Other apps part's share stays held.
+    expect(await h.services.spots.settleRelayViewers()).toEqual({ settled: 2, notBilled: 0, returned: 0 });
+    expect(await open("both")).toBe($(0.88));
+    expect(await h.services.spots.settleOtherApps()).toEqual({ settled: 1, notBilled: 0 });
+    const [settled] = await h.db.select().from(schema.otherAppCharges).where(eq(schema.otherAppCharges.airingId, aired.airingId));
+    expect(settled).toMatchObject({ status: "settled", sessions: 1, costMicros: 8_000 });
+    expect(await open("both")).toBe(0);
+    await ledgerBalances();
+  });
+});

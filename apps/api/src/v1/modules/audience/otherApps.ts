@@ -4,11 +4,13 @@
 // and the station): a gap of two minutes ends it, and it counts once its polls span a minute. Placed
 // by market from the connection, as the viewer's sessions are. The address is never kept, only a
 // hash of it salted with the day, cleared a day after the session (`forget`). Counted apart as
-// "Other apps": never in `minute_samples` or `minute_markets`, so per-thousand billing, the pool and
-// the tuned-in totals don't read them until Kai decides (docs/open-decisions.md, programming Phase 5).
+// "Other apps": never in `minute_samples` or `minute_markets`, so the pool and the tuned-in totals
+// don't read them. Per-thousand spots do (P5.1, the user's decision, docs/open-decisions.md,
+// programming Phase 5): `throughSpot` says which sessions watched through an airing, and the spots
+// module bills them as the airing's Other apps part (`spots/otherAppViewers.ts`).
 
 import { createHash } from "node:crypto";
-import { and, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import { isPrivateAddress } from "../../geo.js";
@@ -17,6 +19,8 @@ import { isPrivateAddress } from "../../geo.js";
 export const OTHER_APPS_GAP_MS = 120_000;
 /** Polls spanning less than this don't count (an app checking the stream, then leaving). */
 export const OTHER_APPS_COUNTS_AFTER_MS = 60_000;
+/** Billed for a spot only when its polls average at least one this often (a player reloads a live playlist every few seconds). */
+export const OTHER_APPS_BILLED_POLL_EVERY_MS = 30_000;
 /** A session's row is written at most this often; the polls between are added up in memory. */
 const WRITE_EVERY_MS = 15_000;
 const DAY = 86_400_000;
@@ -33,6 +37,17 @@ export interface OtherApps {
   poll(input: { stationId: string; ip: string | null; userAgent: string | null }): Promise<void>;
   /** Sessions that counted and their minutes in a window (the part inside it), by station and market; all stations, or these. */
   counts(from: Date, to: Date, stationIds?: string[]): Promise<OtherAppsCount[]>;
+  /**
+   * P5.1: the sessions that watched through a spot on a station, one per connection: their polls ran
+   * from the spot's start (or before) to its end (or after), they count (a minute of polls), and
+   * their polls average at least one every 30 seconds. `placed`: of those, the ones placed in these
+   * markets (a local business's area); a session that couldn't be placed is never in it.
+   */
+  throughSpot(stationId: string, from: Date, to: Date, marketIds?: string[]): Promise<{ sessions: number; placed: number }>;
+  /** P5.1: sessions on a station that began by `from` and were still polling at `to` (those a spot then may be billed for, once their later polls are in). */
+  watchingThrough(stationId: string, from: Date, to: Date): Promise<number>;
+  /** P5.1: the usual Other apps sessions on a station at this hour (UTC), from the last week: for holds. */
+  typical(stationId: string, at: Date): Promise<number>;
   /** Sessions that count and are still polling, by station. */
   tunedInNow(stationIds: string[]): Promise<Map<string, number>>;
   /** Clears the hashed keys of sessions over a day old (the daily purge). */
@@ -139,6 +154,54 @@ export function createOtherApps({ deps, services }: ModuleContext): OtherApps {
         )
         .groupBy(O.stationId, O.marketId);
       return rows.map((r) => ({ stationId: r.stationId, marketId: r.marketId, sessions: Number(r.sessions), minutes: Number(r.minutes) }));
+    },
+
+    async throughSpot(stationId, from, to, marketIds = []) {
+      // One per connection: a key only ever has one run going (a run another replica began is joined).
+      const one = sql`coalesce(${O.clientKey}, ${O.id}::text)`;
+      const [row] = await db
+        .select({
+          sessions: sql<number>`count(distinct ${one})::int`,
+          placed: marketIds.length ? sql<number>`(count(distinct ${one}) filter (where ${inArray(O.marketId, marketIds)}))::int` : sql<number>`0`
+        })
+        .from(O)
+        .where(
+          and(
+            eq(O.stationId, stationId),
+            lte(O.startedAt, from),
+            gte(O.lastPollAt, to),
+            sql`${O.lastPollAt} - ${O.startedAt} >= ${`${OTHER_APPS_COUNTS_AFTER_MS / 1000} seconds`}::interval`,
+            sql`${O.polls} * ${OTHER_APPS_BILLED_POLL_EVERY_MS / 1000} >= extract(epoch from (${O.lastPollAt} - ${O.startedAt}))`
+          )
+        );
+      return { sessions: Number(row?.sessions ?? 0), placed: Number(row?.placed ?? 0) };
+    },
+
+    async watchingThrough(stationId, from, to) {
+      // Within the gap of `to`: a run that's still going may not have written its latest polls yet.
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(O)
+        .where(and(eq(O.stationId, stationId), lte(O.startedAt, from), gt(O.lastPollAt, new Date(to.getTime() - OTHER_APPS_GAP_MS))));
+      return Number(row?.n ?? 0);
+    },
+
+    async typical(stationId, at) {
+      // The same hour on each of the last seven days: the counted sessions' minutes inside it, averaged.
+      const hour = Math.floor(at.getTime() / 3_600_000) * 3_600_000;
+      const [row] = await db
+        .select({ minutes: sql<number>`coalesce(sum(extract(epoch from (least(${O.lastPollAt}, d.t + interval '1 hour') - greatest(${O.startedAt}, d.t)))), 0)::float / 60` })
+        .from(sql`generate_series(${new Date(hour - 7 * DAY)}::timestamptz, ${new Date(hour - DAY)}::timestamptz, interval '1 day') as d(t)`)
+        .innerJoin(
+          O,
+          and(
+            eq(O.stationId, stationId),
+            sql`${O.startedAt} < d.t + interval '1 hour'`,
+            sql`${O.lastPollAt} > d.t`,
+            sql`${O.lastPollAt} - ${O.startedAt} >= ${`${OTHER_APPS_COUNTS_AFTER_MS / 1000} seconds`}::interval`
+          )
+        );
+      return Math.round(Number(row?.minutes ?? 0) / (7 * 60));
     },
 
     async tunedInNow(stationIds) {

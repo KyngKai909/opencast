@@ -367,8 +367,9 @@ export const breakStats = audience.table(
  * gap of two minutes ends it, and it counts once its polls span a minute. Placed by market from
  * the connection, as the viewer's sessions are. The address is never kept: `client_key` is a hash
  * of it, the app's user agent and the station, salted with the day, and it's cleared once the
- * session is a day old. Never in `minute_samples` or `minute_markets`, so per-thousand billing and
- * the pool don't read these (docs/open-decisions.md, programming Phase 5).
+ * session is a day old. Never in `minute_samples` or `minute_markets`, so the pool doesn't read
+ * these; per-thousand spots bill the sessions that watched through them apart, as an airing's
+ * Other apps part (`spots.other_app_charges`, P5.1; docs/open-decisions.md, programming Phase 5).
  */
 export const otherAppSessions = audience.table(
   "other_app_sessions",

@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Other apps viewers on per-thousand spots (programming Phase 5, P5.1)
+
+Additive, with migration 0066.
+
+- `platforms.ts`: `OTHER_APPS_LABEL` ("Other apps"); new `OtherAppsPartStatus` (`counting`, `settled`, `not_billed`), `OtherAppsPart` (`label`, `status`, `reason`, `sessions`, `billedSessions`, `costMicros`, `heldMicros`, `working`) and `OtherAppsLine` (`label`, `airings`, `sessionsAddedUp`, `billedSessionsAddedUp`, `spentMicros`, `waitingMicros`, `waitingAirings`).
+- `spots.ts`: `ResultsAiring.otherApps` (optional): the airing's Other apps part, apart from `costMicros` (Opencast's viewers) and `relayViewers`; absent when nobody was watching in another app through the spot. `Results.otherApps` (optional): the period's line. `Results.totals.otherAppsSpentMicros` and `otherAppsWaitingMicros` (optional); `totals.spentMicros`, `byStation[].spentMicros` and `bySpot[].spentMicros` now include Other apps viewers.
+- `ledger.ts`: `Statement.lines[].kind` gains `other_apps`: the business statement's line "Other apps", added in.
+- Behaviour: per-thousand spots now bill sessions in other apps that watched through them (online businesses: all; local businesses: those placed inside the area), settled two minutes after the spot; the hold adds the station's usual Other apps sessions. A business statement receipt's amount now includes relay viewers and Other apps. Station earnings and statements count Other apps in Spots. `docs/open-decisions.md` P5.12 to P5.14 have the rules.
+
 ## 2026-10-10: The dial in other apps (programming Phase 5)
 
 Additive, with migration 0065.
