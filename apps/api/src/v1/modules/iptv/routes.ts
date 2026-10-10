@@ -1,12 +1,14 @@
 // The dial in other apps (programming Phase 5): `GET /v1/iptv/channels.m3u` and `GET
 // /v1/iptv/xmltv.xml` (and `.xml.gz`). Public, cached, read-only, and not JSON, so they're mounted
 // on the router as files (like previews), not from the contracts. Both take `?market=` (a market's
-// slug) and `?band=tv|radio`, answer `If-None-Match` with a 304, and send CORS `*`.
+// slug) and `?band=tv|radio`, answer `If-None-Match` with a 304, and send CORS `*`. The guide is
+// per country too (programming Phase 6: what's cleared for other apps where the request came from).
 
 import type { Request, Response } from "express";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest } from "../../errors.js";
+import { clientIp, countryOf } from "../../geo.js";
 import { IPTV_CACHE_MS, type IptvFile, type IptvFilter } from "./service.js";
 
 function filterOf(req: Request): IptvFilter {
@@ -48,7 +50,9 @@ function send(req: Request, res: Response, file: IptvFile, type: string, encodin
   res.send(file.body);
 }
 
-export function iptvRoutes(r: RouteRegistrar, { services }: ModuleContext) {
+export function iptvRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) {
+  // Programming Phase 6: the guide is per country (the requester's, from the same lookup as the market).
+  const viewer = async (req: Request) => ({ country: await countryOf(deps.geo, clientIp(req)) });
   r.router.get("/iptv/channels.m3u", async (req, res, next) => {
     try {
       send(req, res, await services.iptv.channelList(filterOf(req), originOf(req)), "audio/x-mpegurl; charset=utf-8", "plain");
@@ -58,14 +62,14 @@ export function iptvRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   });
   r.router.get("/iptv/xmltv.xml", async (req, res, next) => {
     try {
-      send(req, res, await services.iptv.guide(filterOf(req), originOf(req)), "application/xml; charset=utf-8", "negotiate");
+      send(req, res, await services.iptv.guide(filterOf(req), originOf(req), await viewer(req)), "application/xml; charset=utf-8", "negotiate");
     } catch (error) {
       next(error);
     }
   });
   r.router.get("/iptv/xmltv.xml.gz", async (req, res, next) => {
     try {
-      send(req, res, await services.iptv.guide(filterOf(req), originOf(req)), "application/gzip", "gzip-file");
+      send(req, res, await services.iptv.guide(filterOf(req), originOf(req), await viewer(req)), "application/gzip", "gzip-file");
     } catch (error) {
       next(error);
     }

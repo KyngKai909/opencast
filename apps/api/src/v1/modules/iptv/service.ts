@@ -6,6 +6,11 @@
 // There's no "log publish" to rebuild on: log rows are public as soon as they're written. So each
 // file is built when asked for and kept a minute, with an ETag from its bytes (docs/open-decisions.md,
 // programming Phase 5). This module owns no tables: everything comes through the other services.
+//
+// Programming Phase 6: a slot not cleared for other apps (its rights, the carriage agreement it
+// airs under, or its network licence, for the requester's country) is listed as "Airing on
+// Opencast", which is what their stream shows then. The guide is per country: built and kept apart
+// for each (unknown: only a worldwide licence clears it, as on a relay).
 
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
@@ -13,7 +18,7 @@ import type { Band, Market } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { notFound } from "../../errors.js";
 import { publicUrl } from "../../lib/url.js";
-import { episodeNumOf, foldBreaks, offAirDesc, ratingOf, writeM3u, writeXmltv, type IptvChannel, type IptvProgramme } from "./format.js";
+import { elsewhereDesc, ELSEWHERE_TITLE, episodeNumOf, foldBreaks, offAirDesc, ratingOf, writeM3u, writeXmltv, type IptvChannel, type IptvProgramme } from "./format.js";
 
 /** The guide reaches back two hours and seven days ahead. */
 export const GUIDE_BACK_MS = 2 * 3_600_000;
@@ -41,8 +46,11 @@ export interface IptvService {
   channels(filter: IptvFilter, origin: string): Promise<IptvChannel[]>;
   /** `channels.m3u`. `origin` makes paths full URLs when the API has no public origin set (development). */
   channelList(filter: IptvFilter, origin: string): Promise<IptvFile>;
-  /** `xmltv.xml`. */
-  guide(filter: IptvFilter, origin: string): Promise<IptvFile>;
+  /**
+   * `xmltv.xml`. `viewer.country` (programming Phase 6): where the request came from (ISO 3166-1
+   * alpha-2), for the territories a licence clears other apps in; null or absent: unknown.
+   */
+  guide(filter: IptvFilter, origin: string, viewer?: { country: string | null }): Promise<IptvFile>;
 }
 
 /** `"…"`, from the bytes. */
@@ -65,9 +73,9 @@ export function createIptvService({ deps, services }: ModuleContext): IptvServic
     return url.startsWith("/") ? `${origin.replace(/\/+$/, "")}${url}` : url;
   };
 
-  async function cached(kind: string, filter: IptvFilter, origin: string, build: () => Promise<IptvFile>): Promise<IptvFile> {
+  async function cached(kind: string, filter: IptvFilter, origin: string, build: () => Promise<IptvFile>, country: string | null = null): Promise<IptvFile> {
     // The request's origin is only in the file when the API has no public origin of its own.
-    const key = `${kind}|${filter.market ?? ""}|${filter.band ?? ""}|${full(origin, "/")}`;
+    const key = `${kind}|${filter.market ?? ""}|${filter.band ?? ""}|${full(origin, "/")}|${country ?? ""}`;
     const now = deps.clock.now().getTime();
     const hit = cache.get(key);
     if (hit && Math.abs(now - hit.at) < IPTV_CACHE_MS) return hit.value;
@@ -130,7 +138,8 @@ export function createIptvService({ deps, services }: ModuleContext): IptvServic
       });
     },
 
-    async guide(filter, origin) {
+    async guide(filter, origin, viewer) {
+      const country = viewer?.country ?? null;
       return cached("xmltv", filter, origin, async () => {
         const now = deps.clock.now();
         const from = new Date(now.getTime() - GUIDE_BACK_MS);
@@ -153,7 +162,19 @@ export function createIptvService({ deps, services }: ModuleContext): IptvServic
 
         const programmes = new Map<string, IptvProgramme[]>();
         for (const c of channels) {
-          const rows = (feed.get(stationOf.get(c.tvgId)!) ?? []).map((a) => {
+          const airs = feed.get(stationOf.get(c.tvgId)!) ?? [];
+          // Programming Phase 6: its programs not cleared for other apps, for this country.
+          const shows = airs.filter((a) => a.kind === "program" && a.code === "PGM" && a.itemId);
+          const answers = shows.length
+            ? await services.licences.clearance(
+                shows.map((a) => ({ assetId: a.itemId!, agreementId: a.agreementId, at: new Date(a.startsAt) })),
+                "other_apps",
+                country,
+                { at: now, timeZone: await services.stations.timezoneOf(stationOf.get(c.tvgId)!) }
+              )
+            : [];
+          const elsewhere = new Set(shows.filter((_, i) => !answers[i].cleared));
+          const rows = airs.map((a) => {
             const start = new Date(a.startsAt);
             const stop = new Date(a.endsAt);
             const offAir = a.kind === "off_air";
@@ -162,6 +183,8 @@ export function createIptvService({ deps, services }: ModuleContext): IptvServic
             const aired = a.itemId ? first.get(a.itemId) : undefined;
             const programme: IptvProgramme & { fold: boolean; offAir: boolean } = offAir
               ? { start, stop, title: "Off air", subTitle: null, desc: offAirDesc(start, new Date(a.backAt ?? a.endsAt), c.market.timezone), categories: [], episodeNum: null, live: false, isNew: false, rating: null, fold: false, offAir }
+              : elsewhere.has(a)
+              ? { start, stop, title: ELSEWHERE_TITLE, subTitle: null, desc: elsewhereDesc(c), categories: [], episodeNum: null, live: false, isNew: false, rating: null, fold: false, offAir }
               : {
                   start,
                   stop,
@@ -188,7 +211,7 @@ export function createIptvService({ deps, services }: ModuleContext): IptvServic
         }
         const body = writeXmltv({ channels, programmes, generatedAt: now, sourceUrl: deps.config.appOrigin });
         return { body, gzip: gzipSync(body), etag: etagOf(body) };
-      });
+      }, country);
     }
   };
   return service;

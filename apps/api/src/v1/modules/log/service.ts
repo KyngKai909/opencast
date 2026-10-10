@@ -168,7 +168,8 @@ export interface LogService {
    * Programming Phase 5: `window` for the guide in other apps (XMLTV), each airing with the library
    * item it airs (its season, episode and first airing are looked up from that), or null.
    */
-  feed(stationIds: string[], from: Date, to: Date): Promise<Map<string, Array<Airing & { itemId: string | null }>>>;
+  /** `agreementId` (the carriage agreement it airs under) added 2026-10-10, for where it can air (programming Phase 6). */
+  feed(stationIds: string[], from: Date, to: Date): Promise<Map<string, Array<Airing & { itemId: string | null; agreementId: string | null }>>>;
   upcomingForProgram(programId: string, limit: number): Promise<AiringRef[]>;
   itemUsage(itemId: string): Promise<{ upcoming: number }>;
   gaps(stationId: string, from: Date, to: Date): Promise<Gap[]>;
@@ -216,7 +217,8 @@ export interface LogService {
   /** One entry's slot. */
   entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
   /** Every station's items on the log in a window, earliest first (the readiness check reads ahead). */
-  upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
+  /** `code` and `agreementId` (the carriage agreement) added 2026-10-10 (programming Phase 6: where it can air). */
+  upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date; code: string; agreementId: string | null }>>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
   markBreakFilled(breakId: string): Promise<void>;
@@ -1810,9 +1812,15 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async feed(stationIds, from, to) {
       const [rows, airings] = await Promise.all([load(stationIds, from, to), service.window(stationIds, from, to)]);
-      const itemOf = new Map(rows.map((r) => [r.id, r.assetId]));
+      const byId = new Map(rows.map((r) => [r.id, r]));
       return new Map(
-        [...airings].map(([id, list]) => [id, list.map((a) => ({ ...a, itemId: (a.kind === "off_air" || !a.logEntryId ? null : itemOf.get(a.logEntryId)) ?? null }))])
+        [...airings].map(([id, list]) => [
+          id,
+          list.map((a) => {
+            const row = a.kind === "off_air" || !a.logEntryId ? undefined : byId.get(a.logEntryId);
+            return { ...a, itemId: row?.assetId ?? null, agreementId: row?.carriageAgreementId ?? null };
+          })
+        ])
       );
     },
 
@@ -2084,7 +2092,7 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async upcomingItems(from, to) {
       const rows = await db
-        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt })
+        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt, code: E.code, agreementId: E.carriageAgreementId })
         .from(E)
         .where(and(sql`${E.assetId} is not null`, gt(E.endsAt, from), lt(E.startsAt, to)))
         .orderBy(asc(E.startsAt));

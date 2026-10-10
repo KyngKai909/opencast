@@ -321,6 +321,40 @@ export function createLicencesService(ctx: ModuleContext): LicencesService {
           if (to > from) relayed.set(a.stationId, [...(relayed.get(a.stationId) ?? []), { from, to }]);
         }
       });
+      // Programming Phase 6: what went out to other apps. An airing cleared for them (anywhere: with no
+      // country, or in one of this licence's) while a session in another app was tuned in: the
+      // airing's time inside those sessions (once, however many were), and each session's time in it.
+      const otherApps = new Map<string, { spans: Array<{ from: Date; to: Date }>; seconds: number }>();
+      const sessions = stationIds.length ? await services.audience.otherApps.sessions(stationIds, span.from, span.to) : [];
+      for (const stationId of new Set(sessions.map((s) => s.stationId))) {
+        const mine = aired.filter((a) => a.stationId === stationId && a.assetId);
+        const rows = mine.map((a) => ({ assetId: a.assetId!, agreementId: a.agreementId, at: a.startedAt }));
+        const options = { at: span.from, timeZone: zones.get(stationId) };
+        const cleared = (await service.clearance(rows, "other_apps", null, options)).map((a) => a.cleared);
+        for (const country of licence.worldwide ? [] : licence.countries) {
+          if (cleared.every(Boolean)) break;
+          (await service.clearance(rows, "other_apps", country, options)).forEach((a, i) => (cleared[i] ||= a.cleared));
+        }
+        const watching = sessions.filter((s) => s.stationId === stationId);
+        const spans: Array<{ from: Date; to: Date }> = [];
+        let seconds = 0;
+        mine.forEach((a, i) => {
+          if (!cleared[i]) return;
+          const pieces = watching.flatMap((s) => {
+            const from = Math.max(a.startedAt.getTime(), s.startedAt.getTime());
+            const to = Math.min(a.endedAt.getTime(), s.endedAt.getTime());
+            return to > from ? [{ from, to }] : [];
+          });
+          seconds += pieces.reduce((t, p) => t + (p.to - p.from) / 1000, 0);
+          // Overlapping sessions count the airing's minute once.
+          for (const p of pieces.sort((x, y) => x.from - y.from)) {
+            const last = spans[spans.length - 1];
+            if (last && last.to.getTime() >= p.from) last.to = new Date(Math.max(last.to.getTime(), p.to));
+            else spans.push({ from: new Date(p.from), to: new Date(p.to) });
+          }
+        });
+        if (spans.length) otherApps.set(stationId, { spans, seconds });
+      }
       const minutesOf = (spans: Array<{ from: Date; to: Date }>) => spans.reduce((t, s) => t + (s.to.getTime() - s.from.getTime()) / 60_000, 0);
       const rows: LicensorMinutes["rows"] = [];
       const stations: LicensorMinutes["stations"] = [];
@@ -330,11 +364,12 @@ export function createLicencesService(ctx: ModuleContext): LicencesService {
         const mine = aired.filter((a) => a.stationId === stationId);
         const spans = mine.map((a) => ({ from: a.startedAt, to: a.endedAt }));
         const airings = new Set(mine.map((a) => a.logEntryId ?? a.id)).size;
-        // Each outlet it went out on. Programming Phase 5 adds `other_apps` here: the minutes a
-        // station's channel list carried it (cleared for other apps) and the "Other apps" viewers.
+        // Each outlet it went out on: Opencast, relays, and (programming Phase 6) other apps, while
+        // someone watched it there, cleared for them, with their sessions' hours as viewer hours.
         const outlets: Array<{ outlet: Outlet; spans: Array<{ from: Date; to: Date }>; viewerSeconds: number | null }> = [
           { outlet: "opencast", spans, viewerSeconds: await services.audience.viewerSeconds(stationId, spans) },
-          ...(relayed.get(stationId)?.length ? [{ outlet: "relays" as const, spans: relayed.get(stationId)!, viewerSeconds: await services.platforms.viewerSeconds(stationId, relayed.get(stationId)!) }] : [])
+          ...(relayed.get(stationId)?.length ? [{ outlet: "relays" as const, spans: relayed.get(stationId)!, viewerSeconds: await services.platforms.viewerSeconds(stationId, relayed.get(stationId)!) }] : []),
+          ...(otherApps.has(stationId) ? [{ outlet: "other_apps" as const, spans: otherApps.get(stationId)!.spans, viewerSeconds: otherApps.get(stationId)!.seconds }] : [])
         ];
         for (const o of outlets) {
           rows.push({ station, outlet: o.outlet, airings: o.outlet === "opencast" ? airings : new Set(mine.filter((a) => o.spans.some((s) => s.from < a.endedAt && s.to > a.startedAt)).map((a) => a.logEntryId ?? a.id)).size, minutesAired: round1(minutesOf(o.spans)), viewerHours: o.viewerSeconds === null ? null : round1(o.viewerSeconds / 3600) });

@@ -117,7 +117,7 @@ export default function Licence() {
       ) : (
         <p className="nd-lic__empty">Nothing it covers aired in {monthWords(month)}.</p>
       )}
-      <p className="nd-lic__note">Opencast's own viewers come from its players; relay viewers from the platforms that report them. Other apps are counted once they're measured.</p>
+      <p className="nd-lic__note">Opencast's own viewers come from its players; relay viewers from the platforms that report them; other apps' from their sessions (runs of playlist polls).</p>
       {editing && <LicenceForm licence={l} onClose={() => setEditing(false)} />}
     </>
   );

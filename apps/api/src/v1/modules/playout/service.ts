@@ -17,7 +17,9 @@ import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
 import { baseKey, queuePreparation, refKey, syncPreparedVersions, versionedKey, wantRow } from "./engine/prepare.js";
 import { isEveryBreak, partsOf } from "./engine/cadence.js";
-import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
+import { ELSEWHERE_SECONDS, elsewhereSeconds, elsewhereSlateKey, GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
+import { shiftSegment } from "./engine/tsretime.js";
+import { countryOf } from "../../geo.js";
 import { STATION_ID_MS } from "./engine/fill.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared" | "held_by_opencast";
@@ -148,6 +150,13 @@ export interface PlayoutService {
    * TV band, `subs.m3u8` is the subtitle rendition (X2), and `empty.vtt` its empty segment.
    */
   playlist(stationId: string, file: string, request?: PlaylistRequest): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
+  /**
+   * Programming Phase 6: a segment of the other apps' "Airing on Opencast" slate (or, while it isn't
+   * prepared, the generated station ID), as the `index`th in a row of them `offsetMs` in
+   * (`/hls/elsewhere/<key>/<rendition>/<index>-<offsetMs>.ts`): its timestamps moved on, so the
+   * slate plays as one stretch. Null for anything else, or when it isn't prepared.
+   */
+  elsewhereSegment(key: string, rendition: string, index: number, offsetMs: number): Promise<Buffer | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** Stations that aired anything in a window (from the as-run log). */
@@ -357,8 +366,12 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
   const channelUrl = (stationId: string) => publicUrl(deps, `/hls/${stationId}/master.m3u8`);
   /** Segment lengths per prepared key and rendition (they never change once prepared). */
   const lengths = new Map<string, number[]>();
-  /** Rendered playlists, for a second (a burst of viewers costs one render). */
+  /** Rendered playlists, for a second (a burst of viewers costs one render). Other apps' variants apart, by viewer country. */
   const rendered = new Map<string, { at: number; value: { body: string; maxAge: number } | null }>();
+  /** Programming Phase 6: swapped rows whose slate wasn't ready, told once each. */
+  const toldNotReady = new Set<string>();
+  /** Programming Phase 6: the slates' segment bytes (a few kilobytes each, never changed), by key and rendition. */
+  const slateBytes = new Map<string, Buffer>();
   const bandOf = async (stationId: string): Promise<Band> => (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
 
   function segmentUrl(key: string, rendition: string, index: number) {
@@ -381,7 +394,67 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     return (await services.library.stationCaptionLanguage(stationId)) ?? "en";
   }
 
-  async function renderPlaylist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null> {
+  /**
+   * Programming Phase 6: the rows of a playlist not cleared for other apps for a viewer in `country`
+   * (null: unknown, so only a worldwide licence clears them), as the other apps' variant swaps them.
+   */
+  async function swappedFor(stationId: string, rows: ChannelRow[], country: string | null, now: Date): Promise<Set<string>> {
+    const programs = rows.filter((r) => r.kind === "prepared");
+    if (!programs.length) return new Set();
+    const from = new Date(Math.min(...programs.map((r) => r.startsAt.getTime())));
+    const blocked = await service.notCleared(stationId, { from, to: new Date(now.getTime() + 1), outlet: "other_apps", country });
+    const ids = new Set(rows.map((r) => r.id));
+    return new Set(blocked.map((b) => b.channelItemId).filter((id) => ids.has(id)));
+  }
+
+  /**
+   * Programming Phase 6: what a swapped row's segments are in the other apps' variant. The station's
+   * "Airing on Opencast" slate of the segment's length (1 to 4 s, prepared ahead by the engine);
+   * while that isn't prepared, the generated station ID's first segment (and it's logged); with
+   * neither, null (the playlist holds before it, and it's logged). Each slate segment's URL says
+   * how far into the row it is, so it's served with its timestamps moved on (`elsewhereSegment`).
+   */
+  function slateSegments(stationId: string, look: { callSign: string | null; channel: string | null; name: string; colour: string | null; homeCity: string | null }, band: Band, rendition: string) {
+    const lengthOf = (key: string) => lengths.get(`${key}/${rendition}`)?.[0] ?? null;
+    const sid = generatedStationIdKey(look, band);
+    const offsets = new Map<string, number[]>();
+    const tell = (row: ChannelRow, what: string) => {
+      const id = `${row.id}/${what}`;
+      if (toldNotReady.has(id)) return;
+      if (toldNotReady.size > 5_000) toldNotReady.clear();
+      toldNotReady.add(id);
+      console.warn(`[playout] ${look.callSign ?? stationId}: the other apps' "Airing on Opencast" slate isn't prepared yet, so ${(row as ChannelRow & { label?: string }).label ?? "a program"} (not cleared for them) ${what}`);
+    };
+    const pick = (row: ChannelRow, ms: number): { key: string; ms: number } | null => {
+      const key = elsewhereSlateKey(look, band, elsewhereSeconds(ms));
+      const own = lengthOf(key);
+      if (own) return { key, ms: own };
+      const fallback = lengthOf(sid);
+      if (fallback) {
+        tell(row, "shows the station ID in its place");
+        return { key: sid, ms: fallback };
+      }
+      tell(row, "holds the playlist until it is");
+      return null;
+    };
+    return {
+      keys: [...ELSEWHERE_SECONDS.map((seconds) => elsewhereSlateKey(look, band, seconds)), sid],
+      segment(row: ChannelRow, index: number): { uri: string; ms: number } | null {
+        const chosen = pick(row, row.segmentMs[index]);
+        if (!chosen) return null;
+        // Where each of the row's slate segments starts, from the slate lengths before it.
+        let starts = offsets.get(row.id);
+        if (!starts) {
+          starts = [0];
+          for (const ms of row.segmentMs) starts.push(starts[starts.length - 1] + (pick(row, ms)?.ms ?? ms));
+          offsets.set(row.id, starts);
+        }
+        return { uri: publicUrl(deps, `/hls/elsewhere/${chosen.key}/${rendition}/${index}-${Math.round(starts[index])}.ts`), ms: chosen.ms };
+      }
+    };
+  }
+
+  async function renderPlaylist(stationId: string, file: string, otherApps?: { country: string | null }): Promise<{ body: string; maxAge: number; contentType?: string } | null> {
     const band = await bandOf(stationId);
     // The empty caption segment: the same bytes for every station, kept a long time.
     if (file === SUBTITLES.empty) return band === "tv" ? { body: EMPTY_VTT, maxAge: 86_400, contentType: "text/vtt" } : null;
@@ -410,12 +483,15 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       .orderBy(asc(C.seq), asc(C.startsAt))) as ChannelRow[];
     const [end] = latest.kind === "end" ? [] : await db.select().from(C).where(and(eq(C.stationId, stationId), eq(C.run, latest.run), eq(C.kind, "end"), lte(C.startsAt, now))).limit(1);
     if (end) rows.push(end as ChannelRow);
+    // Programming Phase 6: other apps' variant, with what isn't cleared for them swapped for the slate.
+    const swapped = otherApps ? await swappedFor(stationId, rows, otherApps.country, now) : new Set<string>();
     if (subtitles) {
       const sources = await captionSources(db, (ids) => services.library.captionTrackIds(ids), rows as Array<ChannelRow & { assetId: string | null }>);
       const body = renderSubtitles({
         rows,
         now: now.getTime(),
         empty: SUBTITLES.empty,
+        swapped,
         uri: (row, index) => {
           const source = sources.get(row.id);
           return source && index < source.segments ? captionUrl(source.key, source.rendition, index) : null;
@@ -423,7 +499,12 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       });
       return body ? { body, maxAge: 1 } : null;
     }
-    const keys = [...new Set(rows.map((r) => r.preparedKey).filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
+    let slate: ReturnType<typeof slateSegments> | null = null;
+    if (swapped.size) {
+      const ident = (await services.stations.idents([stationId])).get(stationId);
+      if (ident) slate = slateSegments(stationId, { callSign: ident.callSign, channel: ident.channel, name: ident.name, colour: ident.colour ?? null, homeCity: ident.homeCity ?? null }, band, rendition);
+    }
+    const keys = [...new Set([...rows.map((r) => r.preparedKey), ...(slate?.keys ?? [])].filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
     if (keys.length) {
       const found = await db
         .select({ key: schema.preparedRenditions.key, segmentMs: schema.preparedRenditions.segmentMs })
@@ -431,7 +512,15 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .where(and(eq(schema.preparedRenditions.rendition, rendition), inArray(schema.preparedRenditions.key, keys)));
       for (const f of found) lengths.set(`${f.key}/${rendition}`, f.segmentMs);
     }
-    const body = renderMedia({ rows, rendition, now: now.getTime(), lengths: (key) => lengths.get(`${key}/${rendition}`) ?? null, uri: (key, index) => segmentUrl(key, rendition, index) });
+    const body = renderMedia({
+      rows,
+      rendition,
+      now: now.getTime(),
+      lengths: (key) => lengths.get(`${key}/${rendition}`) ?? null,
+      uri: (key, index) => segmentUrl(key, rendition, index),
+      swapped,
+      slate: (row, index) => slate?.segment(row, index) ?? null
+    });
     return body ? { body, maxAge: 1 } : null;
   }
 
@@ -946,13 +1035,16 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async playlist(stationId, file, request) {
-      const id = `${stationId}/${file}`;
+      // Programming Phase 6: other apps' media playlists are a variant of their own (what isn't
+      // cleared for them swapped for the slate), by the viewer's country, never the plain one's cache.
+      const otherApps = request?.via === "iptv" && file.endsWith(".m3u8") && file !== "master.m3u8" && file !== "index.m3u8" ? { country: await countryOf(deps.geo, request.ip ?? null) } : undefined;
+      const id = otherApps ? `${stationId}/${file}|other_apps|${otherApps.country ?? ""}` : `${stationId}/${file}`;
       const hit = rendered.get(id);
       const at = deps.clock.now().getTime();
       let value: { body: string; maxAge: number; contentType?: string } | null;
       if (hit && Math.abs(at - hit.at) < 1_000) value = hit.value;
       else {
-        value = await renderPlaylist(stationId, file);
+        value = await renderPlaylist(stationId, file, otherApps);
         rendered.set(id, { at, value });
         if (rendered.size > 5_000) rendered.clear();
       }
@@ -964,6 +1056,29 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (file === "master.m3u8" || file === "index.m3u8") value = { ...value, body: masterWithQuery(value.body, "via=iptv") };
       }
       return value;
+    },
+
+    async elsewhereSegment(key, rendition, index, offsetMs) {
+      // Only the slates other apps are given (never a way to re-time anything else).
+      if (!/^(slate-aoo|sid)-[0-9a-f]{40}$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !deps.storage.objects.open) return null;
+      if (!Number.isInteger(index) || index < 0 || !Number.isFinite(offsetMs) || offsetMs < 0 || offsetMs > 7 * 86_400_000) return null;
+      const id = `${key}/${rendition}`;
+      let bytes = slateBytes.get(id);
+      if (!bytes) {
+        const stream = await deps.storage.objects.open(`${objectKey.prepared(key, rendition)}/seg_00000.ts`).catch(() => null);
+        if (!stream) return null;
+        const chunks: Buffer[] = [];
+        try {
+          for await (const chunk of stream) chunks.push(chunk as Buffer);
+        } catch {
+          return null;
+        }
+        bytes = Buffer.concat(chunks);
+        if (!bytes.length) return null;
+        if (slateBytes.size > 256) slateBytes.clear();
+        slateBytes.set(id, bytes);
+      }
+      return shiftSegment(bytes, offsetMs, index);
     },
 
     async stationsThatAired(from, to) {
