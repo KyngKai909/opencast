@@ -567,7 +567,14 @@ export const rightsConfirmations = broadcast.table(
     confirmedAt: at("confirmed_at").notNull().defaultNow(),
     note: text("note"),
     permissionRecordId: uuid("permission_record_id").references(() => permissionRecords.id),
-    licenceRecordId: uuid("licence_record_id").references(() => licenceRecords.id)
+    licenceRecordId: uuid("licence_record_id").references(() => licenceRecords.id),
+    /**
+     * Programming Phase 6 (migration 0067): where it may air besides the station (contracts'
+     * `Outlet`), for `owner_permission`, `permission_record` and `licence_record` (`made_it` and
+     * `public_domain` clear every outlet whatever this says; so do CC0, CC BY and CC BY-SA). Rows
+     * made before it have `opencast` and `relays`, since relays already carried them.
+     */
+    outlets: text("outlets").array().notNull().default(sql`'{opencast,relays}'::text[]`)
   },
   (t) => [
     check("permission_record_basis", sql`${t.basis} <> 'permission_record' or ${t.permissionRecordId} is not null`),

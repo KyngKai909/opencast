@@ -9,6 +9,7 @@ import { resetSettings } from "../settingsDb";
 import { resetSponsors } from "../sponsorsDb";
 import { resetStorage } from "../storageDb";
 import { resetClaims } from "../claimsDb";
+import { resetLicences } from "../licencesDb";
 import { bodyOf, fail, needsAdmin } from "../respond";
 
 export const MOCK_BASE = "*/v1/__mock/desk";
@@ -94,6 +95,7 @@ export const mockHandlers: HttpHandler[] = [
     resetSponsors();
     resetStorage();
     resetClaims();
+    resetLicences();
     return HttpResponse.json({ ok: true });
   })
 ];

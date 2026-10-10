@@ -108,5 +108,7 @@ export const MODULE_TABLES: Record<string, string[]> = {
   uploads: ["broadcast.uploads"],
   // Added 2026-10-10 (programming Phase 5): the dial in other apps, the channel list and guide. Reads through the other services only.
   iptv: [],
+  // Added 2026-10-10 (migration 0067, programming Phase 6): network licences and what each covers.
+  licences: ["network.network_licences", "network.network_licence_covers"],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };

@@ -4,8 +4,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { type CarriageTerm, catalogApi, type Offer } from "@opencast/contracts";
-import { Button, ControlTitle, duration, Field, Icon, KeyValueList, money, Notice, Segmented, useToast } from "@opencast/ui";
+import { type CarriageTerm, catalogApi, DEFAULT_OUTLETS, type Offer, Outlet, OUTLET_WORDS, outletsWithOpencast } from "@opencast/contracts";
+import { Button, Checkbox, ControlTitle, duration, Field, Icon, KeyValueList, money, Notice, Segmented, useToast } from "@opencast/ui";
 import { call } from "../../../api/client";
 import type { OfferDetailX } from "../../api/ext/market";
 import type { TermsBody } from "../../api/types";
@@ -16,6 +16,12 @@ import { useLibrary, useRefreshMarket } from "./api";
 import { ProgramCard, Quietly, SectionTop } from "./parts";
 import { airingsText, approvalText, formatFromLibrary, formatLine, noticeText, readDuration, readMoney, termDetail } from "./words";
 import "./OfferForm.css";
+
+/** "Opencast and Relays", "Opencast only": where carriers can send it, as the pane says it (programming Phase 6). */
+export function outletsWords(outlets: readonly Outlet[]): string {
+  const labels = outletsWithOpencast(outlets).map((o) => OUTLET_WORDS[o].label);
+  return labels.length === 1 ? `${labels[0]} only` : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
 
 const BREAKS_PER_HOUR = 4 * 60_000;
 
@@ -30,11 +36,13 @@ interface Draft {
   airings: "1" | "2" | "3" | "any";
   liveOnly: boolean;
   approval: "any_station" | "i_approve";
+  /** Programming Phase 6: where carriers may send it besides their own channel (Opencast always). */
+  outlets: Outlet[];
 }
 
 function draftOf(o: OfferDetailX | null): Draft {
   if (!o)
-    return { barter: true, barterFill: "2:00", cash: true, cashPrice: "$3.00", cpb: false, cpbFill: "1:00", cpbPrice: "$1.50", airings: "3", liveOnly: false, approval: "i_approve" };
+    return { barter: true, barterFill: "2:00", cash: true, cashPrice: "$3.00", cpb: false, cpbFill: "1:00", cpbPrice: "$1.50", airings: "3", liveOnly: false, approval: "i_approve", outlets: [...DEFAULT_OUTLETS] };
   return {
     barter: o.termsOffered.includes("barter"),
     barterFill: duration(o.barterMakerMsPerHour ?? 2 * 60_000),
@@ -45,7 +53,8 @@ function draftOf(o: OfferDetailX | null): Draft {
     cpbPrice: money(o.cashPlusBarter?.priceMicros ?? 1_500_000),
     airings: o.airingsPerEpisode == null ? "any" : (String(o.airingsPerEpisode) as Draft["airings"]),
     liveOnly: o.liveOnly,
-    approval: o.approval
+    approval: o.approval,
+    outlets: outletsWithOpencast(o.outlets)
   };
 }
 
@@ -76,6 +85,7 @@ export function termsFromDraft(d: Draft, breakMsPerHour = BREAKS_PER_HOUR): { bo
       noticeDays: 7,
       approval: d.approval,
       radioBandAllowed: true,
+      outlets: outletsWithOpencast(d.outlets),
       cashPlusBarter: d.cpb ? { priceMicros: cpbPrice!, unit: "per_airing", makerMsPerHour: cpbFill! } : null
     }
   };
@@ -236,6 +246,19 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
             </div>
             <Segmented label="Who can carry it" value={d.approval} onChange={(v) => set("approval", v)} options={[{ value: "any_station", label: "Any station" }, { value: "i_approve", label: "I approve each" }]} />
           </div>
+          <SectionTop title="Where carriers can send it" sub="Opencast is always on" />
+          <div role="group" aria-label="Where carriers can send it" className="cc-mk-outlets">
+            {Outlet.options.map((o) => (
+              <Checkbox
+                key={o}
+                checked={o === "opencast" || d.outlets.includes(o)}
+                disabled={o === "opencast"}
+                onChange={(on) => set("outlets", on ? [...d.outlets, o] : d.outlets.filter((x) => x !== o))}
+                label={OUTLET_WORDS[o].label}
+                helper={OUTLET_WORDS[o].detail}
+              />
+            ))}
+          </div>
           <div className="cc-mk-limit">
             <div>
               <b>Notice to end</b>
@@ -264,6 +287,7 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
               { label: "Airings per episode", value: airingsText({ airingsPerEpisode: d.airings === "any" ? null : Number(d.airings), windowDays: 7 }) },
               ...(program.live ? [{ label: "Airs", value: d.liveOnly ? "Live only" : "Live or later" }] : []),
               { label: "Carriers", value: approvalText({ approval: d.approval, maker: s.station }, null) },
+              { label: "Where it can go", value: outletsWords(d.outlets) },
               { label: "Ending it", value: noticeText(7) }
             ]}
           />

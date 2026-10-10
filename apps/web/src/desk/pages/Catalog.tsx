@@ -90,16 +90,22 @@ export default function Catalog() {
         title="Catalog"
         description="Opencast's own programs, offered free to every station. Made possible by Clear."
         end={
-          s.canEdit ? (
-            <>
-              <Button size="sm" onClick={() => open("series")}>
-                New series
-              </Button>
-              <Button variant="primary" size="sm" icon="plus" onClick={() => open("add")}>
-                Add an item
-              </Button>
-            </>
-          ) : undefined
+          <>
+            {/* Programming Phase 6: what the network licenses from distributors. */}
+            <Button size="sm" variant="text" href={deskPath("/licences")}>
+              Network licences
+            </Button>
+            {s.canEdit && (
+              <>
+                <Button size="sm" onClick={() => open("series")}>
+                  New series
+                </Button>
+                <Button variant="primary" size="sm" icon="plus" onClick={() => open("add")}>
+                  Add an item
+                </Button>
+              </>
+            )}
+          </>
         }
       />
       <StatRow size="sm" className="nd-cov" stats={shelfStats(s)} />

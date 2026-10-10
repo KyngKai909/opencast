@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, boolean, check, date, index, integer, jsonb, serial, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { at, createdAt, id, millis } from "./columns.js";
+import { at, createdAt, id, micros, millis } from "./columns.js";
 import { network, band } from "./namespaces.js";
-import { stations } from "./broadcast.js";
+import { assets, programs, stations } from "./broadcast.js";
 import { users } from "./accounts.js";
 
 // Markets live here because the dial is Opencast's to run. The prompt also lists
@@ -598,4 +598,59 @@ export const handovers = network.table(
   createdAt: createdAt()
   },
   (t) => [check("handover_has_station_or_link", sql`${t.stationId} is not null or ${t.requestId} is not null`)]
+);
+
+/**
+ * Programming Phase 6 (migration 0067): a network licence, what Opencast licenses from a distributor
+ * or other licensor: the outlets it may go to (contracts' `Outlet`; `opencast` always), where
+ * (worldwide, or ISO 3166-1 country codes), from `starts_on` to `ends_on` (both included; read in
+ * the airing station's time zone), and the deal, in plain fields (no money moves yet). What it
+ * covers is in `network_licence_covers`. Owned by the licences module.
+ */
+export const networkLicences = network.table(
+  "network_licences",
+  {
+    id: id(),
+    licensor: text("licensor").notNull(),
+    name: text("name"),
+    outlets: text("outlets").array().notNull().default(sql`'{opencast}'::text[]`),
+    worldwide: boolean("worldwide").notNull().default(false),
+    countries: text("countries").array().notNull().default(sql`'{}'::text[]`),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    dealKind: text("deal_kind", { enum: ["rev_share", "flat_fee", "none"] }).notNull().default("none"),
+    /** Rev share, in hundredths of a percent (1250 is 12.5%). */
+    revShareBasisPoints: integer("rev_share_basis_points"),
+    flatFeeMicros: micros("flat_fee_micros"),
+    flatFeePer: text("flat_fee_per", { enum: ["month", "term"] }),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [
+    check("network_licence_dates", sql`${t.endsOn} >= ${t.startsOn}`),
+    check("network_licence_territory", sql`${t.worldwide} or cardinality(${t.countries}) > 0`),
+    check("network_licence_rev_share", sql`${t.dealKind} <> 'rev_share' or ${t.revShareBasisPoints} between 0 and 10000`),
+    check("network_licence_flat_fee", sql`${t.dealKind} <> 'flat_fee' or (${t.flatFeeMicros} >= 0 and ${t.flatFeePer} is not null)`)
+  ]
+);
+
+/** What a network licence covers: a program (every episode of it) or a single library item, one of the two. */
+export const networkLicenceCovers = network.table(
+  "network_licence_covers",
+  {
+    id: id(),
+    licenceId: uuid("licence_id")
+      .notNull()
+      .references(() => networkLicences.id, { onDelete: "cascade" }),
+    programId: uuid("program_id").references(() => programs.id),
+    assetId: uuid("asset_id").references(() => assets.id)
+  },
+  (t) => [
+    check("network_licence_covers_one", sql`(${t.programId} is null) <> (${t.assetId} is null)`),
+    index("network_licence_covers_licence").on(t.licenceId),
+    index("network_licence_covers_program").on(t.programId),
+    index("network_licence_covers_asset").on(t.assetId)
+  ]
 );

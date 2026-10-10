@@ -48,6 +48,8 @@ import { relaysRoutes } from "./modules/relays/routes.js";
 import { createPlatformsService } from "./modules/platforms/service.js";
 import { platformsRoutes } from "./modules/platforms/routes.js";
 import { createUploadsService } from "./modules/uploads/service.js";
+import { createLicencesService } from "./modules/licences/service.js";
+import { licencesRoutes } from "./modules/licences/routes.js";
 import { localUploadPartRoute, uploadsRoutes } from "./modules/uploads/routes.js";
 import { createIptvService } from "./modules/iptv/service.js";
 import { iptvRoutes } from "./modules/iptv/routes.js";
@@ -77,6 +79,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   services.platforms = createPlatformsService(ctx);
   services.uploads = createUploadsService(ctx);
   services.iptv = createIptvService(ctx);
+  services.licences = createLicencesService(ctx);
 
   const router = express.Router();
   // Webhooks first: they need the raw body, before anything reads it as JSON.
@@ -110,6 +113,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   platformsRoutes(registrar, ctx);
   uploadsRoutes(registrar, ctx);
   iptvRoutes(registrar, ctx);
+  licencesRoutes(registrar, ctx);
   router.use(errorHandler(deps.config.production));
   return { router, services, deps };
 }

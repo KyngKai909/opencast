@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { BumperRole, DateOnly, IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { Outlet } from "./licences.js";
 
 /** A243: a time of day, "HH:MM" (24-hour), in the market's time zone. */
 const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -38,7 +39,13 @@ export const Rights = z.object({
   basis: RightsBasis,
   confirmedBy: z.string().nullable(),
   confirmedAt: Timestamp,
-  note: z.string().nullable()
+  note: z.string().nullable(),
+  /**
+   * Programming Phase 6 (added 2026-10-10): where it may air besides this station (`opencast` is
+   * always in). `made_it` and `public_domain`, and a licence record under CC0, CC BY or CC BY-SA:
+   * every outlet. Rows confirmed before 2026-10-10: `opencast` and `relays`.
+   */
+  outlets: z.array(Outlet).optional()
 });
 
 export const LibraryItem = z.object({
@@ -469,7 +476,12 @@ export const libraryApi = {
     auth: "user",
     summary: "Confirm the rights to air it. Needed before it can go on the log.",
     params: ItemParams,
-    body: z.object({ basis: z.enum(["made_it", "owner_permission", "public_domain"]), note: z.string().max(500).optional() }),
+    body: z.object({
+      basis: z.enum(["made_it", "owner_permission", "public_domain"]),
+      note: z.string().max(500).optional(),
+      /** Programming Phase 6 (added 2026-10-10): for `owner_permission`, where the owner allows it (`opencast` always). Left out: `opencast` and `relays`. */
+      outlets: z.array(Outlet).max(5).optional()
+    }),
     response: LibraryItem
   }),
 

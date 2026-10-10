@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { IDENT_LEGACY_CODE, isIdentCode, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem } from "@opencast/contracts";
+import { IDENT_LEGACY_CODE, isIdentCode, outletsWithOpencast, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem, type Outlet } from "@opencast/contracts";
 import { guessEpisode, iabContentCategories, isChildrensRating, nextEpisodes, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
@@ -20,6 +20,8 @@ export { toWebVtt };
 
 /** A library item's type: a log code, or (A242) an opener, closer or off-air card. */
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN" | IdentCode;
+
+type RightsBasisRow = (typeof schema.rightsConfirmations.$inferSelect)["basis"];
 
 /** What other modules need to know about a library item. */
 export interface ItemRef {
@@ -123,6 +125,11 @@ export interface LibraryService {
   exportToIpfs(itemId: string): Promise<{ contentId: string; ipfsCid: string; url: string }>;
   titles(input: { itemIds: string[]; programIds: string[] }): Promise<{ items: Map<string, string>; programs: Map<string, string> }>;
   itemsByIds(ids: string[]): Promise<Map<string, ItemRef>>;
+  /**
+   * Programming Phase 6: what clearance reads of each item's rights (its basis, the outlets
+   * recorded, its licence record's id), and its program, by item id. Items without rights are left out.
+   */
+  rightsOf(ids: string[]): Promise<Map<string, { basis: RightsBasisRow; outlets: Outlet[]; licenceRecordId: string | null; programId: string | null; stationId: string }>>;
   programsByIds(ids: string[]): Promise<Map<string, ProgramRef>>;
   programsForStation(stationId: string): Promise<ProgramRef[]>;
   /** A program's episodes, in episode order. */
@@ -186,7 +193,7 @@ export interface LibraryService {
   archiveItem(itemId: string): Promise<void>;
   /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
   archiveForClaim(itemId: string): Promise<void>;
-  confirmRights(user: CurrentUser, itemId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string }): Promise<LibraryItem>;
+  confirmRights(user: CurrentUser, itemId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string; outlets?: Outlet[] }): Promise<LibraryItem>;
   importLinks(stationId: string, input: { urls: string[]; expandPlaylists: boolean; code: LogCode; programId?: string }): Promise<ImportJobView>;
   importJob(stationId: string, jobId: string): Promise<ImportJobView>;
   createFolder(stationId: string, input: { name: string; parentFolderId: string | null }): Promise<FolderView>;
@@ -466,7 +473,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
               basis: right.basis,
               confirmedBy: right.confirmedBy ? (names.get(right.confirmedBy) ?? null) : null,
               confirmedAt: right.confirmedAt.toISOString(),
-              note: right.note
+              note: right.note,
+              // Programming Phase 6: where it may air; everywhere for what the station made or is public domain.
+              outlets: right.basis === "made_it" || right.basis === "public_domain" ? ["opencast", "other_apps", "relays", "fast", "recording"] : outletsWithOpencast(right.outlets as Outlet[])
             }
           : null,
         offerable: r.source !== "link",
@@ -872,6 +881,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return new Map((await toRefs(rows)).map((r) => [r.id, r]));
     },
 
+    async rightsOf(ids) {
+      if (!ids.length) return new Map();
+      const rows = await db
+        .select({ id: R.assetId, basis: R.basis, outlets: R.outlets, licenceRecordId: R.licenceRecordId, programId: A.programId, stationId: A.stationId })
+        .from(R)
+        .innerJoin(A, eq(A.id, R.assetId))
+        .where(inArray(R.assetId, [...new Set(ids)]));
+      return new Map(rows.map((r) => [r.id, { basis: r.basis, outlets: r.outlets as Outlet[], licenceRecordId: r.licenceRecordId, programId: r.programId, stationId: r.stationId }]));
+    },
+
     async programsByIds(ids) {
       if (!ids.length) return new Map();
       const rows = await db.select().from(P).where(inArray(P.id, [...new Set(ids)]));
@@ -1273,10 +1292,12 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
 
     async confirmRights(user, itemId, input) {
       await itemRow(itemId);
+      // Programming Phase 6: the outlets the owner allows (opencast always; opencast and relays when not said).
+      const outlets = outletsWithOpencast(input.outlets);
       await db
         .insert(R)
-        .values({ assetId: itemId, basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now() })
-        .onConflictDoUpdate({ target: R.assetId, set: { basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now() } });
+        .values({ assetId: itemId, basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now(), outlets })
+        .onConflictDoUpdate({ target: R.assetId, set: { basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now(), outlets } });
       return service.item(itemId);
     },
 

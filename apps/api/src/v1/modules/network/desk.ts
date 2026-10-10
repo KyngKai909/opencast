@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { formatChannelNumber, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
+import { formatChannelNumber, parseChannelNumber, radioBandTenths, type Band, type Licence } from "@opencast/domain";
 import { RecipeBreakRule, type ClaimPage, type Creator, type CreatorWork, type HeldEarnings, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
@@ -74,6 +74,8 @@ export interface DeskPart extends ExternalPart {
   works(creatorId: string): Promise<CreatorWork[]>;
   addWorks(creatorId: string, works: Array<{ title: string; durationMs: number | null; sourceUrl: string; groupLabel?: string; leftOutReason?: string; noun?: string }>): Promise<CreatorWork[]>;
   recordLicence(workId: string, input: { licence: string; licenceUrl: string; attribution: string }): Promise<CreatorWork>;
+  /** Programming Phase 6: each licence record's licence (CC BY, CC BY-NC…), for clearance. */
+  licencesOfRecords(recordIds: string[]): Promise<Map<string, Licence>>;
   askPermission(creatorId: string, userId: string, input: { sentVia: string[]; note?: string; proposed?: { band: Band; channel: string }; recipeId?: string; workIds?: string[] }): Promise<{ requestId: string; link: string; preview: PermissionPage }>;
   permissionPage(token: string): Promise<PermissionPage>;
   answerPermission(token: string, input: { answer: "yes" | "no"; copyTo?: string; wordingVersion?: string }, from: string | null): Promise<PermissionPage>;
@@ -588,6 +590,12 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       const [creator] = await db.select().from(CR).where(eq(CR.id, work.creatorId));
       if (views[0].covered === "licence" && creator?.stage === "found") await db.update(CR).set({ stage: "already_licensed" }).where(eq(CR.id, creator.id));
       return views[0];
+    },
+
+    async licencesOfRecords(recordIds) {
+      if (!recordIds.length) return new Map();
+      const rows = await db.select({ id: LR.id, licence: LR.licence }).from(LR).where(inArray(LR.id, [...new Set(recordIds)]));
+      return new Map(rows.map((r) => [r.id, r.licence]));
     },
 
     async askPermission(creatorId, userId, input) {

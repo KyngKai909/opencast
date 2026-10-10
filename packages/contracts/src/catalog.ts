@@ -2,6 +2,7 @@ import { z } from "zod";
 import { endpoint } from "./core.js";
 import { Band, DateOnly, Id, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CarriageDeclineReason, CarriageRequestState } from "./states.js";
+import { Outlet } from "./licences.js";
 
 /**
  * Added 2026-09-29: where a preview stands. Previews play the file's prepared segments (the ones
@@ -27,7 +28,14 @@ export const Terms = z.object({
   liveOnly: z.boolean(),
   noticeDays: z.number().int().min(1),
   approval: z.enum(["any_station", "i_approve"]),
-  radioBandAllowed: z.boolean()
+  radioBandAllowed: z.boolean(),
+  /**
+   * Programming Phase 6 (added 2026-10-10): where the carrier may send it besides its own channel
+   * (`opencast` is always in). Copied onto each agreement like the rest, so narrowing it applies to
+   * new carriers only. Left out of a body: unchanged, or `opencast` and `relays` for a new offer;
+   * offers and agreements made before 2026-10-10 have those two.
+   */
+  outlets: z.array(Outlet).max(5).optional()
 });
 
 /**
