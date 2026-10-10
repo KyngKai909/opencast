@@ -62,7 +62,8 @@ beforeAll(async () => {
   const agreementId = asked.body.agreementId as string;
   expect(agreementId).toBeTruthy();
 
-  t0 = Math.ceil((Date.now() + 20_000) / 4_000) * 4_000;
+  // Far enough ahead for what's prepared below (the openers, station IDs and slates, about 25 s).
+  t0 = Math.ceil((Date.now() + 60_000) / 4_000) * 4_000;
   const at = (s: number) => new Date(t0 + s * 1000).toISOString();
   // Its own program, the carried one, its own again: 12 s each.
   await kai.post(`/v1/stations/${carry.id}/log`, { kind: "program", startsAt: at(0), endsAt: at(12), itemId: show.id }).expect(201);
