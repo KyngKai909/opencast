@@ -560,7 +560,9 @@ New service methods: `ledger.earningRows`, `usageTotals`, `opencastShareBetween`
 | P4.6 | **Carriage.** Carriers see the maker's own break points, as before (the catalog doesn't show suggestions, and only the maker's station can use or dismiss them). Once the maker uses them they're the maker's points, and carriers see those | `catalog/service.ts` (unchanged) | **Recommendation:** keep |
 | P4.7 | **Where a break lands.** The log still snaps every break point to a 4-second segment boundary, so a break may come up to 2 s from the middle of a fade, which can clip the first or last words of a scene. The preview plays from two seconds before the point itself, not the snapped one | `log/service.ts` (unchanged) | **Recommendation:** leave it; if it clips on staging, snap to the boundary nearest the fade's middle and say so in the preview |
 
-## Template slots that air the next episode, programming Phase 3 (2026-10-10)
+## Template slots that air the next episode, programming Phase 3 (2026-10-10; the user's decision 2026-10-10)
+
+**Decided:** every recommendation below, as given.
 
 For the user's decision. Built as recommended below.
 
