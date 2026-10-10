@@ -9,12 +9,14 @@ hold a claimable station's earnings until its creator claims them.
 
 [System](#what-the-system-is) · [Layout](#repository-layout) · [Branches](#branches-and-deploys) ·
 [Quickstart](#quickstart) · [Playout](#playout) · [Video in and out](#how-video-gets-in-and-out) ·
-[Money](#money) · [Apps](#the-apps) ·
+[Other apps](#the-dial-in-other-apps) · [Where it can air](#where-it-can-air) · [Money](#money) ·
+[Apps](#the-apps) · [Network desk](#network-desk) · [Sign-ups](#sign-ups-are-invite-only) ·
 [API](#the-api-appsapi) · [Contracts](#the-escrow-contracts-contracts) · [Tests](#tests-and-ci) ·
 [Docs](#documentation)
 
 > ⚠️ **Status: pre-launch, staging only.** Everything runs on staging; nothing serves real viewers
-> yet. The escrow contracts are **unaudited** and deployed only to a local chain. Interfaces still
+> yet, and sign-ups are invite-only. The escrow contracts are **unaudited** and deployed only to a
+> local chain. Interfaces still
 > move: contract changes are additive and logged in
 > [`docs/contracts-changelog.md`](./docs/contracts-changelog.md).
 
@@ -157,6 +159,7 @@ pull request. Never force-push `staging` or `main`.
 | API, worker, relay, Postgres, Redis | `apps/api`, `apps/worker`, `apps/relay` | Railway project `opencast` |
 | Uploads and prepared segments | | Cloudflare R2: `opencast-staging`, `opencast-production` |
 | iPhone, Android, Android TV / Fire TV | `apps/web/ios`, `apps/web/android`, `apps/tv/android` | Capacitor 8; nothing submitted yet |
+| Samsung TVs (Tizen) | `apps/tv/tizen` | A packaged `.wgt` of TV mode, sideloaded for now ([how](./docs/apps/native.md#tv-mode-on-samsung-tvs-tizen)) |
 
 Everything Railway runs is defined in [`.railway/railway.ts`](./.railway/railway.ts) and applied
 with `railway config plan`, then `railway config apply`. Secrets are set in Railway and never
@@ -203,6 +206,7 @@ npm run mock:streams -w @opencast/player # the mock stations' HLS, once
 | `npm run e2e:real` | Playwright against a real API and a throwaway database |
 | `npm run contracts:test` | the Foundry suite |
 | `npm run env:check` | which variables are set, and which are missing |
+| `npm run build:tizen -w @opencast/tv` | the Samsung TV app's build, ready to package and sign with the Tizen CLI |
 
 ---
 
@@ -254,6 +258,30 @@ flowchart LR
   ("12.1 BEAT · Signing off · Back at 6:00 am") and the generated off-air card. Off air too short
   to go dark keeps the channel on (closer, card, opener). A channel that never signs off can open
   each broadcast day with its opener, at the first program boundary after 6:00 am.
+- **What a template slot airs** (programming Phase 3). A program in a day template can air **This
+  episode** (the same one every date), the **Next episode** of one program or a mix, **Fill the
+  slot** (as many next episodes as fit, for a long block like an overnight lofi run), or **Same as
+  earlier slot** (a same-day rerun). A slot walks one step each date it actually airs: a date edited
+  into an exception, taken by a live block or off air doesn't use up an episode. Its position is
+  worked out from the as-run log and the log, never stored, so editing the template carries on where
+  it was. At the end of a program it starts over, with a log warning a week before ("Late Crate airs
+  its last new episode Sat Oct 24, then starts over"), or stops.
+- **Playback orders** (programming Phase 2). In order, Newest first, Shuffle (every episode once
+  before any repeats), Shuffle shows (keeping each program's episodes in order) and Marathon (a
+  season at a time). Episodes have seasons and multi-part groups, guessed from file names
+  (`S02E05`, `2x05`, "Part 1") and correctable; parts always air together. One deterministic walker
+  in `packages/domain` does every order, and dead-air fill and "Repeat from your library" use it too,
+  picking up after the last episode aired, so fill stops replaying the same episodes.
+- **Cleaner pictures** (programming Phase 1). Prepare tonemaps HDR (iPhone HLG, HDR10, Dolby Vision's
+  base layer) to BT.709, deinterlaces interlaced video (by field order, or an `idet` sample),
+  turns phone clips shot on their side upright (pillarboxed), and tags every rendition BT.709. Items it changed say so in
+  the library ("Converted from HDR", "Deinterlaced"); files prepared before are re-prepared
+  alongside their first copy and switched over when ready
+  (`npm run storage:cleaner-pictures -w @opencast/api`).
+- **Suggested break points** (programming Phase 4). Prepare reads a program's chapter marks, or
+  finds stretches that are both black and silent (where an old TV episode's commercials were), and
+  suggests them beside the maker's own points. The maker previews each and chooses Use these or
+  Dismiss; nothing is applied on its own, and carriers see only the maker's points.
 
 To see an evening end to end on the dev database:
 
@@ -306,6 +334,60 @@ flowchart LR
 
 ---
 
+## The dial in other apps
+
+Opencast's stations can be tuned in IPTV apps: TiviMate, Jellyfin, Channels DVR, Kodi (PVR IPTV
+Simple) and VLC. Viewers find both addresses in You, "Watch in other apps". Everything about it is
+in [`docs/iptv.md`](./docs/iptv.md).
+
+| Address | What it is |
+|---|---|
+| `GET /v1/iptv/channels.m3u` | Every Opencast station on the air (independent, claimable and the catalog station), with `tvg-id`, the dial number, call sign, logo and market. `?market=` and `?band=tv\|radio`. External stations are never in it: their permission covers Opencast's own apps only |
+| `GET /v1/iptv/xmltv.xml` (and `.xml.gz`) | The guide, two hours back to seven days ahead, valid against `xmltv.dtd`: titles, episode titles, season and episode, `<new/>` on a first airing, ratings; breaks folded into their program; planned off air as "Off air" |
+
+- Both are public, read-only, cached a minute, with an `ETag` and gzip.
+- Streams are each station's own `master.m3u8` with `?via=iptv`, so these viewers count as their own
+  audience source, **Other apps**: a session is a run of playlist polls, since other apps send no
+  heartbeats. They're shown apart and never count toward the pool or tuned-in totals.
+- Per-thousand spots bill an other-app session that was clearly tuned in across the whole spot; it's
+  its own line on the business's results and statements.
+- **Known limit:** the bug, lower thirds and a spot's code and QR are drawn by Opencast's own player,
+  so other apps don't show them. Station IDs and spots still air; nothing is burned in.
+- **Plex** has no M3U support of its own and only adds tuners on its own network, so Plex users run
+  Threadfin (or xTeVe) pointed at both addresses.
+
+---
+
+## Where it can air
+
+Rights used to answer one question: may this station air it? Now each program also says **where**
+(programming Phase 6), so a relay or another app never carries something its maker didn't clear for
+it.
+
+| Outlet | What it covers |
+|---|---|
+| `opencast` | Opencast's own apps: web, TV and Cast. Always, when the item can air at all |
+| `other_apps` | The M3U and XMLTV above: our stream in someone else's player |
+| `relays` | YouTube, Twitch, Facebook and the other relay platforms |
+| `fast` | FAST platforms (room to name each one later) |
+| `recording` | Viewers may record it |
+
+- **Where clearance comes from:** the station's own rights (made it and public domain clear
+  everything; a permission or licence lists its outlets; CC BY and BY-SA allow every outlet), the
+  carriage offer it's carried under (the maker chooses, `opencast` always on), and **network
+  licences**: the desk's record of a licensor, the programs or items it covers, outlets, territories,
+  dates and the deal (rev share, flat fee or none; no money moves yet).
+- **One rule decides it:** `clearance` in `packages/domain` takes an item, an outlet and a country.
+- **Not cleared?** On a relay, and in other apps, the program airs as the station's "Airing on
+  Opencast, channel 12.1" slate for its whole length (prepared ahead, like everything else), and the
+  guide says so. The log shows a quiet note ("Not on your YouTube relay").
+- **Licences end.** An item whose licence has ended is off the air: the log warns two weeks before,
+  and dead-air fill never picks it.
+- **The licensor's minutes.** Each network licence has a monthly report in Network desk, from the
+  as-run log: minutes aired by station and outlet, and viewer hours, with a CSV.
+
+---
+
 ## Money
 
 Every cent goes through a double-entry ledger in the API (`apps/api/src/v1/modules/ledger`), in
@@ -332,6 +414,8 @@ flowchart LR
   and live hours, measured daily and billed monthly: from earnings first, then its card or Clear
   wallet, with caps and a 14-day grace period that never takes the channel off air. The price sheet,
   every number for review, is in [`docs/pricing.md`](./docs/pricing.md).
+- **Other apps.** Per-thousand spots also bill viewers in IPTV apps where they can be attributed
+  ([above](#the-dial-in-other-apps)); local businesses only for those placed in the spot's area.
 - **Payments** run through a provider switch (`PAYMENTS_PROVIDER`): a fake on staging, Clear or
   Stripe in production. A live Stripe key outside production is refused. Setup is in
   [`docs/stripe.md`](./docs/stripe.md).
@@ -345,8 +429,8 @@ generated by a test.
 
 | App | Who it's for | What's in it |
 |---|---|---|
-| **The Opencast app** (`apps/web`) | viewers and creators, one sign-in | The viewer at `/`: on phones and tablets the swipe home (live TV full screen; swipe up and down through your presets, then the dial), on a computer the dial; tuned in, the guide, station and program pages, search, the radio band, presets, pledges, You. Master control at `/control`: sign on, the Monitor, the log, live sources, the library, programming blocks, breaks, the spot and syndication markets, sponsors, audience, earnings, translators. Network desk at `/desk` for the Opencast team. A PWA; the phone apps wrap it |
-| **TV mode** (`apps/tv`) | the living room | Watching with the banner (and a programming block's name), number entry, the guide (with its block bands), presets, radio, first launch with a sign-in code, settings. The same build is the Cast receiver and the iPhone's second screen |
+| **The Opencast app** (`apps/web`) | viewers and creators, one sign-in | The viewer at `/`: on phones and tablets the swipe home (live TV full screen; swipe up and down through your presets, then the dial), on a computer the dial; tuned in, the guide, station and program pages, search, the radio band, presets, pledges, You (with Invite friends and Watch in other apps). Master control at `/control`: sign on, the Monitor, the log, live sources, the library, programming blocks, breaks, the spot and syndication markets, sponsors, audience, earnings, translators. Network desk at `/desk` for the Opencast team. A PWA; the phone apps wrap it |
+| **TV mode** (`apps/tv`) | the living room | Watching with the banner (and a programming block's name), number entry, the guide (with its block bands), presets, radio, first launch with a sign-in code, settings. The same build is the Cast receiver, the iPhone's second screen, the Android TV / Fire TV app and the Samsung TV (Tizen) app, where the remote's channel, number and media keys work and ▶ opens the menu |
 | **Opencast for business** (`apps/business`) | advertisers and sponsors | The balance, spots and where they aired, codes at the counter, sponsorships, spots made to order |
 | **Site** (`apps/site`) | everyone else | The marketing site, the tuner and the waitlist |
 
@@ -362,12 +446,48 @@ per-airing totals, so no viewer can be identified. A program's numbers show only
 reached 20 viewers. Stations see theirs on the Audience page; makers see totals across the stations
 that carried them.
 
+### Sign-ups are invite-only
+
+While the desk keeps `signups.invite_only` on (it starts on everywhere), someone new can sign in but
+waits: the API answers them `403 invite_required` everywhere except their own account, redeeming a
+code, accepting a team invite, signing out and deleting the account. Signed out, anyone can still
+watch. People come in with:
+
+- **an invite code**: everyone who's in can make **10**, one person each (You, Invite friends), and
+  send its link, `/join/XXXX-XXXX`; a code nobody used can be taken back;
+- **the desk's codes**, made in batches for the first people (any number of uses, a note, an end
+  date), in Network desk, Settings, Invites;
+- **a station or business team invite**, or the desk letting someone waiting in.
+
+Codes are 8 letters and digits with no look-alikes (no 0, O, 1, I or L). Accounts from before
+invite-only stayed in. The switch and the number each are rules in Settings, Rules, Sign-ups.
+
+### Network desk
+
+`/desk`, for the Opencast team: admins see everything, a market lead their own market, a rights
+reviewer the claims.
+
+- **Markets:** the market board (every number on the dial and what holds it), the creator pipeline
+  (leads, asks, setting up claimable stations from recipes), external sources and the catalog.
+- **Stations:** held earnings, rights claims, reserved call signs.
+- **Analytics** (A251, [`docs/analytics-map.md`](./docs/analytics-map.md)): Overview, Stations,
+  Programs, Audience, Money, Health and Growth, for the whole network or a market and band, external
+  stations included. Totals are worked out from viewing sessions every ten minutes and kept for good,
+  so long spans fill in over time. Each station has its own page: its numbers, and its **file**:
+  who made it and everyone on it, every upload (playable once prepared, with the rights reason its
+  people gave) and its schedule ahead.
+- **Acting on a station** (admins, each with a reason its people are told): **Take off the air**
+  (signs it off and holds it there until the desk lifts it) and **Archive** an upload (off every log
+  from its next airing, its files kept).
+- **Settings:** the team, rules (prices, shares, rights, costs, sign-ups…), markets' numbering,
+  escrow signers, storage maintenance, invites and the change log.
+
 ---
 
 ## The API (`apps/api`)
 
 Express, Postgres (Drizzle; rules enforced by triggers) and Redis. `/v1` is built from
-`packages/contracts`: 351 endpoints in 22 modules, listed in [`docs/api.md`](./docs/api.md). How
+`packages/contracts`: 362 endpoints in 23 modules, listed in [`docs/api.md`](./docs/api.md). How
 it's put together — modules, roles, events, how money moves — is in
 [`docs/architecture.md`](./docs/architecture.md), and the schema in
 [`docs/schema.md`](./docs/schema.md).
@@ -423,9 +543,11 @@ real-API Playwright specs on pull requests. Production builds are checked for mo
 | Deploying | [`docs/deploy.md`](./docs/deploy.md) |
 | Prices · Stripe | [`docs/pricing.md`](./docs/pricing.md) · [`docs/stripe.md`](./docs/stripe.md) |
 | Relays · platforms · uploads | [`docs/relay.md`](./docs/relay.md) · [`docs/platforms.md`](./docs/platforms.md) · [`docs/uploads.md`](./docs/uploads.md) |
+| The dial in other apps (M3U, XMLTV, Plex) | [`docs/iptv.md`](./docs/iptv.md) |
+| Maps of the bigger builds: schedule, analytics, programming | [`docs/schedule-map.md`](./docs/schedule-map.md) · [`docs/analytics-map.md`](./docs/analytics-map.md) · [`docs/programming-map.md`](./docs/programming-map.md) |
 | Clear integration | [`docs/clear-integration.md`](./docs/clear-integration.md) |
 | The apps: inventory, rules, testing, native | [`docs/apps/`](./docs/apps/) |
-| Build prompts | [`docs/prompts/`](./docs/prompts/): the platform, apps and follow-up prompts; where the code stood against them is in [`docs/catch-up-report.md`](./docs/catch-up-report.md) |
+| Build prompts | [`docs/prompts/`](./docs/prompts/): the platform, apps, follow-up, schedule and programming prompts; where the code stood against them is in [`docs/catch-up-report.md`](./docs/catch-up-report.md) |
 | Reference designs | [`docs/reference/`](./docs/reference/) |
 | Open decisions | [`docs/open-decisions.md`](./docs/open-decisions.md) |
 
@@ -436,6 +558,10 @@ real-API Playwright specs on pull requests. Production builds are checked for mo
 - Secrets live in Railway, Vercel and the ignored `.env`; never in the repo. Rotate anything that
   has been pasted anywhere else
 - Signed-in endpoints check the Privy token and the caller's role on every request
+- Sign-ups are invite-only: an account that hasn't been let in can only redeem a code, sign out or be
+  deleted
+- Taking a station off the air and archiving its uploads from the desk are for admins only, and
+  always tell the station why
 - Platform stream keys and tokens are stored sealed (AES-256-GCM) and never sent back to an app
 - Money only moves through the ledger, and billing reads only the as-run log
 - The escrow contracts are **unaudited**; don't deploy them to a real network before a review
