@@ -70,6 +70,26 @@ export interface AudienceService {
   totals: Totals;
   /** A251: the desk's Analytics tabs. */
   analytics: Analytics;
+  /**
+   * Programming Phase 6: viewer-seconds on Opencast's own apps during these spans of a station's
+   * air (tuned in each minute, weighted by how much of the minute the span covers), for the
+   * licensor's minutes. Null when no minute in them was counted at all.
+   */
+  viewerSeconds(stationId: string, spans: Array<{ from: Date; to: Date }>): Promise<number | null>;
+}
+
+/** Programming Phase 6: per-minute counts, weighted by how much of each minute the spans cover, in seconds. Null with no samples. */
+export function weightedSeconds(samples: Array<{ minute: Date; count: number }>, spans: Array<{ from: Date; to: Date }>): number | null {
+  if (!samples.length) return null;
+  let total = 0;
+  for (const s of samples) {
+    const start = s.minute.getTime();
+    for (const span of spans) {
+      const overlap = Math.min(start + MINUTE, span.to.getTime()) - Math.max(start, span.from.getTime());
+      if (overlap > 0) total += (s.count * overlap) / 1000;
+    }
+  }
+  return total;
 }
 
 export function createAudienceService({ deps, services }: ModuleContext): AudienceService {
@@ -380,6 +400,18 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           .sort((a, b) => a.minute.localeCompare(b.minute)),
         breaks: breaks.map((b) => ({ startsAt: b.startsAt, endsAt: new Date(Date.parse(b.startsAt) + b.lengthMs).toISOString() }))
       };
+    },
+
+    async viewerSeconds(stationId, spans) {
+      if (!spans.length) return null;
+      const from = minuteOf(new Date(Math.min(...spans.map((s) => s.from.getTime()))));
+      const to = new Date(Math.max(...spans.map((s) => s.to.getTime())));
+      const rows = await db
+        .select({ minute: M.minute, count: M.tunedIn })
+        .from(M)
+        .where(and(eq(M.stationId, stationId), gte(M.minute, from), lt(M.minute, to)));
+      const inside = rows.filter((r) => spans.some((s) => r.minute.getTime() + MINUTE > s.from.getTime() && r.minute < s.to));
+      return weightedSeconds(inside, spans);
     }
   };
   return service;

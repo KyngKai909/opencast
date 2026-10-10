@@ -2,6 +2,19 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Where it can air (programming Phase 6)
+
+Additive, with migration 0065.
+
+- New `licences.ts`:
+  - `Outlet` (`opencast`, `other_apps`, `relays`, `fast`, `recording`) with `OUTLET_WORDS` (each one's label and meaning), `DEFAULT_OUTLETS` (`opencast` and `relays`: what rows made before 2026-10-10 have) and `outletsWithOpencast` (puts `opencast` in, each once, in the enum's order). `fast` is one value for now; individual platforms can be added as values later;
+  - `CountryCode` (ISO 3166-1 alpha-2, upper case), `LicenceDeal` (`rev_share` with `percent`, `flat_fee` with `feeMicros` and `per` `month` or `term`, or `none`), `NetworkLicenceState` (`upcoming`, `active`, `ending`: within two weeks of its last day, `ended`), `LicenceCovered`, `NetworkLicence`, `NetworkLicenceInput`, `LicensorMinutes` and `LicensorMinutesRow`;
+  - new `licencesApi` (`api.licences`), `auth: "desk"` (writes: rights reviewers and admins): `listLicences` (`GET /admin/licences`), `getLicence` (`GET /admin/licences/:licenceId`), `createLicence` (`POST /admin/licences`; 400 when it ends before it starts, or isn't worldwide and names no countries), `updateLicence` (`PATCH /admin/licences/:licenceId`; what it covers is replaced when sent), `licenceMinutes` (`GET /admin/licences/:licenceId/minutes?month=2026-10`) and `licenceMinutesCsv` (`GET /admin/licences/:licenceId/minutes/csv?month=`, `{ filename, csv }`). Dates are inclusive: `endsOn` is the last day it airs.
+- `library.ts`: `Rights.outlets` (optional): where it may air. Everything for `made_it` and `public_domain`; otherwise what was recorded, `opencast` always in (rights confirmed before 2026-10-10: `opencast` and `relays`). `confirmRights` takes `outlets` (optional; left out: `opencast` and `relays`).
+- `catalog.ts`: `Terms.outlets` (optional), so on `Offer`, `offerProgram`'s and `updateOffer`'s bodies, and `Agreement.terms`: where the carrier may send it, `opencast` always in. Copied onto each agreement when it's made, so narrowing it applies to new carriers only. Left out of a new offer: `opencast` and `relays`, which offers and agreements from before 2026-10-10 have too.
+- `log.ts`: `LogEntry.notes` (optional): quiet notes, not warnings, `{ code: "not_cleared", outlet, message }` ("Not on your YouTube relay") on a program not cleared for an outlet the station uses; new `LicenceWarning` and `ProgramLog.licenceWarnings` (optional): `licence_ending` (its network licence ends within two weeks) and `licence_ended` (the entry is after its last day, and won't air), with the licence, its licensor and last day.
+- Behaviour: a log entry for an item whose network licence isn't in force when it starts is refused (422 `licence_ended`, or `licence_not_started`). A relay sends the station's "Airing on Opencast, channel 12.1" slate in place of a program it isn't cleared for.
+
 ## 2026-10-10: Suggested break points (programming Phase 4)
 
 Additive, with migration 0063.

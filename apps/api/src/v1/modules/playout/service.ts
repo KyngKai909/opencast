@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { asLogCode, type BlockBand } from "@opencast/contracts";
+import { asLogCode, type BlockBand, type Outlet } from "@opencast/contracts";
+import type { Clearance } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
@@ -243,6 +244,49 @@ export interface PlayoutService {
   liveAired(from: Date, to: Date): Promise<Array<{ stationId: string; startedAt: Date; endedAt: Date }>>;
   /** The bytes stored for each content ID's prepared segments (every band's renditions, ready or not yet swept). */
   preparedBytes(contentIds: string[]): Promise<Map<string, number>>;
+
+  // ---- Where it can air (added 2026-10-10, programming Phase 6) ----
+  /**
+   * What aired of these items, or of any episode of these programs, starting in [from, to), from
+   * the as-run log: program rows only (no breaks, slates or fills of station IDs), each clipped to
+   * nothing (a row is counted whole where it started). For the licensor's minutes.
+   */
+  airedOf(input: { itemIds: string[]; programIds: string[]; from: Date; to: Date }): Promise<AiredRow[]>;
+  /**
+   * The channel's rows in [from, to) that aren't cleared for `outlet` for a viewer in `country`
+   * (null: unknown, as on a relay): each prepared row carrying an item outside a break (breaks
+   * follow the relay's break setting), with its sequence
+   * numbers (`firstSeq` to `firstSeq + segments - 1`, as the playlist numbers them) and the reason.
+   * What a relay and (Programming Phase 5) the other-apps playlist swap for the station's
+   * "Airing on Opencast" slate.
+   */
+  notCleared(stationId: string, input: { from: Date; to: Date; outlet: Outlet; country: string | null }): Promise<NotClearedRow[]>;
+}
+
+/** Programming Phase 6: an as-run program row of a licensed item. */
+export interface AiredRow {
+  id: string;
+  stationId: string;
+  assetId: string | null;
+  programId: string | null;
+  logEntryId: string | null;
+  agreementId: string | null;
+  startedAt: Date;
+  endedAt: Date;
+}
+
+/** Programming Phase 6: a channel row not cleared for an outlet. */
+export interface NotClearedRow {
+  channelItemId: string;
+  run: number;
+  firstSeq: number;
+  segments: number;
+  startsAt: Date;
+  endsAt: Date;
+  logEntryId: string | null;
+  assetId: string;
+  agreementId: string | null;
+  reason: Clearance["reason"];
 }
 
 export interface PreviewRef {
@@ -953,6 +997,41 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (r.contentId && bytes > 0) out.set(r.contentId, (out.get(r.contentId) ?? 0) + bytes);
       }
       return out;
+    },
+
+    async airedOf({ itemIds, programIds, from, to }) {
+      if (!itemIds.length && !programIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .select({ id: A.id, stationId: A.stationId, assetId: A.assetId, programId: A.programId, logEntryId: A.logEntryId, agreementId: A.carriageAgreementId, startedAt: A.startedAt, endedAt: A.endedAt })
+        .from(A)
+        .where(
+          and(
+            gte(A.startedAt, from),
+            lt(A.startedAt, to),
+            eq(A.code, "PGM"),
+            isNull(A.breakId),
+            inArray(A.reason, ["planned", "rotation", "backup_rotation", "dead_air_fill"]),
+            or(...(itemIds.length ? [inArray(A.assetId, itemIds)] : []), ...(programIds.length ? [inArray(A.programId, programIds)] : []))
+          )
+        )
+        .orderBy(asc(A.startedAt));
+      return rows.filter((r) => r.endedAt > r.startedAt);
+    },
+
+    async notCleared(stationId, { from, to, outlet, country }) {
+      const CI = schema.channelItems;
+      const rows = await db
+        .select()
+        .from(CI)
+        .where(and(eq(CI.stationId, stationId), lt(CI.startsAt, to), gt(CI.endsAt, from), eq(CI.kind, "prepared"), eq(CI.inBreak, false), sql`${CI.assetId} is not null`))
+        .orderBy(asc(CI.seq));
+      if (!rows.length) return [];
+      const timeZone = await services.stations.timezoneOf(stationId);
+      const answers = await services.licences.clearance(rows.map((r) => ({ assetId: r.assetId!, agreementId: r.agreementId, at: r.startsAt })), outlet, country, { at: from, timeZone });
+      return rows.flatMap((r, i) =>
+        answers[i].cleared ? [] : [{ channelItemId: r.id, run: r.run, firstSeq: r.seq, segments: r.segments, startsAt: r.startsAt, endsAt: r.endsAt, logEntryId: r.logEntryId, assetId: r.assetId!, agreementId: r.agreementId, reason: answers[i].reason }]
+      );
     },
 
     async scheduleSignOn(stationId, at) {

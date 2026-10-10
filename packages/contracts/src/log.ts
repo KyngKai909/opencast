@@ -4,6 +4,7 @@ import { BlockBand, BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent,
 import { Captions, PlaybackOrder, Program } from "./library.js";
 import { BlockSpan, DayTemplateBlock } from "./blocks.js";
 import { BreakRule } from "./stations.js";
+import { Outlet } from "./licences.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -49,9 +50,33 @@ export const LogEntry = z.object({
       whatAirs: z.enum(["this_episode", "next_episode", "fill", "same_as"])
     })
     .nullable()
-    .optional()
+    .optional(),
+  /**
+   * Programming Phase 6 (added 2026-10-10): quiet notes, not warnings: it isn't cleared for an outlet
+   * the station uses ("Not on your YouTube relay": the relay shows the station's slate for it).
+   * Absent: none.
+   */
+  notes: z.array(z.object({ code: z.literal("not_cleared"), outlet: Outlet, message: z.string() })).optional()
 });
 export type LogEntry = z.infer<typeof LogEntry>;
+
+/**
+ * Programming Phase 6 (added 2026-10-10): an entry whose network licence ends. `licence_ending`:
+ * it ends within two weeks ("The licence for Prairie Westerns from Prairie Films ends Sat Oct 31.
+ * It's off the air after that."); `licence_ended`: the entry is after the end, and won't air
+ * ("Prairie Westerns won't air: its licence from Prairie Films ended Sat Oct 31.").
+ */
+export const LicenceWarning = z.object({
+  code: z.enum(["licence_ending", "licence_ended"]),
+  entryId: Id,
+  licenceId: Id,
+  licensor: z.string(),
+  /** The licence's last day. */
+  endsOn: DateOnly,
+  startsAt: Timestamp,
+  message: z.string()
+});
+export type LicenceWarning = z.infer<typeof LicenceWarning>;
 
 /**
  * G1 (added 2026-09-29): one thing in a break, in the order it airs. Spots placed in the break
@@ -384,7 +409,9 @@ export const ProgramLog = z.object({
    * Programming Phase 3 (added 2026-10-10): day template warnings for the window's dates, and a
    * program's last new episode from a week before it airs. Absent: none.
    */
-  warnings: z.array(TemplateWarning).optional()
+  warnings: z.array(TemplateWarning).optional(),
+  /** Programming Phase 6 (added 2026-10-10): entries whose network licence ends within two weeks, or has ended. Absent: none. */
+  licenceWarnings: z.array(LicenceWarning).optional()
 });
 
 /**

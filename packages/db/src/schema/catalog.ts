@@ -18,7 +18,13 @@ const termsColumns = () => ({
   airingsPerEpisode: smallint("airings_per_episode"),
   windowDays: smallint("window_days").notNull().default(7),
   liveOnly: boolean("live_only").notNull().default(false),
-  noticeDays: smallint("notice_days").notNull().default(7)
+  noticeDays: smallint("notice_days").notNull().default(7),
+  /**
+   * Programming Phase 6 (migration 0065): where the carrier may send it besides its own channel
+   * (contracts' `Outlet`; `opencast` is always in). Offers and agreements made before it have
+   * `opencast` and `relays`, which relays already carried.
+   */
+  outlets: text("outlets").array().notNull().default(sql`'{opencast,relays}'::text[]`)
 });
 
 /**

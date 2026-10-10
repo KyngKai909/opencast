@@ -41,7 +41,7 @@
 
 import { randomUUID, createHash } from "node:crypto";
 import { asLogCode, isIdentCode, slotPreviewLine, type TemplateSlotPreview, type TemplateWarning } from "@opencast/contracts";
-import { walkEpisodes, type Airing as WalkAiring } from "@opencast/domain";
+import { clearance, walkEpisodes, type Airing as WalkAiring } from "@opencast/domain";
 import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { DayTemplate, DayTemplateEntry, LogDay, TemplateGeneration } from "@opencast/contracts";
@@ -102,7 +102,7 @@ const walks = (e: Pick<TemplateRow, "kind" | "whatAirs">) => e.kind === "program
 export const MARATHON_NEEDS_A_MIX = "Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time.";
 
 /** "Sat Oct 24". */
-const dayWords = (date: string) => new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)).replace(",", "");
+export const dayWords = (date: string) => new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)).replace(",", "");
 
 /** "Late Crate, ep. 14", or the item's title. */
 function episodeLabel(item: Pick<ItemRef, "title" | "programId" | "episodeNumber">, programs: Map<string, Pick<ProgramRef, "title">>): string {
@@ -287,7 +287,19 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     ]);
     const canAir = (i: ItemRef) => !i.archived && i.rightsConfirmed && !i.contentUnavailable && !!i.durationMs && i.status !== "failed" && !pulled.has(i.id);
     const episodesOf = (slot: Pick<TemplateRow, "programIds">) => episodes.filter((e) => e.programId && slot.programIds?.includes(e.programId));
-    return { episodes, canAir, episodesOf, programs };
+    // Programming Phase 6: an episode whose network licence isn't in force that date is passed over.
+    const inForce = await licencesInForce(stationId, episodes);
+    return { episodes, canAir, episodesOf, programs, inForce };
+  }
+
+  /** Programming Phase 6: whether each item's network licences (if any) are in force at a moment, in the station's time zone. */
+  async function licencesInForce(stationId: string, items: Array<Pick<ItemRef, "id" | "programId">>) {
+    const licensed = await services.licences.covering(items);
+    const tz = licensed.size ? await services.stations.timezoneOf(stationId) : "UTC";
+    return (item: Pick<ItemRef, "id">, at: Date) => {
+      const licences = licensed.get(item.id);
+      return !licences || clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at, timeZone: tz }).cleared;
+    };
   }
   type WalkState = Awaited<ReturnType<typeof walkState>>;
 
@@ -318,8 +330,9 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
    * Fill the slot as many as fit its length (never past its end). A slot that stops at its
    * programs' end airs nothing once the walk starts over (`stopped`).
    */
-  function airingsFor(slot: Pick<TemplateRow, "slotId" | "programIds" | "playbackOrder" | "atEnd" | "whatAirs" | "lengthMs">, position: string[], state: WalkState) {
-    const episodes = state.episodesOf(slot).map((i) => ({ ...i, ready: state.canAir(i) }));
+  function airingsFor(slot: Pick<TemplateRow, "slotId" | "programIds" | "playbackOrder" | "atEnd" | "whatAirs" | "lengthMs">, position: string[], state: WalkState, at?: Date) {
+    // Programming Phase 6: `at`, the slot's start that date: episodes whose licence isn't in force then aren't ready.
+    const episodes = state.episodesOf(slot).map((i) => ({ ...i, ready: state.canAir(i) && (!at || state.inForce(i, at)) }));
     const walk = walkEpisodes({ episodes, order: slot.playbackOrder ?? "in_order", seed: slot.slotId, position, programs: slot.programIds ?? undefined });
     const airings: Array<WalkAiring<(typeof episodes)[number]>> = [];
     let stopped = false;
@@ -869,6 +882,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       // A244: the templates' programming blocks (an archived block is made no more).
       const templateBlocks = templates.length ? await db.select().from(TB).where(inArray(TB.templateId, templates.map((t) => t.id))) : [];
       const [items, pulled, blockRefs] = await Promise.all([services.library.itemsByIds(itemIds), services.trust.offAirItems(itemIds), services.library.blocks.refs(templateBlocks.map((b) => b.blockId))]);
+      // Programming Phase 6: a This episode slot's item is skipped on dates its network licence isn't in force.
+      const itemsInForce = await licencesInForce(stationId, [...items.values()]);
       // Phase 3: titles for the warnings.
       const programs = new Map([...(state?.programs ?? new Map<string, ProgramRef>())]);
       for (const [id, p] of await services.library.programsByIds([...new Set([...items.values()].map((i) => i.programId).filter((v): v is string => Boolean(v) && !programs.has(v!)))])) programs.set(id, p);
@@ -928,7 +943,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
               airings = source?.airings ?? [];
               fill = source?.fill ?? false;
             } else if (state) {
-              const walked = airingsFor(e, before(history, e.slotId, date), state);
+              const walked = airingsFor(e, before(history, e.slotId, date), state, startsAt);
               airings = walked.airings.map((a) => a.episodes);
               stopped = walked.stopped;
               aired.set(e.slotId, { airings, fill });
@@ -963,7 +978,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
           }
           if (e.kind === "program") {
             const item = e.assetId ? items.get(e.assetId) : undefined;
-            if (!item || item.archived || !item.rightsConfirmed || item.contentUnavailable || pulled.has(item.id)) {
+            if (!item || item.archived || !item.rightsConfirmed || item.contentUnavailable || pulled.has(item.id) || !itemsInForce(item, startsAt)) {
               skipped++;
               continue;
             }

@@ -3,7 +3,7 @@
 // program writes entries into the shared db's log, so the Program log and the Monitor show them.
 
 import { http } from "msw";
-import { type Agreement, type CarriageRequest, catalogApi, type FitSlot, type Offer, type Slot, type StationIdent } from "@opencast/contracts";
+import { type Agreement, type CarriageRequest, catalogApi, type FitSlot, type Offer, outletsWithOpencast, type Slot, type StationIdent } from "@opencast/contracts";
 import { clock } from "@opencast/ui";
 import { OfferDetailX } from "../../api/ext/market";
 import type { TermsBody } from "../../api/types";
@@ -284,6 +284,8 @@ export const marketHandlers = [
       noticeDays: body.noticeDays,
       approval: body.approval,
       radioBandAllowed: body.radioBandAllowed,
+      // Programming Phase 6: where carriers may send it (Opencast always; Opencast and relays when not said).
+      outlets: outletsWithOpencast(body.outlets),
       cashPlusBarter: body.cashPlusBarter ?? null,
       defaultTerm: body.termsOffered[0]
     };
@@ -333,6 +335,7 @@ export const marketHandlers = [
     const body = (await request.json()) as Partial<TermsBody> & { status?: "offered" | "withdrawn" };
     for (const [k, v] of Object.entries(body)) if (v !== undefined) (o as unknown as Record<string, unknown>)[k] = v;
     if (body.termsOffered?.length) o.defaultTerm = body.termsOffered[0];
+    if (body.outlets) o.outlets = outletsWithOpencast(body.outlets);
     saveMarket();
     return reply(catalogApi.updateOffer.response, toOffer(o, null));
   }),

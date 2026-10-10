@@ -30,6 +30,8 @@ export function pageOf(pathname: string): DeskPage {
     "rights-claims": "rights-claims",
     "reserved-call-signs": "reserved-call-signs",
     "catalog-sponsors": "catalog-sponsors",
+    // Programming Phase 6: network licences sit under the catalog.
+    licences: "catalog",
     settings: "settings"
   };
   return direct[parts[0] ?? ""] ?? "market-board";

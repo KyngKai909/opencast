@@ -214,6 +214,28 @@ export class Slates {
     );
   }
 
+  /**
+   * Programming Phase 6: what a relay shows in place of a program it isn't cleared for, for the
+   * program's length: "Airing on Opencast, channel 12.1", with the call sign above, full screen in
+   * the station's colour. (Phase 5's other-apps playlists can use the same picture.)
+   */
+  airingOnOpencast(station: StationLook): Promise<string> {
+    const cx = FRAME.width / 2;
+    const line = station.channel ? `Airing on Opencast, channel ${station.channel}` : "Airing on Opencast";
+    const size = line.length > 34 ? 58 : 66;
+    const { callSign, channel, name, colour } = station;
+    return this.cached("elsewhere", { callSign, channel, name, colour, v: 1 }, (file) =>
+      this.svgToPng(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
+          <rect width="100%" height="100%" fill="${background(station)}"/>
+          <text x="${cx}" y="${FRAME.height / 2 - 70}" font-family="${MONO}" font-size="44" font-weight="600" fill="#FFFFFF" fill-opacity="0.9" text-anchor="middle">${esc(callSign ?? name)}</text>
+          <text x="${cx}" y="${FRAME.height / 2 + 30}" font-family="${DISPLAY}" font-size="${size}" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-1">${esc(line)}</text>
+        </svg>`,
+        file
+      )
+    );
+  }
+
   /** Off air, and when the station is back. */
   offAir(station: StationLook, backAt: string | null): Promise<string> {
     return this.cached("off", { station, backAt }, (file) =>
