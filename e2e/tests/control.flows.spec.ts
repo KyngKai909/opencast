@@ -228,7 +228,7 @@ test("BEAT edits its log and publishes four changes", async ({ page }) => {
   await log.getByRole("button", { name: /^Fill/ }).first().click();
   const drawer = page.getByRole("dialog", { name: "Add at 10:28 pm" });
   await drawer.getByLabel("Search your library").fill("Late Crate, ep. 1");
-  await drawer.getByRole("button", { name: /^Late Crate, ep\. 1 29:00/ }).click();
+  await drawer.getByRole("button", { name: /^Late Crate, ep\. 1 (Never aired\. )?29:00/ }).click();
   await expect(tray.getByText("Late Crate, ep. 1 goes on at 10:28 pm")).toBeVisible();
 
   // 4. An overnight repeat a place up, with the arrow keys.
