@@ -35,6 +35,7 @@ import { createOrders, type OrdersPart } from "./orders.js";
 import { createCodes, type CodesPart } from "./codes.js";
 import { createBusinessPart, type BusinessPart } from "./business.js";
 import { createRelayViewers } from "./relayViewers.js";
+import { createOtherAppViewers } from "./otherAppViewers.js";
 
 type Targeting = Spot["targeting"];
 
@@ -120,6 +121,11 @@ export interface SpotsService extends SponsorshipsPart, CatalogSponsorsPart, Ord
   settleRelayViewers(): Promise<{ settled: number; notBilled: number; returned: number }>;
   /** What's still held for a business's relay viewers waiting for location data, per platform. */
   relayWaiting(businessId: string): Promise<Array<{ platform: "youtube" | "twitch"; heldMicros: number; airings: number }>>;
+  /**
+   * Other apps viewers (added 2026-10-10, programming Phase 5, P5.1): settles each airing's Other
+   * apps part once the playlist polls after the spot are in, two minutes after it. Run every minute.
+   */
+  settleOtherApps(): Promise<{ settled: number; notBilled: number }>;
 }
 
 export interface BusinessInput {
@@ -693,6 +699,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
   }
 
   const relay = createRelayViewers(ctx);
+  const otherApps = createOtherAppViewers(ctx, relay);
 
   const parts = {
     sponsorships: createSponsorships(ctx),
@@ -1311,7 +1318,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const past = await db.select({ id: AI.id, holdId: AI.holdId }).from(AI).where(and(gte(AI.scheduledAt, since), lt(AI.scheduledAt, cutoff)));
       const open = await services.ledger.openHolds(past.map((a) => a.holdId));
       // Aired, with relay parts still waiting for their numbers (2026-09-30): held for those, not unaired.
-      const waiting = await relay.openAirings(past.filter((a) => (open.get(a.holdId) ?? 0) > 0).map((a) => a.id));
+      const aired = past.filter((a) => (open.get(a.holdId) ?? 0) > 0).map((a) => a.id);
+      // And with an Other apps part still counting (P5.1).
+      const waiting = new Set([...(await relay.openAirings(aired)), ...(await otherApps.openAirings(aired))]);
       let released = 0;
       for (const airing of past) {
         if (!(open.get(airing.holdId) ?? 0) || waiting.has(airing.id)) continue;
@@ -1407,6 +1416,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         const relayEstimate = await relay.holdEstimate(row, stationId, scheduledAt);
         relayEstimateMicros = row.perAiringMaxMicros ? Math.max(0, Math.min(relayEstimate, row.perAiringMaxMicros - holdMicros)) : relayEstimate;
         holdMicros += relayEstimateMicros;
+        // Other apps viewers (P5.1): plus the station's usual sessions at the hour, inside the same maximum.
+        const otherAppsEstimate = await otherApps.holdEstimate(row, stationId, scheduledAt);
+        holdMicros += row.perAiringMaxMicros ? Math.max(0, Math.min(otherAppsEstimate, row.perAiringMaxMicros - holdMicros)) : otherAppsEstimate;
       }
       if (spent.used + holdMicros > row.totalBudgetMicros) {
         await pauseFor(row, "budget_spent");
@@ -1463,10 +1475,14 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       }
       // Relay viewers (2026-09-30): each counted platform's part stays held until its numbers are in.
       const openHold = (await services.ledger.openAmount([airing.airing.holdId])).get(airing.airing.holdId) ?? 0;
-      const keepHeldMicros =
+      let keepHeldMicros =
         airing.airing.rateKind === "per_thousand"
           ? await relay.open({ airing: airing.airing, spot: airing.spot, startedAt, endedAt, fraction, opencastCostMicros: cost, openHoldMicros: openHold })
           : 0;
+      // Other apps viewers (P5.1): what's left of the hold stays held until the polls after the spot are in.
+      if (airing.airing.rateKind === "per_thousand") {
+        keepHeldMicros += await otherApps.open({ airing: airing.airing, spot: airing.spot, startedAt, endedAt, fraction, opencastCostMicros: cost, spareMicros: openHold - cost - keepHeldMicros });
+      }
       const station = (await services.stations.idents([airing.airing.stationId])).get(airing.airing.stationId);
       if (!barter && airing.airing.carriageAgreementId) {
         // It filled the producer's barter share: the producer is paid.
@@ -1490,6 +1506,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
     settleRelayViewers: () => relay.settleDue(),
     relayWaiting: (businessId) => relay.waiting(businessId),
+    settleOtherApps: () => otherApps.settleDue(),
 
     async resumeDailyCaps() {
       const rows = await db.select().from(SP).where(and(eq(SP.status, "paused"), eq(SP.pauseReason, "daily_cap")));

@@ -3,7 +3,7 @@ import { endpoint } from "./core.js";
 import { BumperRole, DateOnly, Id, Micros, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { OrderState, SponsorshipDeclineReason, SponsorshipState, SpotState } from "./states.js";
 import { PreviewStatus } from "./catalog.js";
-import { RelayViewersLine, RelayViewersPart } from "./platforms.js";
+import { OtherAppsLine, OtherAppsPart, RelayViewersLine, RelayViewersPart } from "./platforms.js";
 
 // Businesses ------------------------------------------------------------------
 
@@ -480,7 +480,14 @@ export const ResultsAiring = z.object({
    * platform reported during the spot, and what they cost (apart from `costMicros`, which is
    * Opencast's own viewers). Absent when there's nothing relayed to count.
    */
-  relayViewers: z.array(RelayViewersPart).optional()
+  relayViewers: z.array(RelayViewersPart).optional(),
+  // ---- Other apps viewers (added 2026-10-10, programming Phase 5, P5.1) ----
+  /**
+   * Per-thousand spots: the sessions from Opencast's channel list in other apps (TiviMate, Jellyfin,
+   * Kodi, VLC) that watched through the spot, and what they cost (apart from `costMicros` and
+   * `relayViewers`). Absent when nobody was watching in another app as it aired.
+   */
+  otherApps: OtherAppsPart.optional()
 });
 
 /** P13 (added 2026-09-29): one code's scans, saves and uses in the period, and how the uses were counted. */
@@ -524,7 +531,10 @@ export const Results = z.object({
      * Opencast viewers and relay viewers together), and still held waiting for location data.
      */
     relaySpentMicros: Micros.optional(),
-    relayWaitingMicros: Micros.optional()
+    relayWaitingMicros: Micros.optional(),
+    /** Other apps viewers (added 2026-10-10): spent on them (included in `spentMicros`), and still held while their polls come in. */
+    otherAppsSpentMicros: Micros.optional(),
+    otherAppsWaitingMicros: Micros.optional()
   }),
   byStation: z.array(
     z.object({
@@ -541,7 +551,9 @@ export const Results = z.object({
   bySpot: z.array(z.object({ spotId: Id, title: z.string(), airings: z.number().int(), spentMicros: Micros, customers: z.number().int() })),
   airings: z.array(ResultsAiring),
   /** Relay viewers (added 2026-09-30): one line per platform, "Relay viewers, as reported by YouTube". Absent with none. */
-  relayViewers: z.array(RelayViewersLine).optional()
+  relayViewers: z.array(RelayViewersLine).optional(),
+  /** Other apps viewers (added 2026-10-10): one line, "Other apps". Absent with none. */
+  otherApps: OtherAppsLine.optional()
 });
 
 // ---- Added 2026-09-29: the business app's requests ----

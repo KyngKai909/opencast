@@ -449,6 +449,13 @@
       "when": 1791600312139,
       "tag": "0065_other_app_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791604120254,
+      "tag": "0066_other_app_charges",
+      "breakpoints": true
     }
   ]
 }

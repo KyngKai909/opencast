@@ -57,8 +57,12 @@ export const Statement = z.object({
       // ---- E3 (added 2026-09-29) ----
       /** Station statements use the first seven; business statements (2026-09-29) use `balance` and `spent`. */
       group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other", "balance", "spent", "usage"]).optional(),
-      /** Business statements (added 2026-09-29): what the line is. `spot_station` lines are one spot on one station. */
-      kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station", "relay_viewers", "relay_waiting"]).optional(),
+      /**
+       * Business statements (added 2026-09-29): what the line is. `spot_station` lines are one spot on
+       * one station. `other_apps` (added 2026-10-10, programming Phase 5, P5.1): "Other apps", what
+       * per-thousand spots paid for viewers tuned from the channel list in other apps, added in.
+       */
+      kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station", "relay_viewers", "relay_waiting", "other_apps"]).optional(),
       /** Shown, not added in (money returned from holds, fees paid on top). */
       includedAbove: z.boolean().optional(),
       /** How many airings the line is for (spot lines). */

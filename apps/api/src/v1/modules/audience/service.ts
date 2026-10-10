@@ -71,7 +71,7 @@ export interface AudienceService {
   totals: Totals;
   /** A251: the desk's Analytics tabs. */
   analytics: Analytics;
-  /** Programming Phase 5: the audience source "Other apps", from runs of `via=iptv` playlist polls, counted apart and never billed. */
+  /** Programming Phase 5: the audience source "Other apps", from runs of `via=iptv` playlist polls, counted apart; per-thousand spots bill those that watched through them (P5.1). */
   otherApps: OtherApps;
 }
 

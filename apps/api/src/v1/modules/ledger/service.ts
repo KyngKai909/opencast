@@ -304,6 +304,8 @@ const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.sl
 
 /** Relay viewers' settlements and returns (2026-09-30): `source_type` on their entries. */
 export const RELAY_VIEWERS = "relay_viewers";
+/** Other apps viewers' settlements and returns (2026-10-10, programming Phase 5, P5.1): `source_type` on their entries. */
+export const OTHER_APP_VIEWERS = "other_app_viewers";
 
 /** Pay-as-you-go's line on a station's statement: usage paid from its earnings. */
 const USAGE_FROM_EARNINGS = "Usage, taken from earnings";
@@ -357,13 +359,13 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       .from(E)
       .innerJoin(P, eq(P.entryId, E.id))
       .leftJoin(H, eq(H.id, P.holdId))
-      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), inArray(E.sourceType, ["as_run", RELAY_VIEWERS])));
+      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), inArray(E.sourceType, ["as_run", RELAY_VIEWERS, OTHER_APP_VIEWERS])));
     let micros = 0;
     const entries = new Set<string>();
     for (const r of rows) {
       if ((r.holdAdvertiser === businessId || r.accountId === available) && r.amount < 0) {
         micros += -r.amount;
-        // Relay viewers are part of an airing already counted.
+        // Relay viewers and Other apps viewers are part of an airing already counted.
         if (r.sourceType === "as_run") entries.add(r.entryId);
       }
     }
@@ -852,8 +854,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             label = entry.memo ?? "Returned";
             break;
           case "settle":
-            // Relay viewers (2026-09-30) are part of an airing: "Relay viewers, as reported by YouTube".
-            kind = entry.sourceType === "as_run" || entry.sourceType === RELAY_VIEWERS ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
+            // Relay viewers (2026-09-30) are part of an airing: "Relay viewers, as reported by YouTube"; so are Other apps viewers (P5.1), "Other apps".
+            kind = entry.sourceType === "as_run" || entry.sourceType === RELAY_VIEWERS || entry.sourceType === OTHER_APP_VIEWERS ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
             label = entry.memo ?? "Aired";
             break;
           default:
@@ -1279,7 +1281,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .innerJoin(P, eq(P.entryId, E.id))
         .where(and(eq(P.accountId, account), gte(E.occurredAt, from), lt(E.occurredAt, now)));
       const sum = (pred: (e: typeof E.$inferSelect, amount: number) => boolean) => rows.filter((r) => pred(r.entry, r.amount)).reduce((s, r) => s + r.amount, 0);
-      const spots = sum((e) => e.kind === "settle" && e.sourceType === "as_run");
+      // Other apps viewers (P5.1) are Opencast's own audience: in Spots until the station's pages show them apart (P5.11).
+      const spots = sum((e) => e.kind === "settle" && (e.sourceType === "as_run" || e.sourceType === OTHER_APP_VIEWERS));
       // Relay viewers (2026-09-30): their own lines, one per platform.
       const relayRows = rows.filter((r) => r.entry.kind === "settle" && r.entry.sourceType === RELAY_VIEWERS);
       const relayViewers = (["youtube", "twitch"] as const).flatMap((platform) => {

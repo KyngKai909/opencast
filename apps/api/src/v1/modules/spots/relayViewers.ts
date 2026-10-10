@@ -15,6 +15,7 @@
 // for Opencast's viewers when it airs and keeps the relay estimate held; each platform's relay part
 // (a `relay_charges` row) settles when its numbers are in (online) or YouTube's location data
 // arrives (local). None by `relays.location_wait` (7 days): not charged, returned to the balance.
+// Other apps viewers (P5.1) are the airing's third part, kept held beside these (`otherAppViewers.ts`).
 
 import { and, eq, inArray } from "drizzle-orm";
 import { schema } from "@opencast/db";
@@ -26,6 +27,7 @@ const SP = schema.spotsTable;
 const AD = schema.advertisers;
 const AI = schema.airings;
 const RC = schema.relayCharges;
+const OC = schema.otherAppCharges;
 const MINUTE = 60_000;
 const DAY = 86_400_000;
 /** A platform's count for a minute comes in within the minute after: settled after this. */
@@ -56,6 +58,8 @@ const REASONS: Record<string, string> = {
 };
 
 export interface RelayViewers {
+  /** A spot's area on a station (online businesses: everywhere). */
+  area(spot: SpotRow, stationId: string): Promise<Area>;
   /** The relay part of a per-thousand spot's hold: the usual relay viewers at this hour (local: YouTube's only). */
   holdEstimate(spot: SpotRow, stationId: string, at: Date): Promise<number>;
   /** Opencast's viewers billed for a per-thousand airing: all tuned in (online), or those placed inside the area (local). */
@@ -126,7 +130,12 @@ export function createRelayViewers({ deps, services }: ModuleContext): RelayView
         .select({ held: RC.heldMicros })
         .from(RC)
         .where(and(eq(RC.airingId, charge.airingId), inArray(RC.status, ["counting", "waiting_location"])));
-      const keep = others.reduce((s, r) => s + r.held, 0) - charge.heldMicros;
+      // And for the airing's Other apps part while it counts (P5.1).
+      const otherApps = await tx
+        .select({ held: OC.heldMicros })
+        .from(OC)
+        .where(and(eq(OC.airingId, charge.airingId), eq(OC.status, "counting")));
+      const keep = others.reduce((s, r) => s + r.held, 0) - charge.heldMicros + otherApps.reduce((s, r) => s + r.held, 0);
       const source = { sourceType: "relay_viewers", sourceId: charge.id };
       let returnedMicros = 0;
       if (outcome.status === "settled" && (outcome.costMicros ?? 0) > 0) {
@@ -182,6 +191,8 @@ export function createRelayViewers({ deps, services }: ModuleContext): RelayView
   }
 
   const part: RelayViewers = {
+    area: areaFor,
+
     async holdEstimate(spot, stationId, at) {
       const counted = await services.platforms.countedPlatforms(stationId);
       if (!counted.length) return 0;

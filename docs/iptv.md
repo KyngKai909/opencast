@@ -25,7 +25,9 @@ Both are public, read-only and cached: each is built when asked for and kept a m
 
 A station's playlists asked for with `?via=iptv` count as the audience source "Other apps", by station and market (the market from the connection, as the viewer app places a signed-out viewer). Those apps send no heartbeats, so a session is a run of playlist polls from one connection: two minutes without a poll ends it, and it counts once its polls span a minute. The master asked for with `?via=iptv` names its renditions with it too, since players drop a master's query when they read its relative lines.
 
-They're shown apart (`AudienceReport.otherApps`, `AnalyticsOverview.otherApps`) and never counted toward spot billing, the pool or the tuned-in totals until Kai decides (`docs/open-decisions.md`, P5.1). The address is never kept: only a hash of it with the day, cleared a day later.
+They're shown apart (`AudienceReport.otherApps`, `AnalyticsOverview.otherApps`) and never counted toward the pool or the tuned-in totals. The address is never kept: only a hash of it with the day, cleared a day later.
+
+Per-thousand spots count them where they can be attributed (the user's decision, P5.1 in `docs/open-decisions.md`): a session is billed for a spot when its polls ran from the spot's start (or before) to its end (or after), it counts (a minute of polls), and its polls average at least one every 30 seconds; one per connection. Online businesses pay for every such session; local businesses only for those placed in a market inside the spot's area (a session Opencast couldn't place isn't billed to them). It's the airing's "Other apps" part (`spots/otherAppViewers.ts`, `spots.other_app_charges`): held as the spot airs and settled two minutes after it, once the polls after the spot are in, and shown as its own line on the business's results and statements.
 
 ## Known limit: what other apps don't show
 
