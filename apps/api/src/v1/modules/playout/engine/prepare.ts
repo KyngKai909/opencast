@@ -31,7 +31,14 @@
 // rendition is tagged BT.709. What was prepared before keeps its segments; a file that the probe
 // finds HDR or interlaced is prepared again beside it (`<key>-p2`, the re-prepare job in
 // storageMaintenance.ts) and airs from that once it's ready: `refKey` makes the switch, so nothing
-// else needs to know.
+// else needs to know. A week after it takes over, the first copy is dropped (the storage sweep's
+// `sweepFirstCopies`, built with Phase 4), and the newer one airs on alone.
+//
+// Suggested break points (programming prompt, Phase 4, 2026-10-10; breaks.ts). Once a program's
+// file is prepared, it's looked at for break points (its chapter marks, else where it's both black
+// and silent), once per file (`break_suggestions`), and they never hold the item up: a failure is
+// logged, and the item is ready all the same. Programs prepared before are looked at while the
+// worker has nothing to prepare, one at a time (`checkOlder`), from the stored original.
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -45,11 +52,13 @@ import type { ModuleContext } from "../../../context.js";
 import { captionRendition, languageTag, segmentVtt, vttContentId } from "../../../lib/captions.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
 import { isGeneratedIdent } from "./stationId.js";
+import { BREAKS_FROM_MS, type BreakFinder } from "./breaks.js";
 import { BAND_RENDITIONS, EDGE_FADE_MS, FPS, LADDER, REFERENCE, SEGMENT_MS, TARGET_LUFS, type Band, type Ladder, type Rendition, type RenditionName } from "./ladder.js";
 
 const PI = schema.preparedItems;
 const PR = schema.preparedRenditions;
 const PC = schema.preparedCaptions;
+const BS = schema.breakSuggestions;
 
 /**
  * The generated station ID's sound (added 2026-09-29), and the automatic opener's and closer's
@@ -125,15 +134,16 @@ let versionsRead: { db: unknown; at: number } | null = null;
  * Reads which items have a newer copy ready, at most every 30 s (and at once with `force`, or for
  * another database). A newer copy takes over only when it has every rendition the first one has,
  * so nothing on the log loses its readiness. Until it's read here, the first copy airs, which is
- * still there.
+ * still there. Once the first copy is dropped (a week after, `sweepFirstCopies`), the newer one
+ * airs alone.
  */
 export async function syncPreparedVersions(db: ModuleContext["deps"]["db"], options: { force?: boolean } = {}): Promise<void> {
   const now = Date.now();
   if (!options.force && versionsRead?.db === db && now - versionsRead.at < VERSIONS_EVERY_MS) return;
   versionsRead = { db, at: now };
   const rows = (await db.execute(sql`
-    select b.key as base, v.key as key
-    from ${PI} v join ${PI} b on b.key = regexp_replace(v.key, '-p[0-9]+$', '')
+    select regexp_replace(v.key, '-p[0-9]+$', '') as base, v.key as key
+    from ${PI} v left join ${PI} b on b.key = regexp_replace(v.key, '-p[0-9]+$', '')
     where v.key ~ '-p[0-9]+$'
       and exists (select 1 from ${PR} r where r.key = v.key)
       and not exists (select 1 from ${PR} r where r.key = b.key and not exists (select 1 from ${PR} n where n.key = v.key and n.rendition = r.rendition))
@@ -486,6 +496,8 @@ export interface PreparerOptions {
   transcoder?: Transcoder;
   /** Captions from speech (X2): none until a provider is chosen. */
   captionGenerator?: CaptionGenerator;
+  /** Suggested break points (Phase 4): where to look for them. None looked for without one (the worker's is FFmpeg's). */
+  breakFinder?: BreakFinder | null;
   /** Preparation scratch space (the worker's only disk need). */
   scratchDir: string;
   concurrency?: number;
@@ -510,6 +522,11 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
   const running = new Map<string, Promise<void>>();
   const listeners = new Set<(key: string) => void>();
   let loaded: Promise<void> | undefined;
+  const breakFinder = options.breakFinder ?? null;
+  /** Older programs looked at for break points: the one under way, where the walk is, and when to start it again. */
+  let older: Promise<void> | null = null;
+  let olderAfter: string | undefined;
+  let olderAgainAt = 0;
 
   function markReady(key: string, renditions: string[]) {
     const set = ready.get(key) ?? new Set<string>();
@@ -625,6 +642,8 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
         );
       }
       for (const listener of listeners) listener(key);
+      // Suggested break points (Phase 4), once the item is ready: they never hold it up.
+      if (row.kind === "file" && row.contentId && source?.kind === "file") await suggestBreaks(row.contentId, source.path, durationMs ?? 0);
     } catch (error) {
       const message = (error as Error).message.slice(0, 500);
       log(`[prepare] ${key.slice(0, 16)}… failed: ${message}`);
@@ -652,6 +671,74 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
       if (generated) extra.push({ ...generated, source: "generated" });
     }
     await prepareCaptions(key, extra);
+  }
+
+  /**
+   * Looks in a program's file for break points (Phase 4), once per file: only a file a station's
+   * own program airs from, eight minutes or longer, not looked at before. What's found is kept for
+   * the library; a file that can't be read is kept as looked at, with why. Never throws: a failure
+   * is logged, and the item is ready all the same.
+   */
+  async function suggestBreaks(cid: string, file: string, durationMs: number, known?: { mediaKind: "video" | "audio" }): Promise<void> {
+    if (!breakFinder || durationMs < BREAKS_FROM_MS) return;
+    try {
+      const [done] = await db.select({ cid: BS.contentId }).from(BS).where(eq(BS.contentId, cid));
+      if (done) return;
+      const [program] = known ? [known] : await services.library.programFiles({ minMs: BREAKS_FROM_MS, among: [cid] });
+      if (!program) return;
+      let found: Awaited<ReturnType<BreakFinder>> | null = null;
+      let error: string | null = null;
+      try {
+        found = await breakFinder({ file, durationMs, video: program.mediaKind === "video" });
+      } catch (e) {
+        error = (e as Error).message.slice(0, 500);
+        log(`[prepare] ${cid.slice(0, 16)}… break points failed: ${error.slice(0, 200)}`);
+      }
+      await db
+        .insert(BS)
+        .values({ contentId: cid, source: found?.source ?? null, offsetsMs: found?.offsetsMs ?? [], error, checkedAt: deps.clock.now() })
+        .onConflictDoNothing();
+      if (found?.offsetsMs.length) log(`[prepare] ${cid.slice(0, 16)}… ${found.offsetsMs.length} break points suggested, from ${found.source === "chapter" ? "chapter marks" : "fades to black"}`);
+    } catch (e) {
+      log(`[prepare] ${cid.slice(0, 16)}… break points failed: ${(e as Error).message.slice(0, 200)}`);
+    }
+  }
+
+  /**
+   * Programs prepared before Phase 4, looked at for break points while the worker has nothing to
+   * prepare: one file at a time, from its stored original (read where it is, or downloaded to
+   * scratch), walking the programs by content ID. At the end of the walk, it waits an hour before
+   * walking again (for anything a failed look or a replaced file left).
+   */
+  async function checkOlder(): Promise<void> {
+    if (Date.now() < olderAgainAt) return;
+    const page = await services.library.programFiles({ minMs: BREAKS_FROM_MS, after: olderAfter, limit: 200 });
+    if (!page.length) {
+      olderAfter = undefined;
+      olderAgainAt = Date.now() + 3_600_000;
+      return;
+    }
+    const cids = page.map((p) => p.contentId);
+    const [done, prepared] = await Promise.all([
+      db.select({ cid: BS.contentId }).from(BS).where(inArray(BS.contentId, cids)),
+      // Prepared (an item that can air): the rest are looked at as they're prepared.
+      db.selectDistinct({ cid: PI.contentId }).from(PI).where(and(inArray(PI.contentId, cids), eq(PI.status, "ready")))
+    ]);
+    const skip = new Set(done.map((d) => d.cid));
+    const ready = new Set(prepared.map((p) => p.cid));
+    const next = page.find((p) => !skip.has(p.contentId) && ready.has(p.contentId));
+    olderAfter = next?.contentId ?? cids[cids.length - 1];
+    if (!next) return;
+    const key = objectKey.file(next.contentId);
+    if (objects.readUrl) return suggestBreaks(next.contentId, await objects.readUrl(key, 3_600), next.durationMs, next);
+    const dir = await fs.mkdtemp(path.join(options.scratchDir, "breaks-"));
+    try {
+      const file = path.join(dir, "source");
+      await objects.download(key, file, sha256FromCid(next.contentId));
+      await suggestBreaks(next.contentId, file, next.durationMs, next);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   }
 
   /** Caption tracks uploaded to the items whose current file is this one. */
@@ -797,8 +884,14 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
           .orderBy(sql`${PI.neededAt} asc nulls last`, asc(PI.queuedAt))
           .limit(concurrency * 2);
         const next = queued.find((q) => !running.has(q.key));
-        if (!next) return;
+        if (!next) break;
         void start(next.key);
+      }
+      // Nothing to prepare: an older program is looked at for break points (Phase 4).
+      if (breakFinder && !running.size && !older) {
+        older = checkOlder()
+          .catch((error) => log(`[prepare] break points for an older program failed: ${(error as Error).message.slice(0, 200)}`))
+          .finally(() => (older = null));
       }
     },
 
@@ -885,7 +978,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
 
     /** Waits for preparations under way (tests, shutdown). */
     async settle() {
-      while (running.size) await Promise.all([...running.values()]);
+      while (running.size || older) await Promise.all([...running.values(), older]);
     },
 
     async stats(): Promise<PreparationStats> {

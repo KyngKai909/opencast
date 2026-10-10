@@ -58,7 +58,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.channel_items",
     "broadcast.translator_sessions",
     // Added 2026-09-29 (migration 0021): captions prepared with each item.
-    "broadcast.prepared_captions"
+    "broadcast.prepared_captions",
+    // Added 2026-10-10 (migration 0063, programming Phase 4): break points suggested for a file as it's prepared.
+    "broadcast.break_suggestions"
   ],
   catalog: ["catalog.*"],
   spots: ["spots.*"],

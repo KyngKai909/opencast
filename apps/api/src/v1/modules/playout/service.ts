@@ -14,7 +14,7 @@ import { captionSources } from "./engine/captions.js";
 import { liveObjectPrefixes } from "./engine/assemble.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
-import { queuePreparation, refKey, syncPreparedVersions, versionedKey, wantRow } from "./engine/prepare.js";
+import { baseKey, queuePreparation, refKey, syncPreparedVersions, versionedKey, wantRow } from "./engine/prepare.js";
 import { isEveryBreak, partsOf } from "./engine/cadence.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
 import { STATION_ID_MS } from "./engine/fill.js";
@@ -202,9 +202,11 @@ export interface PlayoutService {
    * `prepared_renditions` and `prepared_captions` rows, and any caption track made from one of
    * them (a WebVTT's content ID) on other items. The as-run log keeps what aired (it never pointed
    * at these rows). Without `evenIfAiring`, a key a channel's playlist pointed at in the last two
-   * hours is left for the storage sweep (players may still be fetching its segments).
+   * hours is left for the storage sweep (players may still be fetching its segments). A file's
+   * newer copy (`<key>-p2`, cleaner pictures) goes with it, unless `alone` (the first copy dropped
+   * once the newer one has taken over, `sweepFirstCopies`).
    */
-  dropPrepared(keys: string[], options: { evenIfAiring: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
+  dropPrepared(keys: string[], options: { evenIfAiring: boolean; alone?: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
   /**
    * Added 2026-09-30: deletes the live segments stored for a live source's blocks (TV ones copied
    * from Livepeer, radio ones packaged by the worker; `prepared/live-<source>-<session>/`), for a
@@ -215,6 +217,19 @@ export interface PlayoutService {
   dropLiveCopies(liveSourceId: string): Promise<{ sessions: string[] }>;
   /** The storage sweep: what was prepared from files that are gone, left while it aired (or from before). */
   sweepPrepared(): Promise<{ dropped: number; deferred: number }>;
+  /**
+   * The storage sweep (programming Phase 4, 2026-10-10, open decision P1.3): a file's first
+   * prepared copy, a week after its newer copy (`<key>-p2`, cleaner pictures) took over, unless a
+   * channel's playlist still points at it (it's tried again on the next sweep). The newer copy airs
+   * on alone.
+   */
+  sweepFirstCopies(): Promise<{ dropped: number; deferred: number }>;
+  /**
+   * Programming Phase 4 (2026-10-10): the break points suggested for these files, found as each was
+   * prepared (chapter marks, or fades to black and silence). Files with none, or not looked at yet,
+   * aren't in it.
+   */
+  breakSuggestions(contentIds: string[]): Promise<Map<string, { source: "chapter" | "fade"; offsetsMs: number[] }>>;
 
   // ---- Pay-as-you-go metering (added 2026-09-29, follow-up Phase 2) ----
   /** Translator sessions overlapping [from, to), each clipped to it; a running one counts to its last update. */
@@ -245,6 +260,8 @@ export const PREVIEW_RENDITION: Record<Band, RenditionName> = { tv: "v360", radi
 const PREVIEW_NEEDED_IN_MS = 3_600_000;
 /** How long after a channel last pointed at a prepared item its segments may still be fetched. */
 const AIRED_GRACE_MS = 2 * 3_600_000;
+/** A file's first prepared copy is kept this long after its newer copy takes over (open decision P1.3). */
+export const FIRST_COPY_KEPT_MS = 7 * 86_400_000;
 
 const HOUR = 3_600_000;
 
@@ -1087,16 +1104,20 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const out = new Map<string, PreviewView>();
       if (!wanted.length) return out;
       const keys = [...new Set(wanted.map((r) => r.contentId))];
+      // The newer copy, once it's ready (its first copy may be gone); keyed back by content ID.
+      await syncPreparedVersions(db);
+      const prepared = new Map(keys.map((k) => [refKey({ contentId: k })!, k]));
       const [info, renditions, items] = await Promise.all([
         services.library.content.info(keys),
-        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, keys)),
-        db.select({ key: PI.key, status: PI.status, mediaKind: PI.mediaKind }).from(PI).where(inArray(PI.key, keys))
+        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, [...prepared.keys()])),
+        db.select({ key: PI.key, status: PI.status, mediaKind: PI.mediaKind }).from(PI).where(inArray(PI.key, [...prepared.keys()]))
       ]);
+      const cidOf = (key: string) => prepared.get(key) ?? key;
       // Sound only, as it was asked for before (an order's delivery, a spot with no picture): the radio band's preview.
-      const soundOnly = new Set(items.filter((i) => i.mediaKind === "audio").map((i) => i.key));
+      const soundOnly = new Set(items.filter((i) => i.mediaKind === "audio").map((i) => cidOf(i.key)));
       const have = new Map<string, Set<string>>();
-      for (const r of renditions) have.set(r.key, (have.get(r.key) ?? new Set()).add(r.rendition));
-      const status = new Map(items.map((i) => [i.key, i.status]));
+      for (const r of renditions) have.set(cidOf(r.key), (have.get(cidOf(r.key)) ?? new Set()).add(r.rendition));
+      const status = new Map(items.map((i) => [cidOf(i.key), i.status]));
       const queue = new Map<string, typeof PI.$inferInsert>();
       for (const asked of wanted) {
         const key = asked.contentId;
@@ -1119,7 +1140,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (options.prepare || now === "queued" || now === "preparing") out.set(key, { status: "preparing", url: null });
         // Asked for: queued (or this band's renditions added to what's queued), after what airs within the hour.
         if (options.prepare) {
-          queue.set(key, wantRow({ contentId: key, mediaKind: ref.mediaKind, band: ref.band, durationMs: ref.durationMs ?? null, neededAt: new Date(deps.clock.now().getTime() + PREVIEW_NEEDED_IN_MS) }, key, queue.get(key)));
+          queue.set(key, wantRow({ contentId: key, mediaKind: ref.mediaKind, band: ref.band, durationMs: ref.durationMs ?? null, neededAt: new Date(deps.clock.now().getTime() + PREVIEW_NEEDED_IN_MS) }, refKey({ contentId: key })!, queue.get(key)));
         }
       }
       if (queue.size) await queuePreparation(db, [...queue.values()]);
@@ -1151,10 +1172,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return { body, maxAge: 60 };
     },
 
-    async dropPrepared(keys, { evenIfAiring }) {
+    async dropPrepared(keys, { evenIfAiring, alone }) {
       // A file's newer copy (`<key>-p2`, cleaner pictures) goes with it.
       const given = keys.filter(Boolean);
-      const newer = given.length ? (await db.select({ key: PI.key }).from(PI).where(inArray(PI.key, given.map(versionedKey)))).map((r) => r.key) : [];
+      const newer = given.length && !alone ?(await db.select({ key: PI.key }).from(PI).where(inArray(PI.key, given.map(versionedKey)))).map((r) => r.key) : [];
       const unique = [...new Set([...given, ...newer])];
       const dropped: string[] = [];
       const deferred: string[] = [];
@@ -1206,7 +1227,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         db.selectDistinct({ key: PI.key }).from(PI).where(sql`${PI.contentId} is not null`),
         db.selectDistinct({ key: PC.contentId }).from(PC)
       ]);
-      const keys = [...new Set([...items.map((r) => r.key), ...captions.map((r) => r.key)])].filter(isContentId);
+      // A newer copy by its file's content ID (its first copy may have been dropped already).
+      const keys = [...new Set([...items.map((r) => baseKey(r.key)), ...captions.map((r) => r.key)])].filter(isContentId);
       let dropped = 0;
       let deferred = 0;
       for (let i = 0; i < keys.length; i += 500) {
@@ -1216,6 +1238,34 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         deferred += result.deferred.length;
       }
       return { dropped, deferred };
+    },
+
+    async sweepFirstCopies() {
+      // Newer copies that took over (every rendition the first has) over a week ago: by when the
+      // newer copy was last prepared, which is when it took over or later.
+      const before = new Date(deps.clock.now().getTime() - FIRST_COPY_KEPT_MS);
+      const rows = (await db.execute(sql`
+        select b.key as key
+        from ${PI} v join ${PI} b on b.key = regexp_replace(v.key, '-p[0-9]+$', '')
+        where v.key ~ '-p[0-9]+$' and v.status = 'ready' and v.prepared_at < ${before.toISOString()}::timestamptz
+          and exists (select 1 from ${PR} r where r.key = v.key)
+          and not exists (select 1 from ${PR} r where r.key = b.key and not exists (select 1 from ${PR} n where n.key = v.key and n.rendition = r.rendition))
+        order by b.key`)) as unknown as { rows: Array<{ key: string }> };
+      if (!rows.rows.length) return { dropped: 0, deferred: 0 };
+      // This process reads the newer copy as the one to air before the first goes (the others have for a week).
+      await syncPreparedVersions(db, { force: true });
+      const result = await service.dropPrepared(
+        rows.rows.map((r) => r.key),
+        { evenIfAiring: false, alone: true }
+      );
+      return { dropped: result.dropped.length, deferred: result.deferred.length };
+    },
+
+    async breakSuggestions(contentIds) {
+      const unique = [...new Set(contentIds.filter(Boolean))];
+      if (!unique.length) return new Map();
+      const rows = await db.select().from(schema.breakSuggestions).where(inArray(schema.breakSuggestions.contentId, unique));
+      return new Map(rows.flatMap((r) => (r.source && r.offsetsMs.length ? [[r.contentId, { source: r.source, offsetsMs: [...r.offsetsMs].sort((a, b) => a - b) }] as const] : [])));
     }
   };
   return service;

@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { and, asc, desc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { IDENT_LEGACY_CODE, isIdentCode, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem } from "@opencast/contracts";
 import { guessEpisode, iabContentCategories, isChildrensRating, nextEpisodes, type ContentRating } from "@opencast/domain";
@@ -99,6 +99,12 @@ export interface LibraryService {
   itemsSharingContent(itemIds: string[]): Promise<string[]>;
   /** Every item's current content ID. */
   currentContent(itemIds: string[]): Promise<Map<string, string>>;
+  /**
+   * Programming Phase 4 (2026-10-10): the files programs in stations' own libraries air from now
+   * (each item's current file, not archived), at least `minMs` long, by content ID in order: those
+   * among `among`, or a page after `after`. Where break points are looked for.
+   */
+  programFiles(options: { minMs: number; among?: string[]; after?: string; limit?: number }): Promise<Array<{ contentId: string; durationMs: number; mediaKind: "video" | "audio" }>>;
   /** The desk's station file (added 2026-10-07): every item a station has, archived ones too, newest first, with its rights and program. */
   stationUploads(stationId: string): Promise<Array<{ id: string; title: string; program: string | null; code: string; source: "upload" | "link" | "creator_work" | "library"; sourceUrl: string | null; originalFilename: string | null; mediaKind: "video" | "audio"; durationMs: number | null; status: "preparing" | "ready" | "failed"; addedAt: Date; archivedAt: Date | null; archivedBy: string | null; archivedReason: string | null; rights: { basis: string; note: string | null; confirmedAt: Date } | null; contentId: string | null }>>;
   /**
@@ -168,6 +174,8 @@ export interface LibraryService {
    */
   upload(stationId: string, file: UploadedFile, fields: ItemFields & { captions?: string; captionLanguage?: string }, options?: { id?: string }): Promise<LibraryItem>;
   updateItem(itemId: string, fields: Partial<ItemFields>): Promise<LibraryItem>;
+  /** Programming Phase 4: uses (they become its break points) or dismisses a program's suggested break points. */
+  answerBreakSuggestions(itemId: string, answer: "use" | "dismiss"): Promise<LibraryItem>;
   archiveItem(itemId: string): Promise<void>;
   /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
   archiveForClaim(itemId: string): Promise<void>;
@@ -397,6 +405,21 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       db.select({ assetId: schema.captionTracks.assetId, language: schema.captionTracks.language }).from(schema.captionTracks).where(inArray(schema.captionTracks.assetId, ids))
     ]);
     const trackLanguage = new Map(tracks.map((t) => [t.assetId, t.language]));
+    // Programming Phase 4: break points suggested for a program with none of its own, until the
+    // station answers them for its current file; with the preview to hear each one from.
+    const askingCid = new Map<string, string>();
+    for (const r of rows) {
+      const cid = files.get(r.id)?.contentId;
+      if (r.code === "PGM" && cid && !breakPoints.some((p) => p.assetId === r.id) && r.breakSuggestionsAnswered !== cid) askingCid.set(r.id, cid);
+    }
+    const suggested = askingCid.size ? await services.playout.breakSuggestions([...askingCid.values()]) : new Map<string, { source: "chapter" | "fade"; offsetsMs: number[] }>();
+    const suggestedRows = rows.filter((r) => suggested.has(askingCid.get(r.id) ?? ""));
+    // A video's TV preview when it has one, else the radio band's sound.
+    const previews = suggestedRows.length
+      ? await services.playout.previews(
+          suggestedRows.flatMap((r) => (["radio", "tv"] as const).filter((band) => band === "radio" || r.mediaKind === "video").map((band) => ({ contentId: askingCid.get(r.id)!, mediaKind: r.mediaKind, band, durationMs: r.durationMs })))
+        )
+      : new Map<string, { url: string | null }>();
     const info = await content.info([...files.values()].flatMap((f) => [f.contentId, f.originalContentId]).filter((v): v is string => Boolean(v)));
     const names = await services.accounts.displayNames(rights.map((r) => r.confirmedBy).filter((v): v is string => Boolean(v)));
     const rightsBy = new Map(rights.map((r) => [r.assetId, r]));
@@ -465,6 +488,11 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         seasonNumber: r.seasonNumber,
         partOf: r.partOf,
         partNumber: r.partNumber,
+        suggestedBreakPoints: (() => {
+          const cid = askingCid.get(r.id);
+          const found = cid ? suggested.get(cid) : undefined;
+          return found ? { source: found.source, pointsMs: found.offsetsMs, previewUrl: previews.get(cid!)?.url ?? null } : null;
+        })(),
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -776,6 +804,28 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     async currentContent(itemIds) {
       const files = await currentFiles(itemIds);
       return new Map([...files].flatMap(([id, f]) => (f.contentId ? [[id, f.contentId] as [string, string]] : [])));
+    },
+
+    async programFiles({ minMs, among, after, limit = 100 }) {
+      if (among && !among.length) return [];
+      const rows = await db
+        .selectDistinctOn([F.contentId], { contentId: F.contentId, durationMs: A.durationMs, mediaKind: A.mediaKind })
+        .from(F)
+        .innerJoin(A, eq(A.id, F.assetId))
+        .where(
+          and(
+            eq(A.code, "PGM"),
+            isNull(A.archivedAt),
+            isNotNull(F.contentId),
+            gte(A.durationMs, minMs),
+            sql`${F.version} = (select max(g.version) from ${F} g where g.asset_id = ${F.assetId})`,
+            among ? inArray(F.contentId, among) : undefined,
+            after ? sql`${F.contentId} > ${after}` : undefined
+          )
+        )
+        .orderBy(F.contentId)
+        .limit(limit);
+      return rows.map((r) => ({ contentId: r.contentId!, durationMs: r.durationMs!, mediaKind: r.mediaKind }));
     },
 
     async preparableSince(since, limit) {
@@ -1172,6 +1222,19 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         if (!WINDOWED.includes(code) && windowOf(row)) Object.assign(patch, { airsFrom: null, airsUntil: null, dailyFrom: null, dailyUntil: null });
         if (Object.keys(patch).length) await tx.update(A).set(patch).where(eq(A.id, itemId));
         if (fields.breakPointsMs) await setBreakPoints(tx, itemId, fields.breakPointsMs);
+      });
+      return service.item(itemId);
+    },
+
+    async answerBreakSuggestions(itemId, answer) {
+      const row = await itemRow(itemId);
+      const [item] = await toItems([row]);
+      const suggested = item.suggestedBreakPoints;
+      const cid = item.storage?.contentId ?? (await currentFiles([itemId])).get(itemId)?.contentId;
+      if (!suggested || !cid) throw new HttpError(409, "no_suggestions", "There are no suggested break points to answer.");
+      await db.transaction(async (tx) => {
+        await tx.update(A).set({ breakSuggestionsAnswered: cid }).where(eq(A.id, itemId));
+        if (answer === "use") await setBreakPoints(tx, itemId, suggested.pointsMs);
       });
       return service.item(itemId);
     },

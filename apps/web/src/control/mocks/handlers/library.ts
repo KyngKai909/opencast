@@ -61,7 +61,9 @@ const withProbe = (i: LibraryItem): LibraryItem => ({
   airs: i.airs ?? null,
   airingNow: inWindow(i.airs, now()),
   // A244: the programming block it belongs to.
-  programBlockId: i.programBlockId ?? null
+  programBlockId: i.programBlockId ?? null,
+  // Programming Phase 4: suggested break points, offered only while it has none of its own.
+  suggestedBreakPoints: i.breakPointsMs.length ? null : (i.suggestedBreakPoints ?? null)
 });
 
 /** Programs with their listing status computed from what they air this week. */
@@ -350,6 +352,24 @@ export const libraryHandlers = [
     Object.assign(item, rest);
     saveDb();
     return reply(libraryApi.getItem.response, withProbe(item));
+  }),
+
+  // Programming Phase 4, as the API: Use these makes them the item's break points; either answer ends them.
+  http.post(path(libraryApi.answerBreakSuggestions), async ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const item = itemById(String(params.itemId));
+    if (!item) return fail(404, "not_found", "That item wasn't found.");
+    const denied = programs(item.stationId, p);
+    if (denied) return denied;
+    const parsed = libraryApi.answerBreakSuggestions.body.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return fail(400, "invalid", "Use them or dismiss them.");
+    const suggested = withProbe(item).suggestedBreakPoints;
+    if (!suggested) return fail(409, "no_suggestions", "There are no suggested break points to answer.");
+    if (parsed.data.answer === "use") item.breakPointsMs = [...suggested.pointsMs];
+    item.suggestedBreakPoints = null;
+    saveDb();
+    return reply(libraryApi.answerBreakSuggestions.response, withProbe(item));
   }),
 
   http.delete(path(libraryApi.deleteItem), ({ request, params }) => {

@@ -289,7 +289,13 @@ export const assets = broadcast.table(
      * (`SID`) or one of its bumpers (`BMP`, by role). Null: the station's own. A block's items are
      * never in the station's pools; they air only during the block.
      */
-    programBlockId: uuid("program_block_id").references((): AnyPgColumn => programBlocks.id)
+    programBlockId: uuid("program_block_id").references((): AnyPgColumn => programBlocks.id),
+    /**
+     * Programming Phase 4 (migration 0063): the file (content ID) whose suggested break points the
+     * station answered, used or dismissed (`break_suggestions`). A new file's suggestions are asked
+     * about again.
+     */
+    breakSuggestionsAnswered: text("break_suggestions_answered")
   },
   (t) => [
     check("link_has_url", sql`${t.source} <> 'link' or ${t.sourceUrl} is not null`),
@@ -527,6 +533,24 @@ export const assetBreakPoints = broadcast.table(
   },
   (t) => [primaryKey({ columns: [t.assetId, t.offsetMs] })]
 );
+
+/**
+ * Programming Phase 4 (migration 0063): break points suggested for a file, found while it was
+ * prepared, kept apart from a maker's own (`asset_break_points`). One row per file (content ID),
+ * once it's been looked at: its chapter marks (`chapter`), or without them, where it's both black
+ * and silent (`fade`). No points (and no source) when nothing qualified or the file couldn't be
+ * read (`error`). A station sees them on its own library's programs, and they become the item's
+ * break points only when it says Use these.
+ */
+export const breakSuggestions = broadcast.table("break_suggestions", {
+  contentId: text("content_id")
+    .primaryKey()
+    .references(() => contents.cid),
+  source: text("source", { enum: ["chapter", "fade"] }),
+  offsetsMs: integer("offsets_ms").array().notNull().default(sql`'{}'::integer[]`),
+  error: text("error"),
+  checkedAt: at("checked_at").notNull().defaultNow()
+});
 
 /**
  * One per asset. A log entry can only reference an asset that has one: the
