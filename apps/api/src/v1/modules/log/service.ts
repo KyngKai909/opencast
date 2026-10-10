@@ -1,7 +1,8 @@
 import { asLogCode, isIdentCode } from "@opencast/contracts";
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Airing, AiringBlock, BlockBand, BlockSpan, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
+import { clearance, licenceEnding, notClearedNote, walkEpisodes } from "@opencast/domain";
+import type { Airing, AiringBlock, BlockBand, BlockSpan, BreakContent, BreakRow, LicenceWarning, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { clockTime, localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
@@ -14,7 +15,7 @@ import { blockAt, loadSpans, memberOf, memberships, type Membership, type SpanRo
 import type { BlockRef } from "../library/blocks.js";
 import { catalogCreditBreaks, catalogEntries } from "../playout/engine/catalogCredit.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
-import { broadcastDate, broadcastDay, createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+import { broadcastDate, broadcastDay, createTemplateOps, dayWords, templateLabel, type TemplateOps } from "./templates.js";
 import { MIN_RUN_MS, nextClockTime, programRuns } from "./timing.js";
 import { createChangeOps, logVersion, PARK, type ChangeOps } from "./changes.js";
 
@@ -24,6 +25,7 @@ export type { Boundary, Element } from "../playout/engine/sequence.js";
 /** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
 export const DEAD_AIR_NOTE = "Filled automatically: dead air";
 import type { ItemRef } from "../library/service.js";
+import { LICENCE_WARNING_DAYS } from "../licences/service.js";
 import type { BreakRuleView } from "../stations/service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
@@ -50,6 +52,8 @@ export interface AiringRef {
   title: string;
   startsAt: string;
   endsAt: string;
+  /** Programming Phase 3: the episode, as the guide lists it (null: none). */
+  episodeTitle?: string | null;
 }
 
 export interface BreakSlotView {
@@ -160,6 +164,12 @@ export interface LogService {
   nowNext(stationIds: string[], at: Date): Promise<Map<string, { now: Airing | null; next: Airing | null }>>;
   /** Every airing in a window per station, for the guide and station pages. */
   window(stationIds: string[], from: Date, to: Date): Promise<Map<string, Airing[]>>;
+  /**
+   * Programming Phase 5: `window` for the guide in other apps (XMLTV), each airing with the library
+   * item it airs (its season, episode and first airing are looked up from that), or null.
+   */
+  /** `agreementId` (the carriage agreement it airs under) added 2026-10-10, for where it can air (programming Phase 6). */
+  feed(stationIds: string[], from: Date, to: Date): Promise<Map<string, Array<Airing & { itemId: string | null; agreementId: string | null }>>>;
   upcomingForProgram(programId: string, limit: number): Promise<AiringRef[]>;
   itemUsage(itemId: string): Promise<{ upcoming: number }>;
   gaps(stationId: string, from: Date, to: Date): Promise<Gap[]>;
@@ -207,16 +217,23 @@ export interface LogService {
   /** One entry's slot. */
   entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
   /** Every station's items on the log in a window, earliest first (the readiness check reads ahead). */
-  upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
+  /** `code` and `agreementId` (the carriage agreement) added 2026-10-10 (programming Phase 6: where it can air). */
+  upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date; code: string; agreementId: string | null }>>;
+  /** Programming Phase 6 (P6.8): every station's program entries of these items still to air after `from`, earliest first. */
+  upcomingOfItems(itemIds: string[], from: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
   markBreakFilled(breakId: string): Promise<void>;
   /**
    * Nobody filled the gap: repeat from the library, in order, and record that it happened.
-   * Whatever doesn't fit airs station ID and bumpers.
+   * Whatever doesn't fit airs station ID and bumpers. Programming Phase 2: each program's next
+   * episode, In order, picking up after its last airing in the as-run log, so filling twice airs
+   * different episodes.
    */
   /** `usable` (playout's): only items it can air now (prepared for air). */
   fillDeadAir(stationId: string, gap: Gap, options?: { usable?(item: ItemRef): boolean }): Promise<number>;
+  /** Programming Phase 2: what dead-air fill would air next (up to `count` items, in order), for playout to prepare ahead. */
+  repeatsAhead(stationId: string, count: number): Promise<ItemRef[]>;
   /** Adds a break now, cued from a live block. */
   cueBreak(stationId: string, at: Date, lengthMs: number, logEntryId: string | null): Promise<BreakSlotView>;
   /** "During Saturday Reel" / "After Late Crate, ep. 14" for stored breaks. */
@@ -301,6 +318,38 @@ export function createLogService(ctx: ModuleContext): LogService {
     const held = stored.filter((b) => filled.get(b.id)).map((b) => b.id);
     if (empty.length) await ex.delete(B).where(inArray(B.id, empty));
     if (held.length) await ex.update(B).set({ logEntryId: null }).where(inArray(B.id, held));
+  }
+
+  /**
+   * Programming Phase 2: dead-air fill's repeats, an airing at a time. Which program is chosen as
+   * before: the station's 20 newest repeatable programs, taking turns. Its episode is the walker's,
+   * In order, picking up after the program's last airing in the as-run log, then after what this
+   * fill has placed. A multi-part episode is one airing (its parts). An item in no program is its
+   * own airing, as before. Null when nothing can air.
+   */
+  async function deadAirRepeats(stationId: string, given: (item: ItemRef) => boolean, during?: { from: Date; to: Date }): Promise<() => ItemRef[] | null> {
+    const candidates = await services.library.repeatable(stationId, 20);
+    const walks = await services.library.episodeWalks(stationId, candidates.flatMap((i) => (i.programId ? [i.programId] : [])));
+    // Programming Phase 6: never anything whose network licence isn't in force for the whole gap.
+    const licensed = await services.licences.covering([...candidates, ...[...walks.values()].flatMap((w) => w.episodes)]);
+    const tz = licensed.size ? await stationTz(stationId) : "UTC";
+    const span = during ?? { from: deps.clock.now(), to: deps.clock.now() };
+    const inForce = (item: ItemRef) => {
+      const licences = licensed.get(item.id);
+      return !licences || [span.from, span.to].every((at) => clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at, timeZone: tz }).cleared);
+    };
+    const usable = (item: ItemRef) => given(item) && inForce(item);
+    const items = candidates.filter(usable);
+    const walkers = new Map(
+      [...walks].map(([programId, w]) => [programId, walkEpisodes({ episodes: w.episodes.map((e) => ({ ...e, ready: w.repeatable.has(e.id) && usable(e) })), order: "in_order", seed: programId, position: w.aired })])
+    );
+    let i = 0;
+    return () => {
+      if (!items.length) return null;
+      const item = items[i++ % items.length];
+      const next = item.programId ? walkers.get(item.programId)?.next() : undefined;
+      return next && !next.done ? next.value.episodes : [item];
+    };
   }
 
   /**
@@ -398,7 +447,9 @@ export function createLogService(ctx: ModuleContext): LogService {
     );
     for (const [id, p] of extraPrograms) programs.set(id, p);
     const makers = await services.stations.idents([...agreements.values()].map((a) => a.makerStationId));
-    return { items, programs, agreements, makers };
+    // Programming Phase 3: the template slots that made them.
+    const slots = await templates.slotsOf(rows.map((r) => r.templateSlotId).filter((v): v is string => Boolean(v)));
+    return { items, programs, agreements, makers, slots };
   }
 
   function titleOf(row: Row, ctx: Awaited<ReturnType<typeof context>>): string {
@@ -454,8 +505,52 @@ export function createLogService(ctx: ModuleContext): LogService {
       localNote: row.localNote,
       episodeDescription: airing.episodeDescription ?? null,
       endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null,
-      keepTime: row.keepTime
+      keepTime: row.keepTime,
+      // Programming Phase 3: the template slot that made it (one taken off its template since: null).
+      ...(row.templateSlotId ? { templateSlot: ctx.slots.get(row.templateSlotId) ?? null } : {})
     };
+  }
+
+  /**
+   * Programming Phase 6: where the window's programs can air. A quiet note on an entry not cleared
+   * for an outlet the station uses (relays, when it relays everything to a platform: "Not on your
+   * YouTube relay"), and a warning on an entry whose network licence ends within two weeks, or has
+   * ended by the time it airs.
+   */
+  async function whereItAirs(stationId: string, rows: Row[], ctx: Awaited<ReturnType<typeof context>>) {
+    const notes = new Map<string, NonNullable<LogEntry["notes"]>>();
+    const warnings: LicenceWarning[] = [];
+    const programs = rows.filter((r) => r.kind === "program" && r.assetId);
+    if (!programs.length) return { notes, warnings };
+    const tz = await stationTz(stationId);
+    const now = deps.clock.now();
+    const [relay, platforms, licensed] = await Promise.all([
+      services.relays.settings(stationId),
+      services.platforms.relayPlatformNames(stationId).catch(() => [] as string[]),
+      services.licences.covering([...ctx.items.values()].map((i) => ({ id: i.id, programId: i.programId })))
+    ]);
+    if (relay.mode === "everything" && platforms.length) {
+      const answers = await services.licences.clearance(programs.map((r) => ({ assetId: r.assetId!, agreementId: r.carriageAgreementId, at: r.startsAt })), "relays", null, { at: now, timeZone: tz });
+      programs.forEach((r, i) => {
+        if (!answers[i].cleared) notes.set(r.id, [{ code: "not_cleared", outlet: "relays", message: notClearedNote("relays", platforms) }]);
+      });
+    }
+    for (const r of programs) {
+      const licences = licensed.get(r.assetId!);
+      if (!licences) continue;
+      const title = titleOf(r, ctx);
+      const answer = clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at: r.startsAt, timeZone: tz });
+      const last = licences.reduce((a, b) => (b.endsOn > a.endsOn ? b : a));
+      if (!answer.cleared && answer.reason === "licence_ended") {
+        warnings.push({ code: "licence_ended", entryId: r.id, licenceId: last.id, licensor: last.licensor, endsOn: last.endsOn, startsAt: r.startsAt.toISOString(), message: `${title} won't air: its licence from ${last.licensor} ended ${dayWords(last.endsOn)}.` });
+        continue;
+      }
+      const ending = licenceEnding(licences, { at: now, timeZone: tz, days: LICENCE_WARNING_DAYS });
+      if (ending && answer.cleared) {
+        warnings.push({ code: "licence_ending", entryId: r.id, licenceId: ending.id, licensor: ending.licensor, endsOn: ending.endsOn, startsAt: r.startsAt.toISOString(), message: `The licence for ${title} from ${ending.licensor} ends ${dayWords(ending.endsOn)}. It's off the air after that.` });
+      }
+    }
+    return { notes, warnings };
   }
 
   async function listingViews(rows: Row[]): Promise<Listing[]> {
@@ -1290,6 +1385,15 @@ export function createLogService(ctx: ModuleContext): LogService {
       // A242: never on the log (so the log, guide and dial keep the codes every app knows).
       if (isIdentCode(item.code)) throw refused("not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
       if (!item.rightsConfirmed) throw refused("rights_unconfirmed", "Confirm the rights to air it first.");
+      // Programming Phase 6: a network licence covering it has to be in force when it airs.
+      const licences = (await services.licences.covering([item])).get(item.id);
+      if (licences) {
+        const answer = clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at: startsAt, timeZone: await stationTz(stationId) });
+        if (!answer.cleared && answer.licence) {
+          const day = dayWords(answer.licence.endsOn);
+          throw refused(answer.reason === "licence_ended" ? "licence_ended" : "licence_not_started", answer.reason === "licence_ended" ? `Its licence from ${answer.licence.licensor} ended ${day}.` : `Its licence from ${answer.licence.licensor} hasn't started by then.`);
+        }
+      }
       if (item.stationId !== stationId) {
         if (!input.carriageAgreementId) throw refused("needs_agreement", "Another station's program needs a carriage agreement.");
         await services.catalog.checkAiring({ agreementId: input.carriageAgreementId, carrierStationId: stationId, itemId: item.id, startsAt, excludeEntryId: excludeId });
@@ -1665,7 +1769,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       const rows = await db.select().from(E).where(inArray(E.id, ids));
       const ctx = await context(rows);
       return new Map(
-        rows.map((r) => [r.id, { id: r.id, stationId: r.stationId, title: titleOf(r, ctx), startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString() }])
+        rows.map((r) => [r.id, { id: r.id, stationId: r.stationId, title: titleOf(r, ctx), startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), episodeTitle: toAiring(r, ctx).episodeTitle }])
       );
     },
 
@@ -1706,6 +1810,20 @@ export function createLogService(ctx: ModuleContext): LogService {
         );
       }
       return result;
+    },
+
+    async feed(stationIds, from, to) {
+      const [rows, airings] = await Promise.all([load(stationIds, from, to), service.window(stationIds, from, to)]);
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return new Map(
+        [...airings].map(([id, list]) => [
+          id,
+          list.map((a) => {
+            const row = a.kind === "off_air" || !a.logEntryId ? undefined : byId.get(a.logEntryId);
+            return { ...a, itemId: row?.assetId ?? null, agreementId: row?.carriageAgreementId ?? null };
+          })
+        ])
+      );
     },
 
     async upcomingForProgram(programId, limit) {
@@ -1976,9 +2094,19 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async upcomingItems(from, to) {
       const rows = await db
-        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt })
+        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt, code: E.code, agreementId: E.carriageAgreementId })
         .from(E)
         .where(and(sql`${E.assetId} is not null`, gt(E.endsAt, from), lt(E.startsAt, to)))
+        .orderBy(asc(E.startsAt));
+      return rows.map((r) => ({ ...r, itemId: r.itemId! }));
+    },
+
+    async upcomingOfItems(itemIds, from) {
+      if (!itemIds.length) return [];
+      const rows = await db
+        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt })
+        .from(E)
+        .where(and(eq(E.kind, "program"), inArray(E.assetId, [...new Set(itemIds)]), gt(E.endsAt, from)))
         .orderBy(asc(E.startsAt));
       return rows.map((r) => ({ ...r, itemId: r.itemId! }));
     },
@@ -2001,26 +2129,30 @@ export function createLogService(ctx: ModuleContext): LogService {
     async fillDeadAir(stationId, gap, options = {}) {
       const startsAt = new Date(gap.startsAt);
       const endsAt = new Date(gap.endsAt);
-      const items = (await services.library.repeatable(stationId, 20)).filter((i) => options.usable?.(i) ?? true);
+      const next = await deadAirRepeats(stationId, (i) => options.usable?.(i) ?? true, { from: startsAt, to: endsAt });
       // From a segment boundary (the stream changes item there).
       let cursor = nextSegment(startsAt.getTime());
       let placed = 0;
-      for (let i = 0; items.length && i < 200; i++) {
-        const item = items[i % items.length];
-        const length = roundUpToMinute(item.durationMs!);
-        if (cursor + length > endsAt.getTime()) break;
-        await db.insert(E).values({
-          stationId,
-          startsAt: new Date(cursor),
-          endsAt: new Date(cursor + length),
-          kind: "program",
-          code: item.code,
-          assetId: item.id,
-          programId: item.programId,
-          localNote: DEAD_AIR_NOTE
-        });
-        cursor += length;
-        placed++;
+      for (let i = 0; i < 200; i++) {
+        const airing = next();
+        if (!airing) break;
+        // A multi-part episode fits whole, or not at all.
+        if (cursor + airing.reduce((t, item) => t + roundUpToMinute(item.durationMs!), 0) > endsAt.getTime()) break;
+        for (const item of airing) {
+          const length = roundUpToMinute(item.durationMs!);
+          await db.insert(E).values({
+            stationId,
+            startsAt: new Date(cursor),
+            endsAt: new Date(cursor + length),
+            kind: "program",
+            code: item.code,
+            assetId: item.id,
+            programId: item.programId,
+            localNote: DEAD_AIR_NOTE
+          });
+          cursor += length;
+          placed++;
+        }
       }
       const now = deps.clock.now();
       const [event] = await db
@@ -2031,6 +2163,17 @@ export function createLogService(ctx: ModuleContext): LogService {
       else await db.insert(schema.deadAirEvents).values({ stationId, gapStartsAt: startsAt, gapEndsAt: endsAt, autoFilledAt: now });
       deps.bus.emit("station.dead_air_filled", { stationId, gapStartsAt: gap.startsAt, gapEndsAt: gap.endsAt });
       return placed;
+    },
+
+    async repeatsAhead(stationId, count) {
+      const next = await deadAirRepeats(stationId, () => true);
+      const ahead = new Map<string, ItemRef>();
+      for (let i = 0; i < count * 4 && ahead.size < count; i++) {
+        const airing = next();
+        if (!airing) break;
+        for (const item of airing) ahead.set(item.id, item);
+      }
+      return [...ahead.values()].slice(0, count);
     },
 
     async markBreakFilled(breakId) {
@@ -2170,17 +2313,20 @@ export function createLogService(ctx: ModuleContext): LogService {
       const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       const ctx = await context(rows);
       const breaks = await service.breaks(stationId, from, to);
-      const [contents, repeats, days, blocks, spans] = await Promise.all([
+      const [contents, repeats, days, blocks, spans, warnings, airs] = await Promise.all([
         service.breakContents(stationId, breaks),
         service.repeats(stationId, from),
         templates.days(stationId, from, to),
         spanViews(stationId, from, to),
-        spansOverlapping(stationId, from, to)
+        spansOverlapping(stationId, from, to),
+        templates.warnings(stationId, from, to),
+        whereItAirs(stationId, rows, ctx)
       ]);
       return {
         from: from.toISOString(),
         to: to.toISOString(),
-        entries: rows.map((r) => toEntry(r, ctx)),
+        // Programming Phase 6: a quiet note where it isn't cleared for an outlet the station uses.
+        entries: rows.map((r) => (airs.notes.has(r.id) ? { ...toEntry(r, ctx), notes: airs.notes.get(r.id) } : toEntry(r, ctx))),
         // G1: each break's rows, in the order they air.
         breaks: breaks.map((b) => ({ ...b, rows: (contents.get(b.startsAt) ?? []).map(breakRow) })),
         gaps: gapsIn(rows, from, to, offAir),
@@ -2191,7 +2337,11 @@ export function createLogService(ctx: ModuleContext): LogService {
         // Edit mode: what a draft began from (a batch is refused if the window changed since; A244: its blocks too).
         version: logVersion(rows, spans),
         // A244: programming blocks in the window.
-        ...(blocks.length ? { blocks } : {})
+        ...(blocks.length ? { blocks } : {}),
+        // Programming Phase 3: day template warnings (a program's last new episode, a week ahead).
+        ...(warnings.length ? { warnings } : {}),
+        // Programming Phase 6: network licences ending within two weeks, or ended.
+        ...(airs.warnings.length ? { licenceWarnings: airs.warnings } : {})
       };
     },
 

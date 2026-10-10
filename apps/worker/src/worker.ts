@@ -12,12 +12,13 @@
 // time preparing takes), readiness, radio live's CPU (`live`) and TV live copying (`liveCopy`:
 // bytes pulled and written per live hour, CPU, segments skipped and the delay a copy adds);
 // GET /hls/<station>/master.m3u8 (and <rendition>.m3u8) serves a channel's playlists, rendered from
-// the database, so any replica answers them.
+// the database, so any replica answers them; GET /hls/elsewhere/… the other apps' "Airing on
+// Opencast" slate segments those playlists name (programming Phase 6).
 
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
+import { clientIp, createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
 import { STORAGE_ROOT } from "./config.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
 import { startExternalChecks } from "./externalChecks.js";
@@ -76,9 +77,10 @@ async function tick() {
 const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? (process.env.RAILWAY_ENVIRONMENT ? process.env.PORT : undefined) ?? 8788);
 const PLAYLIST = /^\/hls\/([0-9a-f-]{36})\/([a-z0-9]+\.m3u8|empty\.vtt)$/;
 const PREPARED = /^\/hls\/(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.(?:ts|vtt))$/;
+const ELSEWHERE = /^\/hls\/elsewhere\/([\w-]+)\/([a-z0-9]+)\/(\d{1,6})-(\d{1,9})\.ts$/;
 const LOCAL_OBJECT = /^\/objects\/((?:prepared|proof)\/[\w/.-]+)$/;
 const health = http.createServer((req, res) => {
-  const url = (req.url ?? "").split("?")[0];
+  const [url, search = ""] = (req.url ?? "").split("?");
   if (url === "/health") {
     engine
       .stats()
@@ -94,14 +96,28 @@ const health = http.createServer((req, res) => {
   // A channel's playlists, from its assembled timeline (any replica can answer), with a short cache.
   const playlist = PLAYLIST.exec(url);
   if (playlist) {
+    // Programming Phase 5: `?via=iptv` (the channel list's) counts the poll as "Other apps".
+    const via = new URLSearchParams(search).get("via");
     services.playout
-      .playlist(playlist[1], playlist[2])
+      .playlist(playlist[1], playlist[2], via ? { via, ip: clientIp(req), userAgent: req.headers["user-agent"] ?? null } : undefined)
       .then((found) => {
         if (!found) return void res.writeHead(404, { ...cors, "cache-control": "no-cache" }).end();
         const headers = { ...cors, "content-type": found.contentType ?? "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}`, vary: "Accept-Encoding" };
         // A 30-minute window is tens of kilobytes of repetitive lines: gzip takes it to a few.
         if (/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) res.writeHead(200, { ...headers, "content-encoding": "gzip" }).end(gzipSync(found.body));
         else res.writeHead(200, headers).end(found.body);
+      })
+      .catch(() => res.writeHead(500, cors).end());
+    return;
+  }
+  // Programming Phase 6: the other apps' "Airing on Opencast" slate, re-timed to its place in the program it stands in for.
+  const elsewhere = ELSEWHERE.exec(url);
+  if (elsewhere) {
+    services.playout
+      .elsewhereSegment(elsewhere[1], elsewhere[2], Number(elsewhere[3]), Number(elsewhere[4]))
+      .then((segment) => {
+        if (!segment) return void res.writeHead(404, cors).end();
+        res.writeHead(200, { ...cors, "content-type": "video/mp2t", "cache-control": "public, max-age=31536000, immutable" }).end(segment);
       })
       .catch(() => res.writeHead(500, cors).end());
     return;

@@ -219,10 +219,12 @@ export function createContent({ deps, services }: ModuleContext) {
     /**
      * The storage sweep (the worker, hourly): what was prepared from files that went while a
      * channel still pointed at it, and the separate 360p previews made before previews played the
-     * prepared segments (`previews/<cid>/`, and their rows). Safe to run any time.
+     * prepared segments (`previews/<cid>/`, and their rows); and (programming Phase 4, open decision
+     * P1.3) first prepared copies a week after a newer one took over. Safe to run any time.
      */
-    async sweep(): Promise<{ prepared: { dropped: number; deferred: number }; oldPreviews: number }> {
+    async sweep(): Promise<{ prepared: { dropped: number; deferred: number }; firstCopies: { dropped: number; deferred: number }; oldPreviews: number }> {
       const prepared = await services.playout.sweepPrepared();
+      const firstCopies = await services.playout.sweepFirstCopies();
       const old = await db.select({ cid: PV.cid }).from(PV);
       for (const { cid } of old) {
         await objects.deletePrefix(objectKey.preview(cid));
@@ -233,7 +235,7 @@ export function createContent({ deps, services }: ModuleContext) {
       }
       // Needs left without a preview row.
       await db.delete(NEED);
-      return { prepared, oldPreviews: old.length };
+      return { prepared, firstCopies, oldPreviews: old.length };
     },
 
     // --- IPFS ---------------------------------------------------------------------

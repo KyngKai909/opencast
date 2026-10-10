@@ -2,6 +2,83 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Where it can air, the emails (programming Phase 6, P6.1 and P6.8)
+
+Additive, no migration.
+
+- `notifications.ts`: `NoticeKind` gains `carriage_outlets` (station owners, once per station: carriers can send its carried programs to their relays unless the maker turns it off; email on, push off) and `licence_ending` (station owners, once per licence and last day: a network licence for something on the log ends within two weeks; the Network desk, once per licence; push and email on).
+- Behaviour: both come from the jobs' hourly pass. `confirmRights`'s `outlets` (2026-10-10) is now sent by master control's Rights dialog for the owner's permission (P6.13).
+
+## 2026-10-10: Other apps viewers on per-thousand spots (programming Phase 5, P5.1)
+
+Additive, with migration 0066.
+
+- `platforms.ts`: `OTHER_APPS_LABEL` ("Other apps"); new `OtherAppsPartStatus` (`counting`, `settled`, `not_billed`), `OtherAppsPart` (`label`, `status`, `reason`, `sessions`, `billedSessions`, `costMicros`, `heldMicros`, `working`) and `OtherAppsLine` (`label`, `airings`, `sessionsAddedUp`, `billedSessionsAddedUp`, `spentMicros`, `waitingMicros`, `waitingAirings`).
+- `spots.ts`: `ResultsAiring.otherApps` (optional): the airing's Other apps part, apart from `costMicros` (Opencast's viewers) and `relayViewers`; absent when nobody was watching in another app through the spot. `Results.otherApps` (optional): the period's line. `Results.totals.otherAppsSpentMicros` and `otherAppsWaitingMicros` (optional); `totals.spentMicros`, `byStation[].spentMicros` and `bySpot[].spentMicros` now include Other apps viewers.
+- `ledger.ts`: `Statement.lines[].kind` gains `other_apps`: the business statement's line "Other apps", added in.
+- Behaviour: per-thousand spots now bill sessions in other apps that watched through them (online businesses: all; local businesses: those placed inside the area), settled two minutes after the spot; the hold adds the station's usual Other apps sessions. A business statement receipt's amount now includes relay viewers and Other apps. Station earnings and statements count Other apps in Spots. `docs/open-decisions.md` P5.12 to P5.14 have the rules.
+
+## 2026-10-10: The dial in other apps (programming Phase 5)
+
+Additive, with migration 0065.
+
+- `audience.ts`: `AudienceReport.otherApps` (optional): the audience source "Other apps", viewers tuned from the channel list in TiviMate, Jellyfin, Channels DVR, Kodi or VLC, `{ tunedInNow, sessions, hoursWatched, byMarket[] }` (`byMarket[].market` null for those Opencast couldn't place). Counted apart from runs of `via=iptv` playlist polls; never in the report's other numbers, never billed.
+- `analytics.ts`: `AnalyticsOverview.otherApps` (optional): the same by station and market, `{ station, market, sessions, hours }`, most hours first. Never in the totals, like `relays`.
+- Not in the contracts (files, not JSON; mounted like previews): `GET /v1/iptv/channels.m3u` and `GET /v1/iptv/xmltv.xml` (and `.xml.gz`), public, with `?market=` (a market's slug) and `?band=tv|radio`, an ETag, a minute's cache and gzip. 404 for a market that doesn't exist, 400 for another band. `docs/iptv.md` says what's in them.
+- Behaviour: a station's playlists (`/hls/:stationId/master.m3u8` and its renditions) asked for with `?via=iptv` count as "Other apps", and that master names its renditions with `?via=iptv` too. Without it, nothing changes.
+
+## 2026-10-10: Where it can air (programming Phase 6)
+
+Additive, with migration 0067.
+
+- New `licences.ts`:
+  - `Outlet` (`opencast`, `other_apps`, `relays`, `fast`, `recording`) with `OUTLET_WORDS` (each one's label and meaning), `DEFAULT_OUTLETS` (`opencast` and `relays`: what rows made before 2026-10-10 have) and `outletsWithOpencast` (puts `opencast` in, each once, in the enum's order). `fast` is one value for now; individual platforms can be added as values later;
+  - `CountryCode` (ISO 3166-1 alpha-2, upper case), `LicenceDeal` (`rev_share` with `percent`, `flat_fee` with `feeMicros` and `per` `month` or `term`, or `none`), `NetworkLicenceState` (`upcoming`, `active`, `ending`: within two weeks of its last day, `ended`), `LicenceCovered`, `NetworkLicence`, `NetworkLicenceInput`, `LicensorMinutes` and `LicensorMinutesRow`;
+  - new `licencesApi` (`api.licences`), `auth: "desk"` (writes: rights reviewers and admins): `listLicences` (`GET /admin/licences`), `getLicence` (`GET /admin/licences/:licenceId`), `createLicence` (`POST /admin/licences`; 400 when it ends before it starts, or isn't worldwide and names no countries), `updateLicence` (`PATCH /admin/licences/:licenceId`; what it covers is replaced when sent), `licenceMinutes` (`GET /admin/licences/:licenceId/minutes?month=2026-10`) and `licenceMinutesCsv` (`GET /admin/licences/:licenceId/minutes/csv?month=`, `{ filename, csv }`). Dates are inclusive: `endsOn` is the last day it airs.
+- `library.ts`: `Rights.outlets` (optional): where it may air. Everything for `made_it` and `public_domain`; otherwise what was recorded, `opencast` always in (rights confirmed before 2026-10-10: `opencast` and `relays`). `confirmRights` takes `outlets` (optional; left out: `opencast` and `relays`).
+- `catalog.ts`: `Terms.outlets` (optional), so on `Offer`, `offerProgram`'s and `updateOffer`'s bodies, and `Agreement.terms`: where the carrier may send it, `opencast` always in. Copied onto each agreement when it's made, so narrowing it applies to new carriers only. Left out of a new offer: `opencast` and `relays`, which offers and agreements from before 2026-10-10 have too.
+- `log.ts`: `LogEntry.notes` (optional): quiet notes, not warnings, `{ code: "not_cleared", outlet, message }` ("Not on your YouTube relay") on a program not cleared for an outlet the station uses; new `LicenceWarning` and `ProgramLog.licenceWarnings` (optional): `licence_ending` (its network licence ends within two weeks) and `licence_ended` (the entry is after its last day, and won't air), with the licence, its licensor and last day.
+- Behaviour: a log entry for an item whose network licence isn't in force when it starts is refused (422 `licence_ended`, or `licence_not_started`). A relay sends the station's "Airing on Opencast, channel 12.1" slate in place of a program it isn't cleared for.
+
+## 2026-10-10: Suggested break points (programming Phase 4)
+
+Additive, with migration 0063.
+
+- `library.ts`: `LibraryItem.suggestedBreakPoints` (optional, nullable): break points suggested for a program in the station's own library, found as its file was prepared, `{ source: "chapter" | "fade", pointsMs, previewUrl }`. Null when there are none to answer (none found, not looked for yet, already used or dismissed for this file, or the item has break points of its own). Never applied on their own.
+- `library.ts`: `answerBreakSuggestions` (`POST /library/:itemId/break-suggestions`, body `{ answer: "use" | "dismiss" }`, returns the `LibraryItem`). `use` makes them `breakPointsMs`; either answer ends them for this file. 409 `no_suggestions` when there are none to answer.
+
+## 2026-10-10: Template slots that air the next episode (programming Phase 3)
+
+Additive, with migration 0064.
+
+- `log.ts`:
+  - new `WhatAirs` (`this_episode`, `next_episode`, `fill`, `same_as`) with `WHAT_AIRS_WORDS` (each one's label and meaning), and `AtProgramEnd` (`start_over`, `stop`);
+  - `DayTemplateEntry.slotId` (optional): the slot's lasting id (`id` still changes on each save), and `whatAirs`, `programIds`, `order` (a `PlaybackOrder`), `atEnd`, `sameAsSlotId` (optional);
+  - `DayTemplateEntryInput` takes the same (`slotId`, `whatAirs`, `programIds` up to 20, `order`, `atEnd`, `sameAsSlotId`), each optional; for Next episode and Fill the slot `itemId` is optional. An entry sent without `slotId` (or with one that isn't the template's) is a new slot, whose walk starts afresh. Marathon on a slot with one program is refused (400);
+  - `DayTemplate.dates[].warnings` (optional) and `ProgramLog.warnings` (optional): new `TemplateWarning` (`last_episode`, `pushes_kept`; the template, slot, date, the airing's start and the words). The log lists a program's last new episode from a week before it;
+  - `LogEntry.templateSlot` (optional, nullable): the slot that made the entry (slot id, template, its name and label, the slot's start, what airs);
+  - new endpoint `previewTemplateSlot` (`POST /stations/:stationId/log/templates/:templateId/preview`, owner and operator): what a slot, saved or not, would air on the template's next dates (four by default), as `TemplateSlotPreview` (`dates`, `line`), and `slotPreviewLine`, the line's words for the apps and the mocks.
+- `accounts.ts`: `Reminder.airing.episodeTitle` (optional, nullable): the episode, as the guide lists it.
+- Behaviour: a template entry made before 2026-10-10 airs this episode, as before. Every entry a template makes names its slot; the day a template is built from becomes its slots' first airing.
+
+## 2026-10-09: Cleaner pictures from prepare (programming Phase 1)
+
+Additive, with migration 0061.
+
+- `library.ts`: `ItemHistory.preparation.converted` (optional): what preparing did to the picture, `from_hdr` (an HDR file tonemapped to BT.709) and `deinterlaced`. Empty when it did neither, or when the item was prepared before 2026-10-09 and hasn't been prepared again.
+
+## 2026-10-09: Seasons, multi-part episodes and playback orders (programming Phase 2)
+
+Additive, with migration 0062.
+
+- `library.ts`:
+  - `LibraryItem.seasonNumber`, `partOf`, `partNumber` (optional, nullable): its season, and a multi-part episode's shared words and part number;
+  - on `getLibrary` only, from the station's as-run log: `LibraryItem.neverAired`, `lastAiredAt`, and for a program's episodes `upNext` (where it comes in the program's walk, In order, after its last airing; 0 airs next; null when it can't air yet) and `nextEpisode` (optional);
+  - the update input (`updateItem`, and `upload`'s body) takes `seasonNumber`, `partOf` (1 to 200 characters) and `partNumber`, each nullable;
+  - new `PlaybackOrder` (`in_order`, `newest_first`, `shuffle`, `shuffle_shows`, `marathon`) and `PLAYBACK_ORDER_WORDS` (each order's label and meaning). Nothing takes an order yet; Phase 3's template slots will.
+- `uploads.ts`: `LibraryUploadFields.seasonNumber`, `partOf`, `partNumber` (optional).
+- Behaviour: an upload of a program that sends neither `seasonNumber` nor `episodeNumber` has both guessed from the file's name, and one that sends neither `partOf` nor `partNumber` has its part guessed from the title.
+
 ## 2026-10-07: Invite-only sign-ups
 
 Additive, with migration 0060.

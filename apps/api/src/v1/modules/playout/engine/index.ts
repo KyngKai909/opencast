@@ -6,6 +6,9 @@
 //   - every hour checks the next 48 hours of every station's log and queues anything not prepared;
 //     every minute warns the station and the Network desk about anything airing within the hour
 //     that still isn't; every few minutes queues items whose rights were just confirmed;
+//   - (programming Phase 6) with the readiness check, and every few minutes for the next two
+//     hours, queues the other apps' "Airing on Opencast" slates for a station whose log has a
+//     program not cleared for other apps (the `via=iptv` playlists swap it for them);
 //   - applies commands (sign on and off, skip, cue a break, end a live block early, replan);
 //   - fills breaks ahead of time (holding the money) and fills dead air nobody filled;
 //   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
@@ -38,8 +41,9 @@ import { createLiveCopier, liveCopyCounter, type LiveCopyStats } from "./livecop
 import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
-import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
-import { GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
+import { baseKey, createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
+import { ffmpegBreakFinder, type BreakFinder } from "./breaks.js";
+import { ELSEWHERE_SECONDS, elsewhereSlateKey, GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
 import { clockTime } from "../../../lib/time.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
@@ -52,6 +56,8 @@ const READY_EVERY_MS = 3_600_000;
 /** Not prepared this close to air: the station and Network desk are told. */
 const READY_WARN_MS = 3_600_000;
 const READY_WARN_EVERY_MS = 60_000;
+/** Programming Phase 6: between readiness checks, the other apps' slates are queued for this far ahead. */
+const ELSEWHERE_AHEAD_MS = 2 * 3_600_000;
 /** Items whose rights were just confirmed are queued this often. */
 const RIGHTS_EVERY_MS = 5 * 60_000;
 /** Caption tracks uploaded since are cut this often (X2). */
@@ -74,6 +80,11 @@ export interface EngineOptions {
   liveUrl?: (liveSourceId: string) => Promise<string | null>;
   /** Captions from speech (X2): none by default, until a provider is chosen. */
   captionGenerator?: CaptionGenerator;
+  /**
+   * Suggested break points (programming Phase 4): where to look for them. FFmpeg's with FFmpeg's
+   * transcoder; none with another transcoder (a test's fake has no real file to look in), unless given.
+   */
+  breakFinder?: BreakFinder | null;
   /** How far ahead the channel's rows are written. */
   leadMs?: number;
   /**
@@ -110,11 +121,19 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     scratchDir,
     concurrency: options.prepareConcurrency ?? Number(process.env.PREPARE_CONCURRENCY ?? 1),
     captionGenerator: options.captionGenerator,
+    breakFinder: options.breakFinder !== undefined ? options.breakFinder : options.transcoder ? null : ffmpegBreakFinder(),
     log
   });
   const bands = new Map<string, Band>();
+  /** What the run sheets found not prepared (by key), and the stations planned without it. */
+  const waitingOn = new Map<string, Set<string>>();
   const planner = createPlanner(ctx, {
-    isReady: (ref, stationId) => preparer.isReady(ref, bands.get(stationId) ?? "tv"),
+    isReady: (ref, stationId) => {
+      const ready = preparer.isReady(ref, bands.get(stationId) ?? "tv");
+      const key = ready ? null : refKey(ref);
+      if (key) waitingOn.set(key, (waitingOn.get(key) ?? new Set<string>()).add(stationId));
+      return ready;
+    },
     // A generated station ID that isn't prepared (a new station, or its look changed): queued now.
     wantGenerated: (spec) => preparer.generated(spec)
   });
@@ -153,9 +172,16 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let ingestListening: Promise<unknown> | null = null;
   let ingestTriedAt = 0;
 
-  // A program that just became ready airs from its next segment boundary: plan again.
+  // A program that just became ready airs from its next segment boundary: the stations whose run
+  // sheets went without it plan again (a newer copy, `-p2`, for those waiting on the first). Only
+  // those: since 2026-10-10, not every station for anything prepared (another station's
+  // generated ID, a slate).
   preparer.onReady((key) => {
-    if (!key.startsWith("slate-")) for (const a of assemblers.values()) a.replan();
+    for (const k of new Set([key, baseKey(key)])) {
+      const stations = waitingOn.get(k);
+      waitingOn.delete(k);
+      for (const id of stations ?? []) assemblers.get(id)?.replan();
+    }
   });
 
   async function bandOf(stationIds: string[]) {
@@ -194,7 +220,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       // A244: programming blocks' own IDs, bumpers, intros and outros too (their automatic cards are asked for by the planner).
       const blockItems = [...(blocks ?? new Map()).values()].flatMap((b) => [...b.stationIds, ...b.bumpers, ...b.intros, ...b.outros]);
       for (const f of [...ids, ...bumpers, ...blockItems]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
-      for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
+      // Programming Phase 2: the episodes fill would air next, not just the newest programs.
+      for (const r of await services.log.repeatsAhead(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
     // Barter breaks inside carried programs air the producer's spots: their rotations too.
     const producers = new Map<string, Band>();
@@ -202,6 +229,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       for (const a of await services.catalog.activeAgreements(stationId)) if (a.carrierStationId === stationId && a.term !== "cash") producers.set(a.makerStationId, band(stationId));
     }
     wants.push(...(await spotWants([...new Set([...stationIds, ...producers.keys()])], now, to, producers)));
+    // Programming Phase 6: the other apps' slates for programs not cleared for them.
+    await queueElsewhereSlates(now, to).catch((error) => log(`[prepare] queueing the other apps' slates failed: ${(error as Error).message}`));
     await preparer.want(wants);
     await preparer.refresh(wants.map((w) => refKey(w)).filter((k): k is string => Boolean(k)));
     const keys = new Map<string, boolean>();
@@ -325,6 +354,42 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         if (preparer.isReady(key, band)) continue;
         const png = band === "radio" ? null : await planner.slates.identCard(look, w.kind, w.back);
         await preparer.generated({ key, png, band, seconds: GENERATED_IDENT_MS / 1000 });
+      }
+    }
+  }
+
+  /**
+   * Programming Phase 6: the "Airing on Opencast" slates other apps see in place of a program not
+   * cleared for them (stationId.ts, `elsewhereSlateKey`), queued unless prepared, so a `via=iptv`
+   * playlist never waits on FFmpeg: for each station with a program on its log in [from, to) that
+   * isn't cleared for other apps for every viewer (no country: only a worldwide licence clears it),
+   * needed by the first one's start. Four stills of 1 to 4 seconds per station look, prepared once.
+   */
+  async function queueElsewhereSlates(from: Date, to: Date) {
+    const programs = (await services.log.upcomingItems(from, to)).filter((e) => e.code === "PGM");
+    const stationIds = [...new Set(programs.map((e) => e.stationId))];
+    if (!stationIds.length) return;
+    const idents = await services.stations.idents(stationIds);
+    for (const id of stationIds) {
+      const ident = idents.get(id);
+      if (!ident) continue;
+      const mine = programs.filter((e) => e.stationId === id);
+      const answers = await services.licences.clearance(
+        mine.map((e) => ({ assetId: e.itemId, agreementId: e.agreementId, at: e.startsAt })),
+        "other_apps",
+        null,
+        { at: from, timeZone: await services.stations.timezoneOf(id) }
+      );
+      const first = mine.find((_, i) => !answers[i].cleared);
+      if (!first) continue;
+      const band: Band = ident.band ?? "tv";
+      bands.set(id, band);
+      const look = { callSign: ident.callSign, channel: ident.channel, name: ident.name, homeCity: ident.homeCity ?? null, colour: ident.colour ?? null };
+      for (const seconds of ELSEWHERE_SECONDS) {
+        const key = elsewhereSlateKey(look, band, seconds);
+        if (preparer.isReady(key, band)) continue;
+        const png = band === "radio" ? null : await planner.slates.airingOnOpencast(look);
+        await preparer.generated({ key, png, band, seconds, neededAt: first.startsAt < from ? from : first.startsAt });
       }
     }
   }
@@ -495,6 +560,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     sweep,
     queueGeneratedIds,
     queueGeneratedIdents,
+    queueElsewhereSlates,
     warnNotReady,
 
     async tick() {
@@ -517,6 +583,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         await queueConfirmed().catch((error) => log(`[prepare] queueing confirmed items failed: ${(error as Error).message}`));
         await queueGeneratedIds().catch((error) => log(`[prepare] queueing generated station IDs failed: ${(error as Error).message}`));
         await queueGeneratedIdents().catch((error) => log(`[prepare] queueing automatic openers and closers failed: ${(error as Error).message}`));
+        // Programming Phase 6: entries put on the log since the readiness check.
+        await queueElsewhereSlates(deps.clock.now(), new Date(now + ELSEWHERE_AHEAD_MS)).catch((error) => log(`[prepare] queueing the other apps' slates failed: ${(error as Error).message}`));
       }
       if (now - lastSweep >= READY_EVERY_MS) {
         lastSweep = now;
@@ -542,6 +610,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
           .sweep()
           .then((swept) => {
             if (swept.prepared.dropped || swept.oldPreviews) log(`[storage] swept: ${swept.prepared.dropped} prepared items of files that are gone, ${swept.oldPreviews} old previews`);
+            if (swept.firstCopies.dropped) log(`[storage] swept: ${swept.firstCopies.dropped} first copies a week after their newer copy took over`);
           })
           .catch((error) => log(`[storage] the sweep failed: ${(error as Error).message}`));
       }

@@ -7,8 +7,8 @@
 // draws them: rows and words like the library's own).
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { libraryApi, type Folder, type GeneratedStationId, type LibraryCode, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
-import { Button, ChoiceList, CodeSelect, Field, Icon, LIBRARY_CODES, LOG_CODE_WORDS, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
+import { DEFAULT_OUTLETS, libraryApi, Outlet, OUTLET_WORDS, outletsWithOpencast, type Folder, type GeneratedStationId, type LibraryCode, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
+import { Button, Checkbox, ChoiceList, CodeSelect, Field, Icon, LIBRARY_CODES, LOG_CODE_WORDS, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
@@ -493,14 +493,24 @@ export function GeneratedStationIdRow({ generated, callSign, colour, radio, phon
 
 type Basis = "made_it" | "owner_permission" | "public_domain";
 
+/**
+ * Programming Phase 6 (P6.13): where the owner's permission lets it go besides this station, as
+ * the API keeps it (`opencast` always; `opencast` and `relays` until the person says otherwise).
+ */
+function ownerOutlets(item: Item | null): Outlet[] {
+  return item?.rights?.basis === "owner_permission" && item.rights.outlets ? outletsWithOpencast(item.rights.outlets) : [...DEFAULT_OUTLETS];
+}
+
 export function RightsPane({ item, callSign, phone, onClose }: { item: Item | null; callSign: string; phone: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [basis, setBasis] = useState<Basis | null>(null);
+  const [outlets, setOutlets] = useState<Outlet[]>(() => ownerOutlets(item));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setBasis(item?.rights && item.rights.basis !== "permission_record" && item.rights.basis !== "licence_record" ? item.rights.basis : null);
+    setOutlets(ownerOutlets(item));
     setError(null);
   }, [item?.id, item?.rights]);
   if (!item) return null;
@@ -508,7 +518,8 @@ export function RightsPane({ item, callSign, phone, onClose }: { item: Item | nu
     if (!basis) return;
     setBusy(true);
     try {
-      await call(libraryApi.confirmRights, { params: { itemId: item.id }, body: { basis } });
+      // Only the owner's permission has a say: made it and public domain go everywhere.
+      await call(libraryApi.confirmRights, { params: { itemId: item.id }, body: basis === "owner_permission" ? { basis, outlets: outletsWithOpencast(outlets) } : { basis } });
       await refreshLibrary(qc);
       toast.show({ message: `${callSign} can air ${item.title}.` });
       onClose();
@@ -560,6 +571,24 @@ export function RightsPane({ item, callSign, phone, onClose }: { item: Item | nu
           { value: "public_domain", title: "It's in the public domain", helper: "No one owns it any more" }
         ]}
       />
+      {basis === "owner_permission" && (
+        <div className="cc-rights__outlets">
+          <h3 className="cc-rights__h">Where the owner allows it</h3>
+          <p className="cc-rights__sub">Opencast is always on. Tick what else the owner agreed to.</p>
+          <div role="group" aria-label="Where the owner allows it">
+            {Outlet.options.map((o) => (
+              <Checkbox
+                key={o}
+                checked={o === "opencast" || outlets.includes(o)}
+                disabled={o === "opencast"}
+                onChange={(on) => setOutlets(on ? [...outlets, o] : outlets.filter((x) => x !== o))}
+                label={OUTLET_WORDS[o].label}
+                helper={OUTLET_WORDS[o].detail}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       {link && <p className="cc-rights__note">Because it came from a link, it can air on {callSign} but can't be offered to other stations for carriage. If the owner asks, it comes off air the same day.</p>}
       {error && (
         <p className="cc-rights__error" role="alert">

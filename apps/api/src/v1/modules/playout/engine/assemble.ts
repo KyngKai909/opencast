@@ -712,7 +712,16 @@ export class ChannelAssembler {
       .where(and(eq(CI.stationId, this.stationId), or(gt(CI.endsAt, new Date(at)), and(eq(CI.kind, "end"), gte(CI.startsAt, new Date(at))))))
       .orderBy(asc(CI.seq), asc(CI.startsAt));
     let standByGone = false;
+    // What was cut airs again from the cut, as planned now: a program written in full ahead of
+    // the clock is no longer passed. Fixed 2026-10-10: before, a replan (a spot placed, a log
+    // edit, anything becoming ready) in the last 20 s of an item deleted the next program's row
+    // but left it passed, and its whole length aired the station ID slate.
+    const unpass = (planKey: string | null) => {
+      if (!planKey) return;
+      for (const p of this.passed) if (p.startsWith(`${planKey}@`)) this.passed.delete(p);
+    };
     for (const row of rows) {
+      unpass(row.planKey);
       if (row.startsAt.getTime() >= at) {
         await this.db.delete(CI).where(eq(CI.id, row.id));
         if (this.standBy?.id === row.id) standByGone = true;

@@ -178,7 +178,22 @@ export const AudienceReport = z.object({
   /** U3: the same window a week earlier, minute by minute, past now too. */
   comparison: z.array(z.object({ minute: Timestamp, tunedIn: z.number().int() })).optional(),
   /** U3: every break in the window, for the shaded bands. */
-  breaks: z.array(z.object({ startsAt: Timestamp, endsAt: Timestamp })).optional()
+  breaks: z.array(z.object({ startsAt: Timestamp, endsAt: Timestamp })).optional(),
+  /**
+   * Programming Phase 5 (added 2026-10-10): the audience source "Other apps", viewers tuned from
+   * the channel list (`/v1/iptv/channels.m3u`) in TiviMate, Jellyfin, Channels DVR, Kodi or VLC.
+   * Counted apart, from runs of playlist polls (those apps send no heartbeats): never in the
+   * numbers above, and never billed. `byMarket`'s `market` is null for those Opencast couldn't
+   * place. Absent from an older API.
+   */
+  otherApps: z
+    .object({
+      tunedInNow: z.number().int(),
+      sessions: z.number().int(),
+      hoursWatched: z.number(),
+      byMarket: z.array(z.object({ market: z.object({ id: Id, slug: z.string(), name: z.string() }).nullable(), sessions: z.number().int(), hoursWatched: z.number() }))
+    })
+    .optional()
 });
 
 export const audienceApi = {

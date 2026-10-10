@@ -25,3 +25,6 @@ storage/slates/
 storage/cache/
 storage/objects/
 storage/pinata-move-*.json
+
+# Claude Code’s local settings and preview configs (never committed).
+.claude/

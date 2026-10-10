@@ -95,7 +95,13 @@ export const AnalyticsOverview = z.object({
   /** Every station's hours, most first. */
   stations: z.array(z.object({ station: AnalyticsStation, hours: z.number(), previousHours: z.number().nullable() })),
   /** Counted apart, never in the totals: relays' own viewer counts. */
-  relays: z.array(z.object({ station: AnalyticsStation, platform: z.enum(["youtube", "twitch"]), averageViewers: z.number(), peakViewers: z.number().int() }))
+  relays: z.array(z.object({ station: AnalyticsStation, platform: z.enum(["youtube", "twitch"]), averageViewers: z.number(), peakViewers: z.number().int() })),
+  /**
+   * Programming Phase 5 (added 2026-10-10): counted apart, never in the totals or billing: the
+   * audience source "Other apps" (the channel list in TiviMate, Jellyfin, Channels DVR, Kodi or
+   * VLC), by station and market, from runs of playlist polls. Most hours first. Absent from an older API.
+   */
+  otherApps: z.array(z.object({ station: AnalyticsStation, market: AnalyticsMarket.nullable(), sessions: z.number().int(), hours: z.number() })).optional()
 });
 export type AnalyticsOverview = z.infer<typeof AnalyticsOverview>;
 

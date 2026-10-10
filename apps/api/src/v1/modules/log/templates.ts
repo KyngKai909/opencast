@@ -25,15 +25,31 @@
 //
 // G7's "Repeat this day" (`repeatDay`) makes a template too. G7 copies made before templates
 // (`repeat_groups.template` false) stay as they were: `removeRepeat` still takes them off.
+//
+// Programming Phase 3: a program slot says what airs from it. This episode (the item, every date,
+// as before), Next episode (one step of its programs' walk each date it airs, in its order: the
+// walker in `@opencast/domain`), Fill the slot (as many next episodes as fit, never past its end)
+// or Same as earlier slot (what an earlier slot aired that date). A slot keeps its id across saves
+// (`slot_id`, sent back by the editor) and every entry it makes names it (`template_slot_id`), so
+// where its walk is comes from the log and is never stored: the slot's entries before the date,
+// aired (in the as-run log) or still to come. A date where it didn't air (an exception without it,
+// a live block in its place, off air) used no episode, and the next date gets it. Dates are made in
+// order, each counting the ones before, and a date records what its walk was made from (`walk`):
+// when that changes, the date is made again. An episode longer than its slot pushes what follows
+// down (the ripple), stopping at an entry kept at its time; at the end of its programs a slot starts
+// over (with a warning a week ahead) or stops.
 
-import { asLogCode, isIdentCode } from "@opencast/contracts";
+import { randomUUID, createHash } from "node:crypto";
+import { asLogCode, isIdentCode, slotPreviewLine, type TemplateSlotPreview, type TemplateWarning } from "@opencast/contracts";
+import { clearance, walkEpisodes, type Airing as WalkAiring } from "@opencast/domain";
 import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { DayTemplate, DayTemplateEntry, LogDay, TemplateGeneration } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
-import { addDays, localDate, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
+import { addDays, clockTime, localDate, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
 import { snapToSegment } from "../../lib/segments.js";
+import type { ItemRef, ProgramRef } from "../library/service.js";
 
 const G = schema.repeatGroups;
 const TE = schema.dayTemplateEntries;
@@ -53,6 +69,9 @@ type Group = typeof G.$inferSelect;
 type TemplateRow = typeof TE.$inferSelect;
 type EntryRow = typeof E.$inferSelect;
 type Pattern = Group["pattern"];
+type WhatAirs = TemplateRow["whatAirs"];
+type Order = NonNullable<TemplateRow["playbackOrder"]>;
+type TemplateNoteRow = schema.TemplateNoteRow;
 
 export interface TemplateEntryInput {
   startTime: string;
@@ -67,6 +86,69 @@ export interface TemplateEntryInput {
   localNote?: string;
   /** G18: "Keep at this time" (left out: false). */
   keepTime?: boolean;
+  /** Programming Phase 3: the slot's id as read (kept when it's one of the template's), and what airs from it. */
+  slotId?: string;
+  whatAirs?: WhatAirs;
+  programIds?: string[];
+  order?: Order;
+  atEnd?: "start_over" | "stop";
+  sameAsSlotId?: string;
+}
+
+/** Programming Phase 3: the slots that walk their programs' episodes. */
+const walks = (e: Pick<TemplateRow, "kind" | "whatAirs">) => e.kind === "program" && (e.whatAirs === "next_episode" || e.whatAirs === "fill");
+
+/** Programming Phase 3: the words for Marathon on a slot with one program (the user's decision on Phase 2). */
+export const MARATHON_NEEDS_A_MIX = "Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time.";
+
+/** "Sat Oct 24". */
+export const dayWords = (date: string) => new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)).replace(",", "");
+
+/** "Late Crate, ep. 14", or the item's title. */
+function episodeLabel(item: Pick<ItemRef, "title" | "programId" | "episodeNumber">, programs: Map<string, Pick<ProgramRef, "title">>): string {
+  const program = item.programId ? programs.get(item.programId)?.title : undefined;
+  return program && item.episodeNumber != null ? `${program}, ep. ${item.episodeNumber}` : item.title;
+}
+
+const noteView = (n: TemplateNoteRow, templateId: string, date: string): TemplateWarning => ({ code: n.code, templateId, slotId: n.slotId, date, startsAt: n.startsAt, message: n.message });
+
+/** Each part's length on the log: whole minutes, as fill places them. */
+const partLength = (i: Pick<ItemRef, "durationMs">) => roundUpToMinute(i.durationMs ?? 0);
+const airingLength = (parts: Array<Pick<ItemRef, "durationMs">>) => parts.reduce((t, p) => t + partLength(p), 0);
+
+/** One row a date would put on the log, before the ripple. */
+type Desired = typeof E.$inferInsert & { startsAt: Date; endsAt: Date };
+
+/**
+ * Programming Phase 3: a date's rows in the broadcast day's order, with the ripple: a row that
+ * would start before the one ahead of it ends (an episode longer than its slot) moves down just
+ * enough, and so on down the day, until a gap takes the rest. An entry kept at its time doesn't
+ * move: what wouldn't end before it isn't placed, and that's a warning (`pushesKept` words it).
+ */
+export function ripple(rows: Desired[], pushesKept: (kept: Desired, overBy: number, dropped: Desired[]) => void): { rows: Desired[]; dropped: number } {
+  const out: Desired[] = [];
+  let cursor = -Infinity;
+  let dropped = 0;
+  for (const r of rows) {
+    const start = r.startsAt.getTime();
+    if (start < cursor) {
+      // A carried program's times are its agreement's: it stays put too.
+      if (r.keepTime || r.carriageAgreementId) {
+        const going = out.filter((x) => x.endsAt.getTime() > start);
+        pushesKept(r, cursor - start, going);
+        for (const g of going) out.splice(out.indexOf(g), 1);
+        dropped += going.length;
+        cursor = Math.max(-Infinity, ...out.map((x) => x.endsAt.getTime()));
+      } else {
+        const shift = cursor - start;
+        r.startsAt = new Date(start + shift);
+        r.endsAt = new Date(r.endsAt.getTime() + shift);
+      }
+    }
+    out.push(r);
+    cursor = Math.max(cursor, r.endsAt.getTime());
+  }
+  return { rows: out, dropped };
 }
 
 /** A244: a programming block in a day template, as sent. */
@@ -109,6 +191,15 @@ export interface TemplateOps {
   markEdited(stationId: string, dates: Array<string | Date>): Promise<void>;
   /** G11: every broadcast day `[from, to)` touches, with the template that made it. */
   days(stationId: string, from: Date, to: Date): Promise<LogDay[]>;
+  /**
+   * Programming Phase 3: the template warnings for the broadcast days `[from, to)` touches, and a
+   * program's last new episode from a week before its date.
+   */
+  warnings(stationId: string, from: Date, to: Date): Promise<TemplateWarning[]>;
+  /** Programming Phase 3: what a slot (saved or not) would air on the template's next dates, from where its walk is. Reads only. */
+  preview(stationId: string, templateId: string, entry: TemplateEntryInput, count?: number): Promise<TemplateSlotPreview>;
+  /** Programming Phase 3: the slots that made log entries (for a log entry's details), by slot id. */
+  slotsOf(slotIds: string[]): Promise<Map<string, { slotId: string; templateId: string; templateName: string | null; label: string; startTime: string; whatAirs: WhatAirs }>>;
 }
 
 const RANK: Record<Pattern, number> = { once: 3, weekly: 2, weekdays: 1, daily: 0 };
@@ -183,29 +274,142 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     return row;
   }
 
-  /** A broadcast day's log as template entries (at their wall-clock minutes). */
-  async function snapshot(stationId: string, day: string, tz: string) {
+  /**
+   * Programming Phase 3: what walking slots walk: their programs' episodes, which of them can air
+   * (rights confirmed, a length, the file available, not failed or taken off air; one still being
+   * prepared can, as This episode's can), and the programs, for words.
+   */
+  async function walkState(stationId: string, slots: Array<Pick<TemplateRow, "programIds">>) {
+    const episodes = await services.library.programEpisodes(stationId, slots.flatMap((s) => s.programIds ?? []));
+    const [pulled, programs] = await Promise.all([
+      services.trust.offAirItems(episodes.map((e) => e.id)),
+      services.library.programsByIds([...new Set(episodes.map((e) => e.programId).filter((v): v is string => Boolean(v)))])
+    ]);
+    const canAir = (i: ItemRef) => !i.archived && i.rightsConfirmed && !i.contentUnavailable && !!i.durationMs && i.status !== "failed" && !pulled.has(i.id);
+    const episodesOf = (slot: Pick<TemplateRow, "programIds">) => episodes.filter((e) => e.programId && slot.programIds?.includes(e.programId));
+    // Programming Phase 6: an episode whose network licence isn't in force that date is passed over.
+    const inForce = await licencesInForce(stationId, episodes);
+    return { episodes, canAir, episodesOf, programs, inForce };
+  }
+
+  /** Programming Phase 6: whether each item's network licences (if any) are in force at a moment, in the station's time zone. */
+  async function licencesInForce(stationId: string, items: Array<Pick<ItemRef, "id" | "programId">>) {
+    const licensed = await services.licences.covering(items);
+    const tz = licensed.size ? await services.stations.timezoneOf(stationId) : "UTC";
+    return (item: Pick<ItemRef, "id">, at: Date) => {
+      const licences = licensed.get(item.id);
+      return !licences || clearance({ rights: { basis: "made_it" }, licences }, "opencast", null, { at, timeZone: tz }).cleared;
+    };
+  }
+  type WalkState = Awaited<ReturnType<typeof walkState>>;
+
+  /**
+   * Programming Phase 3: the walking slots' entries that count, oldest first: aired (in the as-run
+   * log, as more than a slate) or still to come. One that didn't air used no episode.
+   */
+  async function slotHistory(ex: Executor, stationId: string, slotIds: string[], tz: string): Promise<Array<{ slotId: string | null; date: string; assetId: string | null }>> {
+    if (!slotIds.length) return [];
+    const now = deps.clock.now();
+    const rows = await ex
+      .select({ id: E.id, slotId: E.templateSlotId, date: E.templateDate, startsAt: E.startsAt, assetId: E.assetId })
+      .from(E)
+      .where(and(eq(E.stationId, stationId), inArray(E.templateSlotId, slotIds), isNotNull(E.assetId)))
+      .orderBy(asc(E.startsAt), asc(E.id));
+    // Playout's as-run log says which of those that have started aired (its program rows: no slates).
+    const started = rows.filter((r) => r.startsAt <= now).map((r) => r.id);
+    const aired = new Set(started.length ? (await services.playout.programRows({ logEntryIds: started })).map((r) => r.logEntryId) : []);
+    // The day a template was built from has no template date: its broadcast day.
+    return rows.filter((r) => r.startsAt > now || aired.has(r.id)).map((r) => ({ slotId: r.slotId, date: r.date ?? broadcastDate(r.startsAt, tz), assetId: r.assetId }));
+  }
+  type History = Awaited<ReturnType<typeof slotHistory>>;
+  /** Where a slot's walk is on a date: its airings on the dates before it, as item ids. */
+  const before = (history: History, slotId: string, date: string) => history.filter((h) => h.slotId === slotId && h.date < date).map((h) => h.assetId!);
+
+  /**
+   * Programming Phase 3: a walking slot's airings on a date, from its position: Next episode one,
+   * Fill the slot as many as fit its length (never past its end). A slot that stops at its
+   * programs' end airs nothing once the walk starts over (`stopped`).
+   */
+  function airingsFor(slot: Pick<TemplateRow, "slotId" | "programIds" | "playbackOrder" | "atEnd" | "whatAirs" | "lengthMs">, position: string[], state: WalkState, at?: Date) {
+    // Programming Phase 6: `at`, the slot's start that date: episodes whose licence isn't in force then aren't ready.
+    const episodes = state.episodesOf(slot).map((i) => ({ ...i, ready: state.canAir(i) && (!at || state.inForce(i, at)) }));
+    const walk = walkEpisodes({ episodes, order: slot.playbackOrder ?? "in_order", seed: slot.slotId, position, programs: slot.programIds ?? undefined });
+    const airings: Array<WalkAiring<(typeof episodes)[number]>> = [];
+    let stopped = false;
+    let room = snapToSegment(slot.lengthMs);
+    for (const a of walk) {
+      if (slot.atEnd === "stop" && a.cycle > 0) {
+        stopped = true;
+        break;
+      }
+      if (slot.whatAirs !== "fill") {
+        airings.push(a);
+        break;
+      }
+      const length = airingLength(a.episodes);
+      if (length > room || airings.length >= 200) break;
+      airings.push(a);
+      room -= length;
+    }
+    return { airings, stopped };
+  }
+
+  /** "Late Crate airs its last new episode Sat Oct 24, then starts over." */
+  function lastEpisodeNote(slot: Pick<TemplateRow, "slotId" | "atEnd">, episode: ItemRef, date: string, startsAt: Date, programs: Map<string, ProgramRef>): TemplateNoteRow {
+    const name = (episode.programId ? programs.get(episode.programId)?.title : undefined) ?? episode.title;
+    return {
+      code: "last_episode",
+      slotId: slot.slotId,
+      startsAt: startsAt.toISOString(),
+      message: slot.atEnd === "stop" ? `${name} airs its last new episode ${dayWords(date)}, then stops. Its slot is dead air after that.` : `${name} airs its last new episode ${dayWords(date)}, then starts over.`
+    };
+  }
+
+  /**
+   * A broadcast day's log as template entries (at their wall-clock minutes). Programming Phase 3:
+   * taken again for the template that made the day (`current`, its entries), an entry one of its
+   * slots made keeps that slot (its id, what airs, its length); the rest of a Fill the slot's run,
+   * and what a slot's ripple moved, is the slot's and doesn't become an entry of its own.
+   */
+  async function snapshot(stationId: string, day: string, tz: string, current: TemplateRow[] = []) {
     const { from, to } = broadcastDay(day, tz);
     const rows = await db
       .select()
       .from(E)
       .where(and(eq(E.stationId, stationId), gte(E.startsAt, from), lt(E.startsAt, to)))
       .orderBy(asc(E.startsAt));
-    return rows.map((r) => ({
-      startMinute: localMinute(r.startsAt, tz),
-      lengthMs: r.endsAt.getTime() - r.startsAt.getTime(),
-      kind: r.kind,
-      code: asLogCode(r.code),
-      assetId: r.assetId,
-      programId: r.programId,
-      carriageAgreementId: r.carriageAgreementId,
-      liveSourceId: r.liveSourceId,
-      localNote: r.localNote,
-      episodeTitle: r.episodeTitle,
-      episodeDescription: r.episodeDescription,
-      // G18: the day's fixed points stay fixed on each date the template makes.
-      keepTime: r.keepTime
-    }));
+    const slots = new Map(current.map((e) => [e.slotId, e]));
+    const seen = new Set<string>();
+    return rows.flatMap((r) => {
+      const slot = r.templateSlotId ? slots.get(r.templateSlotId) : undefined;
+      const entry = {
+        startMinute: localMinute(r.startsAt, tz),
+        lengthMs: r.endsAt.getTime() - r.startsAt.getTime(),
+        kind: r.kind,
+        code: asLogCode(r.code),
+        assetId: r.assetId,
+        programId: r.programId,
+        carriageAgreementId: r.carriageAgreementId,
+        liveSourceId: r.liveSourceId,
+        localNote: r.localNote,
+        episodeTitle: r.episodeTitle,
+        episodeDescription: r.episodeDescription,
+        // G18: the day's fixed points stay fixed on each date the template makes.
+        keepTime: r.keepTime,
+        // Phase 3: the log entry it was taken from, and the slot that made that.
+        sourceId: r.id,
+        sourceSlotId: r.templateSlotId
+      };
+      if (!slot) return [entry];
+      if (slot.whatAirs === "this_episode") {
+        if (seen.has(slot.slotId)) return [entry];
+        seen.add(slot.slotId);
+        return [{ ...entry, slotId: slot.slotId }];
+      }
+      if (seen.has(slot.slotId)) return [];
+      seen.add(slot.slotId);
+      return [{ ...entry, lengthMs: slot.lengthMs, slotId: slot.slotId, whatAirs: slot.whatAirs, programIds: slot.programIds, playbackOrder: slot.playbackOrder, atEnd: slot.atEnd, sameAsSlotId: slot.sameAsSlotId, episodeTitle: null, episodeDescription: null }];
+    });
   }
 
   /**
@@ -242,16 +446,50 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     return out;
   }
 
-  /** Entries sent for a template, checked as the log checks them (times are checked per date). */
-  async function fromInput(stationId: string, list: TemplateEntryInput[]) {
+  /**
+   * Entries sent for a template, checked as the log checks them (times are checked per date).
+   * Programming Phase 3: each keeps the slot id it was sent with when that's one of the template's
+   * (`slots`), else gets a new one; a walking slot names the station's own programs; Same as earlier
+   * slot points at an earlier slot that airs episodes.
+   */
+  async function fromInput(stationId: string, list: TemplateEntryInput[], slots: Set<string> = new Set()) {
     const items = await services.library.itemsByIds(list.map((x) => x.itemId).filter((v): v is string => Boolean(v)));
+    const walkPrograms = await services.library.programsByIds([...new Set(list.flatMap((x) => x.programIds ?? (x.programId ? [x.programId] : [])))]);
     const out = [];
+    const used = new Set<string>();
     for (const [i, x] of list.entries()) {
       const [hh, mm] = x.startTime.split(":").map(Number);
       const startMinute = hh * 60 + mm;
       let lengthMs = x.lengthMs ?? null;
       let code: EntryRow["code"] = "PGM";
       let programId = x.programId ?? null;
+      const whatAirs: WhatAirs = x.kind === "program" ? (x.whatAirs ?? "this_episode") : "this_episode";
+      const slotId = x.slotId && slots.has(x.slotId) && !used.has(x.slotId) ? x.slotId : randomUUID();
+      used.add(slotId);
+      const slot = { slotId, whatAirs, programIds: null as string[] | null, playbackOrder: null as Order | null, atEnd: null as "start_over" | "stop" | null, sameAsSlotId: null as string | null };
+      if (x.kind === "program" && whatAirs !== "this_episode") {
+        const item = x.itemId ? items.get(x.itemId) : undefined;
+        if (x.itemId && (!item || item.archived || item.stationId !== stationId)) throw notFound("That item");
+        if (whatAirs === "same_as") {
+          if (!x.sameAsSlotId) throw badRequest("Choose the earlier slot it repeats.", { [`entries.${i}.sameAsSlotId`]: "Required" });
+          slot.sameAsSlotId = x.sameAsSlotId;
+        } else {
+          const ids = [...new Set(x.programIds?.length ? x.programIds : programId ? [programId] : item?.programId ? [item.programId] : [])];
+          if (!ids.length) throw badRequest("Choose the program it airs the next episode of.", { [`entries.${i}.programIds`]: "Required" });
+          for (const id of ids) {
+            const p = walkPrograms.get(id);
+            if (!p || p.stationId !== stationId) throw notFound("That program");
+          }
+          const order = x.order ?? "in_order";
+          if (order === "marathon" && ids.length < 2) throw badRequest(MARATHON_NEEDS_A_MIX, { [`entries.${i}.order`]: "Several programs" });
+          Object.assign(slot, { programIds: ids, playbackOrder: order, atEnd: x.atEnd ?? "start_over" });
+          programId = ids.length === 1 ? ids[0] : null;
+        }
+        lengthMs = lengthMs ?? (item?.durationMs ? roundUpToMinute(item.durationMs) : null);
+        if (!lengthMs || lengthMs <= 0) throw badRequest("Say how long the slot runs.", { [`entries.${i}.lengthMs`]: "Required" });
+        out.push({ startMinute, lengthMs, kind: x.kind, code, assetId: item?.id ?? null, programId, carriageAgreementId: null, liveSourceId: null, localNote: x.localNote ?? null, episodeTitle: null, episodeDescription: null, keepTime: x.keepTime ?? false, ...slot });
+        continue;
+      }
       if (x.kind === "program") {
         if (!x.itemId) throw badRequest("Choose what airs.", { [`entries.${i}.itemId`]: "Required" });
         const item = items.get(x.itemId);
@@ -282,13 +520,20 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         localNote: x.localNote ?? null,
         episodeTitle: x.episodeTitle ?? null,
         episodeDescription: x.episodeDescription ?? null,
-        keepTime: x.keepTime ?? false
+        keepTime: x.keepTime ?? false,
+        ...slot
       });
     }
     // In the broadcast day's order: "23:00" comes before "01:00".
     out.sort(byDayOrder);
     for (let i = 1; i < out.length; i++) {
       if (dayOrder(out[i - 1].startMinute) * MIN + out[i - 1].lengthMs > dayOrder(out[i].startMinute) * MIN) throw badRequest("Two entries overlap.", { entries: "Overlap" });
+    }
+    // Same as earlier slot: an earlier slot on the template that airs episodes.
+    for (const [i, e] of out.entries()) {
+      if (e.whatAirs !== "same_as") continue;
+      const source = out.findIndex((s) => s.slotId === e.sameAsSlotId);
+      if (source < 0 || source >= i || out[source].kind !== "program" || out[source].whatAirs === "same_as") throw badRequest("Choose an earlier program slot on this template.", { entries: "Same as earlier slot" });
     }
     return out;
   }
@@ -330,9 +575,18 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     ]);
     const blockRefs = await services.library.blocks.refs(blocks.map((b) => b.blockId));
     const items = await services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v)));
-    const programIds = entries.map((e) => e.programId ?? (e.assetId ? items.get(e.assetId)?.programId : null)).filter((v): v is string => Boolean(v));
+    const programIds = entries.flatMap((e) => [e.programId ?? (e.assetId ? items.get(e.assetId)?.programId : null), ...(e.programIds ?? [])]).filter((v): v is string => Boolean(v));
     const programs = await services.library.programsByIds([...new Set(programIds)]);
-    const title = (e: TemplateRow) => {
+    const title = (e: TemplateRow): string => {
+      // Programming Phase 3: a mix is its programs ("Late Crate and Slow Hours"); a rerun, its slot's.
+      if (e.whatAirs === "same_as") {
+        const source = entries.find((s) => s.templateId === e.templateId && s.slotId === e.sameAsSlotId);
+        if (source) return title(source);
+      }
+      if (walks(e) && (e.programIds?.length ?? 0) > 1) {
+        const names = e.programIds!.map((id) => programs.get(id)?.title).filter((v): v is string => Boolean(v));
+        if (names.length) return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+      }
       const item = e.assetId ? items.get(e.assetId) : undefined;
       const programId = e.programId ?? item?.programId ?? null;
       if (programId && programs.has(programId)) return programs.get(programId)!.title;
@@ -367,10 +621,17 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             episodeTitle: e.episodeTitle,
             episodeDescription: e.episodeDescription,
             localNote: e.localNote,
-            keepTime: e.keepTime
+            keepTime: e.keepTime,
+            // Programming Phase 3: the slot, and what airs from it.
+            slotId: e.slotId,
+            whatAirs: e.whatAirs,
+            ...(walks(e) ? { programIds: e.programIds ?? [], order: e.playbackOrder ?? "in_order", atEnd: e.atEnd ?? "start_over" } : {}),
+            ...(e.whatAirs === "same_as" ? { sameAsSlotId: e.sameAsSlotId } : {})
           })
         ),
-      dates: dates.filter((d) => d.templateId === g.id).map((d) => ({ date: d.date, edited: Boolean(d.editedAt), entries: d.entries, skipped: d.skipped })),
+      dates: dates
+        .filter((d) => d.templateId === g.id)
+        .map((d) => ({ date: d.date, edited: Boolean(d.editedAt), entries: d.entries, skipped: d.skipped, ...(d.notes?.length ? { warnings: d.notes.map((n) => noteView(n, g.id, d.date)) } : {}) })),
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt?.toISOString() ?? null,
       // A244: its programming blocks, in the broadcast day's order.
@@ -416,7 +677,11 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const now = deps.clock.now();
       const today = broadcastDate(now, tz);
       checkPattern({ ...input, fromDay: input.fromDay }, today);
-      const [entries, blocks] = await Promise.all([snapshot(stationId, input.fromDay, tz), snapshotBlocks(stationId, input.fromDay, tz)]);
+      const [snapped, blocks] = await Promise.all([snapshot(stationId, input.fromDay, tz), snapshotBlocks(stationId, input.fromDay, tz)]);
+      // Programming Phase 3: each entry is a slot from the start, and the day it was built from is
+      // its first airing (a slot made Next episode later goes on from there). An entry another
+      // template's slot made stays that slot's.
+      const entries = snapped.map(({ sourceId, sourceSlotId, ...e }) => ({ ...e, slotId: randomUUID(), sourceId, sourceSlotId }));
       const [row] = await db.transaction(async (tx) => {
         const inserted = await tx
           .insert(G)
@@ -432,7 +697,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             updatedAt: now
           })
           .returning();
-        if (entries.length) await tx.insert(TE).values(entries.map((e) => ({ ...e, templateId: inserted[0].id })));
+        if (entries.length) await tx.insert(TE).values(entries.map(({ sourceId: _row, sourceSlotId: _slot, ...e }) => ({ ...e, templateId: inserted[0].id })));
+        for (const e of entries) if (!e.sourceSlotId) await tx.update(E).set({ templateSlotId: e.slotId }).where(eq(E.id, e.sourceId));
         if (blocks.length) await tx.insert(TB).values(blocks.map((b) => ({ ...b, templateId: inserted[0].id })));
         return inserted;
       });
@@ -450,7 +716,13 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const onto = pattern === "once" ? (input.onto ?? (current.pattern === "once" ? current.endsOn : null)) : null;
       const until = pattern === "once" ? onto : input.until !== undefined ? input.until : current.pattern === "once" ? null : current.endsOn;
       if (input.pattern || input.onto || input.until !== undefined) checkPattern({ pattern, onto, until, fromDay: current.startsOn }, today);
-      const entries = input.entries ? await fromInput(stationId, input.entries) : input.fromDay ? await snapshot(stationId, input.fromDay, tz) : null;
+      // Programming Phase 3: its slots keep their ids (and so their walks) through the save.
+      const currentEntries = input.entries || input.fromDay ? await db.select().from(TE).where(eq(TE.templateId, templateId)) : [];
+      const entries = input.entries
+        ? await fromInput(stationId, input.entries, new Set(currentEntries.map((e) => e.slotId)))
+        : input.fromDay
+          ? (await snapshot(stationId, input.fromDay, tz, currentEntries)).map(({ sourceId: _row, sourceSlotId: _slot, ...e }) => e)
+          : null;
       // A244: its blocks, as sent (`blocks` replaces them), or from the day again.
       const blocks = input.blocks ? await blocksFromInput(stationId, input.blocks) : input.fromDay ? await snapshotBlocks(stationId, input.fromDay, tz) : null;
       const [row] = await db.transaction(async (tx) => {
@@ -558,29 +830,6 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       if (options.through && options.through > last) last = options.through < cap ? options.through : cap;
 
       const templates = await db.select().from(G).where(and(eq(G.stationId, stationId), eq(G.template, true), isNull(G.removedAt)));
-      const readRecords = async (ex: Executor) =>
-        new Map((await ex.select().from(TD).where(and(eq(TD.stationId, stationId), gte(TD.date, first), lte(TD.date, last)))).map((r) => [r.date, r]));
-      const due = (records: Map<string, typeof TD.$inferSelect>) => {
-        const dates: string[] = [];
-        let exceptions = 0;
-        for (let d = first; d <= last; d = addDays(d, 1)) {
-          const rec = records.get(d);
-          const win = winner(templates, d);
-          if (rec?.editedAt) {
-            if (win) exceptions++;
-            continue;
-          }
-          if (!rec && !win) continue;
-          if (rec && win && rec.templateId === win.id && options.force !== win.id && rec.generatedAt >= (win.updatedAt ?? win.createdAt)) continue;
-          dates.push(d);
-        }
-        return { dates, exceptions };
-      };
-      // Most runs have nothing to do: look before taking the lock.
-      const before = due(await readRecords(db));
-      totals.exceptions = before.exceptions;
-      if (!before.dates.length) return totals;
-
       const templateEntries = templates.length
         ? await db
             .select()
@@ -588,10 +837,61 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             .where(inArray(TE.templateId, templates.map((t) => t.id)))
             .orderBy(asc(TE.startMinute))
         : [];
+      // Programming Phase 3: the slots that walk, what they walk, and where each walk is.
+      const walking = templateEntries.filter(walks);
+      const state = walking.length ? await walkState(stationId, walking) : null;
+      const readHistory = (ex: Executor) => slotHistory(ex, stationId, walking.map((e) => e.slotId), tz);
+      /** What a date's walking slots are made from: each one's airings before it, and its programs' episodes. */
+      const walkOf = (t: Group, date: string, history: History): string | null => {
+        const mine = walking.filter((e) => e.templateId === t.id);
+        if (!mine.length || !state) return null;
+        const made = mine.map((e) => [
+          [e.slotId, e.startMinute, e.lengthMs, e.whatAirs, e.programIds, e.playbackOrder, e.atEnd],
+          before(history, e.slotId, date),
+          state.episodesOf(e).map((i) => (state.canAir(i) ? i.id : `${i.id}!`))
+        ]);
+        return createHash("sha1").update(JSON.stringify(made)).digest("base64url");
+      };
+
+      const readRecords = async (ex: Executor) =>
+        new Map((await ex.select().from(TD).where(and(eq(TD.stationId, stationId), gte(TD.date, first), lte(TD.date, last)))).map((r) => [r.date, r]));
+      /** Whether a date is made (again): its template changed, another took it, or (Phase 3) its walk did. */
+      const isDue = (rec: typeof TD.$inferSelect | undefined, d: string, history: History) => {
+        const win = winner(templates, d);
+        if (rec?.editedAt) return false;
+        if (!rec && !win) return false;
+        if (rec && win && rec.templateId === win.id && options.force !== win.id && rec.generatedAt >= (win.updatedAt ?? win.createdAt) && (rec.walk ?? null) === walkOf(win, d, history)) return false;
+        return true;
+      };
+      const exceptionsIn = (records: Map<string, typeof TD.$inferSelect>) => {
+        let exceptions = 0;
+        for (let d = first; d <= last; d = addDays(d, 1)) if (records.get(d)?.editedAt && winner(templates, d)) exceptions++;
+        return exceptions;
+      };
+      // Most runs have nothing to do: look before taking the lock.
+      {
+        const records = await readRecords(db);
+        totals.exceptions = exceptionsIn(records);
+        const history = walking.length ? await readHistory(db) : [];
+        let any = false;
+        for (let d = first; d <= last && !any; d = addDays(d, 1)) any = isDue(records.get(d), d, history);
+        if (!any) return totals;
+      }
+
       const itemIds = [...new Set(templateEntries.map((e) => e.assetId).filter((v): v is string => Boolean(v)))];
       // A244: the templates' programming blocks (an archived block is made no more).
       const templateBlocks = templates.length ? await db.select().from(TB).where(inArray(TB.templateId, templates.map((t) => t.id))) : [];
       const [items, pulled, blockRefs] = await Promise.all([services.library.itemsByIds(itemIds), services.trust.offAirItems(itemIds), services.library.blocks.refs(templateBlocks.map((b) => b.blockId))]);
+      // Programming Phase 6: a This episode slot's item is skipped on dates its network licence isn't in force.
+      const itemsInForce = await licencesInForce(stationId, [...items.values()]);
+      // Phase 3: titles for the warnings.
+      const programs = new Map([...(state?.programs ?? new Map<string, ProgramRef>())]);
+      for (const [id, p] of await services.library.programsByIds([...new Set([...items.values()].map((i) => i.programId).filter((v): v is string => Boolean(v) && !programs.has(v!)))])) programs.set(id, p);
+      const titleOf = (row: Desired) => {
+        const item = row.assetId ? (items.get(row.assetId) ?? state?.episodes.find((e) => e.id === row.assetId)) : undefined;
+        const programId = row.programId ?? item?.programId ?? null;
+        return (programId ? programs.get(programId)?.title : undefined) ?? item?.title ?? (row.kind === "live" ? "Live" : row.kind === "off_air" ? "Off air" : "Untitled");
+      };
 
       /** A244: a date's spans from its template. */
       function spansFor(t: Group, date: string) {
@@ -605,18 +905,80 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       }
       const spanKey = (x: { startsAt: Date; endsAt: Date; blockId: string }) => [x.startsAt.getTime(), x.endsAt.getTime(), x.blockId].join("|");
 
-      /** A date's entries from its template: what can air (rights, claims, carriage limits). */
-      async function desiredFor(t: Group, date: string) {
-        const rows: Array<typeof E.$inferInsert & { startsAt: Date; endsAt: Date }> = [];
+      /**
+       * A date's entries from its template: what can air (rights, claims, carriage limits).
+       * Programming Phase 3: a walking slot's episodes from where its walk is (`history`), a rerun
+       * of an earlier slot's, then the ripple; and the date's warnings.
+       */
+      async function desiredFor(t: Group, date: string, history: History) {
+        const planned: Desired[] = [];
+        const notes: TemplateNoteRow[] = [];
         let skipped = 0;
-        for (const e of templateEntries.filter((x) => x.templateId === t.id)) {
+        // What each slot aired this date, for Same as earlier slot; the rows that run past their slot.
+        const aired = new Map<string, { airings: ItemRef[][]; fill: boolean }>();
+        const longer = new Map<Desired, string>();
+        for (const e of templateEntries.filter((x) => x.templateId === t.id).sort(byDayOrder)) {
           const startsAt = templateInstant(date, e.startMinute, tz);
           // On a segment boundary (the template keeps the day's lengths as they were made).
           const endsAt = new Date(startsAt.getTime() + snapToSegment(e.lengthMs));
           if (startsAt <= now) continue;
+          const base = {
+            stationId,
+            kind: e.kind,
+            code: asLogCode(e.code),
+            liveSourceId: e.liveSourceId,
+            carriageAgreementId: e.carriageAgreementId,
+            localNote: e.localNote,
+            keepTime: e.keepTime,
+            repeatGroupId: t.id,
+            templateDate: date,
+            templateSlotId: e.slotId
+          };
+          if (e.kind === "program" && e.whatAirs !== "this_episode") {
+            let airings: ItemRef[][] = [];
+            let fill = e.whatAirs === "fill";
+            let stopped = false;
+            if (e.whatAirs === "same_as") {
+              const source = aired.get(e.sameAsSlotId ?? "");
+              airings = source?.airings ?? [];
+              fill = source?.fill ?? false;
+            } else if (state) {
+              const walked = airingsFor(e, before(history, e.slotId, date), state, startsAt);
+              airings = walked.airings.map((a) => a.episodes);
+              stopped = walked.stopped;
+              aired.set(e.slotId, { airings, fill });
+              const ending = walked.airings.find((a) => a.cycle === 0 && a.endsCycle);
+              if (ending) notes.push(lastEpisodeNote(e, ending.episodes[0], date, startsAt, programs));
+            }
+            if (!airings.length) {
+              // A slot stopped at its program's end is dead air, as the station chose; otherwise nothing could air.
+              if (!stopped) skipped++;
+              continue;
+            }
+            let cursor = startsAt.getTime();
+            const rows: Desired[] = [];
+            for (const parts of airings) {
+              // Fill the slot never runs past its end (a rerun of one fits this slot's length too).
+              if (fill && cursor + airingLength(parts) > endsAt.getTime()) break;
+              for (const p of parts) {
+                rows.push({ ...base, code: asLogCode(p.code), assetId: p.id, programId: p.programId, episodeTitle: null, episodeDescription: null, startsAt: new Date(cursor), endsAt: new Date(cursor + partLength(p)) });
+                cursor += partLength(p);
+              }
+            }
+            const lastRow = rows[rows.length - 1];
+            if (!fill && lastRow) {
+              // Shorter than the slot: the slot's length, with time for breaks and fill, as before.
+              // Longer: the ripple pushes what follows.
+              if (lastRow.endsAt < endsAt) lastRow.endsAt = endsAt;
+              else if (lastRow.endsAt > endsAt) longer.set(lastRow, episodeLabel(airings[0][0], programs));
+            }
+            if (!rows.length) skipped++;
+            planned.push(...rows);
+            continue;
+          }
           if (e.kind === "program") {
             const item = e.assetId ? items.get(e.assetId) : undefined;
-            if (!item || item.archived || !item.rightsConfirmed || item.contentUnavailable || pulled.has(item.id)) {
+            if (!item || item.archived || !item.rightsConfirmed || item.contentUnavailable || pulled.has(item.id) || !itemsInForce(item, startsAt)) {
               skipped++;
               continue;
             }
@@ -629,25 +991,19 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
               }
             }
           }
-          rows.push({
-            stationId,
-            startsAt,
-            endsAt,
-            kind: e.kind,
-            code: asLogCode(e.code),
-            assetId: e.assetId,
-            programId: e.programId,
-            liveSourceId: e.liveSourceId,
-            carriageAgreementId: e.carriageAgreementId,
-            localNote: e.localNote,
-            episodeTitle: e.episodeTitle,
-            episodeDescription: e.episodeDescription,
-            keepTime: e.keepTime,
-            repeatGroupId: t.id,
-            templateDate: date
-          });
+          planned.push({ ...base, assetId: e.assetId, programId: e.programId, episodeTitle: e.episodeTitle, episodeDescription: e.episodeDescription, startsAt, endsAt });
         }
-        return { rows, skipped };
+        const laid = ripple(planned, (kept, overBy, going) => {
+          const pusher = [...longer.keys()].filter((r) => r.startsAt < kept.startsAt).pop();
+          const at = clockTime(kept.startsAt, tz);
+          notes.push({
+            code: "pushes_kept",
+            slotId: kept.templateSlotId!,
+            startsAt: kept.startsAt.toISOString(),
+            message: `${pusher ? longer.get(pusher) : going.length ? titleOf(going[0]) : "An episode"} would push ${titleOf(kept)} ${Math.ceil(overBy / MIN)} min past ${at} on ${dayWords(date)}, where it's kept. What doesn't fit before ${at} isn't placed that day.`
+          });
+        });
+        return { rows: laid.rows, skipped: skipped + laid.dropped, notes };
       }
 
       const keyOf = (x: { startsAt: Date; endsAt: Date; kind: string; assetId?: string | null; liveSourceId?: string | null; carriageAgreementId?: string | null }) =>
@@ -657,8 +1013,11 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         // One generation per station at a time (the job and a write can meet).
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`day-templates:${stationId}`}))`);
         const records = await readRecords(tx);
-        for (const date of due(records).dates) {
+        let history = walking.length ? await readHistory(tx) : [];
+        // In date order: a walking slot's date counts what the dates before it now have.
+        for (let date = first; date <= last; date = addDays(date, 1)) {
           const rec = records.get(date);
+          if (!isDue(rec, date, history)) continue;
           const win = winner(templates, date);
           const existing = rec
             ? await tx
@@ -666,7 +1025,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
                 .from(E)
                 .where(and(eq(E.stationId, stationId), eq(E.repeatGroupId, rec.templateId), eq(E.templateDate, date)))
             : [];
-          const desired = win ? await desiredFor(win, date) : { rows: [], skipped: 0 };
+          const walk = win ? walkOf(win, date, history) : null;
+          const desired = win ? await desiredFor(win, date, history) : { rows: [], skipped: 0, notes: [] };
           const wanted = new Map(desired.rows.map((r) => [keyOf(r), r]));
           const kept = new Set<string>();
           const stale: EntryRow[] = [];
@@ -675,10 +1035,11 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             const want = wanted.get(key);
             if (want && !kept.has(key)) {
               kept.add(key);
-              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId || row.keepTime !== want.keepTime) {
+              const slotId = want.templateSlotId ?? null;
+              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId || row.keepTime !== want.keepTime || row.templateSlotId !== slotId) {
                 await tx
                   .update(E)
-                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime })
+                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime, templateSlotId: slotId })
                   .where(eq(E.id, row.id));
               }
             } else if (row.startsAt > now) {
@@ -733,14 +1094,17 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
           }
           totals.skippedForConflicts += skipped;
           if (win) {
+            const notes = desired.notes.length ? desired.notes : null;
             await tx
               .insert(TD)
-              .values({ stationId, date, templateId: win.id, generatedAt: now, entries: placed, skipped })
-              .onConflictDoUpdate({ target: [TD.stationId, TD.date], set: { templateId: win.id, generatedAt: now, entries: placed, skipped, editedAt: null } });
+              .values({ stationId, date, templateId: win.id, generatedAt: now, entries: placed, skipped, walk, notes })
+              .onConflictDoUpdate({ target: [TD.stationId, TD.date], set: { templateId: win.id, generatedAt: now, entries: placed, skipped, editedAt: null, walk, notes } });
           } else {
             await tx.delete(TD).where(and(eq(TD.stationId, stationId), eq(TD.date, date)));
           }
           totals.dates++;
+          // The dates after it count what this one has now.
+          if (walking.length && (rec?.walk || walk)) history = await readHistory(tx);
         }
       });
       return totals;
@@ -792,6 +1156,68 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         );
       }
       return out;
+    },
+
+    async warnings(stationId, from, to) {
+      const tz = await services.stations.timezoneOf(stationId);
+      const firstDay = broadcastDate(from, tz);
+      const lastDay = broadcastDate(new Date(Math.max(from.getTime(), to.getTime() - 1)), tz);
+      // A program's last new episode shows from a week before its date.
+      const rows = await db
+        .select({ date: TD.date, templateId: TD.templateId, notes: TD.notes })
+        .from(TD)
+        .where(and(eq(TD.stationId, stationId), gte(TD.date, firstDay), lte(TD.date, addDays(lastDay, 7)), isNotNull(TD.notes)))
+        .orderBy(asc(TD.date));
+      return rows.flatMap((r) => (r.notes ?? []).filter((n) => n.code === "last_episode" || r.date <= lastDay).map((n) => noteView(n, r.templateId, r.date)));
+    },
+
+    async preview(stationId, templateId, entry, count = 4) {
+      const t = await group(stationId, templateId);
+      if (!t.template || t.removedAt) throw notFound("That template");
+      const tz = await services.stations.timezoneOf(stationId);
+      const today = broadcastDate(deps.clock.now(), tz);
+      const current = await db.select().from(TE).where(eq(TE.templateId, templateId));
+      // A rerun previews the slot it repeats.
+      const source = entry.whatAirs === "same_as" ? current.find((e) => e.slotId === entry.sameAsSlotId) : undefined;
+      if (entry.whatAirs === "same_as" && !source) throw badRequest("Choose an earlier program slot on this template.", { sameAsSlotId: "Not on the template" });
+      const [slot] = source ? [source] : await fromInput(stationId, [entry], new Set(current.map((e) => e.slotId)));
+      // The template's next dates: those it makes, not edited by hand.
+      const others = await db.select().from(G).where(and(eq(G.stationId, stationId), eq(G.template, true), isNull(G.removedAt)));
+      const edited = new Set((await db.select({ date: TD.date }).from(TD).where(and(eq(TD.stationId, stationId), gt(TD.date, today), isNotNull(TD.editedAt)))).map((d) => d.date));
+      const dates: string[] = [];
+      for (let d = addDays(today, 1); d <= addDays(today, MAX_AHEAD_DAYS) && dates.length < count; d = addDays(d, 1)) {
+        if (winner(others, d)?.id === templateId && !edited.has(d)) dates.push(d);
+      }
+      const out: TemplateSlotPreview["dates"] = [];
+      if (walks(slot)) {
+        const state = await walkState(stationId, [slot]);
+        // From where the slot's walk is before the first of them; each date after takes one step more.
+        const known = current.some((e) => e.slotId === slot.slotId);
+        const position = known && dates.length ? before(await slotHistory(db, stationId, [slot.slotId], tz), slot.slotId, dates[0]) : [];
+        for (const date of dates) {
+          const { airings } = airingsFor(slot, position, state);
+          const episodes = airings.flatMap((a) => a.episodes);
+          position.push(...episodes.map((e) => e.id));
+          out.push({ date, episodes: episodes.map((e) => ({ itemId: e.id, title: e.title, programId: e.programId, seasonNumber: e.seasonNumber, episodeNumber: e.episodeNumber })) });
+        }
+        const days = t.pattern === "weekly" ? { one: WEEKDAYS[t.weekday ?? 0], many: `${WEEKDAYS[t.weekday ?? 0]}s` } : t.pattern === "weekdays" ? { one: "weekday", many: "weekdays" } : t.pattern === "once" ? (t.endsOn ? dayWords(t.endsOn) : "Once") : { one: "day", many: "days" };
+        return { dates: out, line: slotPreviewLine(out, days, (id) => (id ? (state.programs.get(id)?.title ?? "") : "")) };
+      }
+      // This episode: the same item every date.
+      const item = slot.assetId ? (await services.library.itemsByIds([slot.assetId])).get(slot.assetId) : undefined;
+      for (const date of dates) out.push({ date, episodes: item ? [{ itemId: item.id, title: item.title, programId: item.programId, seasonNumber: item.seasonNumber, episodeNumber: item.episodeNumber }] : [] });
+      return { dates: out, line: item ? `The same every date: ${item.title}` : "No dates ahead" };
+    },
+
+    async slotsOf(slotIds) {
+      const ids = [...new Set(slotIds)];
+      if (!ids.length) return new Map();
+      const rows = await db
+        .select({ slotId: TE.slotId, startMinute: TE.startMinute, whatAirs: TE.whatAirs, group: G })
+        .from(TE)
+        .innerJoin(G, eq(G.id, TE.templateId))
+        .where(inArray(TE.slotId, ids));
+      return new Map(rows.map((r) => [r.slotId, { slotId: r.slotId, templateId: r.group.id, templateName: r.group.name, label: templateLabel(r.group), startTime: minuteText(r.startMinute), whatAirs: r.whatAirs }]));
     }
   };
   return ops;

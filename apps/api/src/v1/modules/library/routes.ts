@@ -68,6 +68,11 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await canEditStation(user, await library.stationOfItem(params.itemId));
     return library.updateItem(params.itemId, body);
   });
+  // Programming Phase 4: a program's suggested break points, used or dismissed.
+  r.handle(api.answerBreakSuggestions, async ({ user, params, body }) => {
+    await canEditStation(user, await library.stationOfItem(params.itemId));
+    return library.answerBreakSuggestions(params.itemId, body.answer);
+  });
   r.handle(api.deleteItem, async ({ user, params }) => {
     await canEditStation(user, await library.stationOfItem(params.itemId));
     await library.archiveItem(params.itemId);

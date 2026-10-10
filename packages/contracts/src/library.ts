@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { BumperRole, DateOnly, IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { Outlet } from "./licences.js";
 
 /** A243: a time of day, "HH:MM" (24-hour), in the market's time zone. */
 const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -38,7 +39,13 @@ export const Rights = z.object({
   basis: RightsBasis,
   confirmedBy: z.string().nullable(),
   confirmedAt: Timestamp,
-  note: z.string().nullable()
+  note: z.string().nullable(),
+  /**
+   * Programming Phase 6 (added 2026-10-10): where it may air besides this station (`opencast` is
+   * always in). `made_it` and `public_domain`, and a licence record under CC0, CC BY or CC BY-SA:
+   * every outlet. Rows confirmed before 2026-10-10: `opencast` and `relays`.
+   */
+  outlets: z.array(Outlet).optional()
 });
 
 export const LibraryItem = z.object({
@@ -117,9 +124,62 @@ export const LibraryItem = z.object({
    * only during the block.
    */
   programBlockId: Id.nullable().optional(),
+  /** Programming Phase 2 (added 2026-10-09): its season, beside `episodeNumber`. Guessed from the file's name at upload. */
+  seasonNumber: z.number().int().nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09): a multi-part episode. What its parts share ("The Long
+   * Night"; the same words in one program, any case, are one episode) and this part's number. Its
+   * parts always air together, in part order. Guessed from the title at upload. Null: one episode.
+   */
+  partOf: z.string().nullable().optional(),
+  partNumber: z.number().int().nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09), on `getLibrary` only: what the station's as-run log
+   * says. `lastAiredAt` is when it last aired on the station (null: never, and `neverAired`).
+   */
+  neverAired: z.boolean().optional(),
+  lastAiredAt: Timestamp.nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09), on `getLibrary` only, for a program's episodes: where it
+   * comes in its program's walk, In order, picking up after the program's last airing on the station
+   * (as dead-air fill and "Repeat from your library" choose). 0 airs next (a multi-part episode's
+   * parts count one each, in part order); null when it can't air yet (not ready, rights not
+   * confirmed) or isn't in a program. `nextEpisode` is true for what airs next.
+   */
+  upNext: z.number().int().nullable().optional(),
+  nextEpisode: z.boolean().optional(),
+  /**
+   * Programming Phase 4 (added 2026-10-10): break points suggested for a program in the station's
+   * own library, found as its file was prepared: its chapter marks (`chapter`), or where it's both
+   * black and silent (`fade`). Never applied on their own: `answerBreakSuggestions` uses them (they
+   * become `breakPointsMs`) or dismisses them. Null (or absent) when there are none to answer: none
+   * found, not looked for yet, already answered for this file, or the item has break points of its
+   * own. `previewUrl` is the item's prepared preview (VOD HLS), for hearing each point from two
+   * seconds before; null until it's prepared.
+   */
+  suggestedBreakPoints: z
+    .object({ source: z.enum(["chapter", "fade"]), pointsMs: z.array(Millis), previewUrl: z.string().nullable() })
+    .nullable()
+    .optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
+
+/**
+ * Programming Phase 2 (added 2026-10-09): the orders a program's episodes can air in, for template
+ * slots (Phase 3); dead-air fill and "Repeat from your library" use `in_order`. Every order airs
+ * each episode once before any repeats, and a multi-part episode's parts together. There's no plain
+ * random that can repeat.
+ */
+export const PlaybackOrder = z.enum(["in_order", "newest_first", "shuffle", "shuffle_shows", "marathon"]);
+export type PlaybackOrder = z.infer<typeof PlaybackOrder>;
+export const PLAYBACK_ORDER_WORDS: Record<PlaybackOrder, { label: string; meaning: string }> = {
+  in_order: { label: "In order", meaning: "Season, then episode, then date added" },
+  newest_first: { label: "Newest first", meaning: "The newest episode not yet aired from this slot, then back through the rest" },
+  shuffle: { label: "Shuffle", meaning: "Every episode once, in a random order, before any repeats; then a new random order" },
+  shuffle_shows: { label: "Shuffle shows, keep each in order", meaning: "Which program is random, and each program's episodes stay in order" },
+  marathon: { label: "Marathon", meaning: "A whole season in a row, then the next season" }
+};
 
 export const Folder = z.object({ id: Id, name: z.string(), parentFolderId: Id.nullable(), itemCount: z.number().int() });
 
@@ -238,7 +298,14 @@ export const ItemHistory = z.object({
     .object({
       status: z.enum(["ready", "queued", "preparing", "failed", "not_asked"]),
       renditions: z.array(z.string()),
-      preparedAt: Timestamp.nullable()
+      preparedAt: Timestamp.nullable(),
+      /**
+       * Added 2026-10-09 (cleaner pictures, programming Phase 1): what preparing did to the picture.
+       * `from_hdr`: an HDR file (PQ or HLG, phone video mostly) tonemapped to BT.709; `deinterlaced`:
+       * an interlaced one made progressive. Empty when it did neither, or the item was prepared
+       * before this (and the re-prepare job found nothing to change).
+       */
+      converted: z.array(z.enum(["from_hdr", "deinterlaced"])).optional()
     })
     .optional(),
   audioLayout: AudioLayout.nullable(),
@@ -265,6 +332,15 @@ const ItemFields = z.object({
   programId: Id.nullable(),
   folderId: Id.nullable(),
   episodeNumber: z.number().int().positive().nullable(),
+  /**
+   * Programming Phase 2 (2026-10-09): its season, and a multi-part episode's shared words and part
+   * number. On upload, when neither `seasonNumber` nor `episodeNumber` is sent, both are guessed from
+   * the file's name ("S02E05", "2x05", "Season 2 Episode 5"); when `partOf` isn't sent, the part is
+   * guessed from the title ("Part 1", "(1)").
+   */
+  seasonNumber: z.number().int().positive().nullable(),
+  partOf: z.string().trim().min(1).max(200).nullable(),
+  partNumber: z.number().int().positive().nullable(),
   episodeDescription: z.string().max(160).nullable(),
   breakPointsMs: z.array(Millis),
   /**
@@ -363,6 +439,20 @@ export const libraryApi = {
     body: ItemFields.partial(),
     response: LibraryItem
   }),
+  /**
+   * Programming Phase 4 (added 2026-10-10): `use` makes the item's suggested break points its own
+   * (`breakPointsMs`); `dismiss` leaves its break points as they are. Either way they aren't
+   * suggested again for this file. 409 `no_suggestions` when there are none to answer.
+   */
+  answerBreakSuggestions: endpoint({
+    method: "POST",
+    path: "/library/:itemId/break-suggestions",
+    auth: "user",
+    summary: "Use or dismiss the break points suggested for a program (chapter marks, fades to black). Never applied otherwise.",
+    params: ItemParams,
+    body: z.object({ answer: z.enum(["use", "dismiss"]) }),
+    response: LibraryItem
+  }),
   deleteItem: endpoint({
     method: "DELETE",
     path: "/library/:itemId",
@@ -386,7 +476,12 @@ export const libraryApi = {
     auth: "user",
     summary: "Confirm the rights to air it. Needed before it can go on the log.",
     params: ItemParams,
-    body: z.object({ basis: z.enum(["made_it", "owner_permission", "public_domain"]), note: z.string().max(500).optional() }),
+    body: z.object({
+      basis: z.enum(["made_it", "owner_permission", "public_domain"]),
+      note: z.string().max(500).optional(),
+      /** Programming Phase 6 (added 2026-10-10): for `owner_permission`, where the owner allows it (`opencast` always). Left out: `opencast` and `relays`. */
+      outlets: z.array(Outlet).max(5).optional()
+    }),
     response: LibraryItem
   }),
 

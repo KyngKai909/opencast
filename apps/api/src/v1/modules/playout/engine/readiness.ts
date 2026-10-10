@@ -8,7 +8,7 @@ import { inArray } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
 import { BAND_RENDITIONS, type Band } from "./ladder.js";
-import { refKey } from "./prepare.js";
+import { refKey, syncPreparedVersions } from "./prepare.js";
 
 export interface LogItemReadiness {
   entryId: string;
@@ -40,6 +40,7 @@ export async function logReadiness(ctx: ModuleContext, stationId: string, band: 
   const { services } = ctx;
   const entries = (await services.log.entries(stationId, from, to)).filter((e) => e.assetId && e.kind === "program" && e.startsAt < to && e.endsAt > from);
   const items = await services.library.itemsByIds(entries.map((e) => e.assetId!));
+  await syncPreparedVersions(ctx.deps.db);
   const keys = new Map(entries.map((e) => [e.id, (() => { const i = items.get(e.assetId!); return i ? refKey(i) : null; })()]));
   const { ready, status } = await readyKeys(ctx, [...keys.values()].filter((k): k is string => Boolean(k)), band);
   return entries.map((e) => {

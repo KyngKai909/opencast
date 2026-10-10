@@ -238,6 +238,11 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
         if (r?.avg == null) continue;
         relays.push({ station: stations.get(t.stationId)!, platform: t.service, averageViewers: round1(r.avg), peakViewers: Number(r.peak ?? 0) });
       }
+      // Programming Phase 5: other apps (the channel list), by station and market, also never in the totals.
+      const otherApps = (await services.audience.otherApps.counts(from, to, ids))
+        .filter((c) => stations.has(c.stationId))
+        .map((c) => ({ station: stations.get(c.stationId)!, market: c.marketId ? (allMarkets.get(c.marketId) ?? null) : null, sessions: c.sessions, hours: round1(c.minutes / 60) }))
+        .sort((a, b) => b.hours - a.hours || b.sessions - a.sessions);
 
       return {
         scope,
@@ -257,7 +262,8 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
           .map((p) => ({ market: p.market ? (allMarkets.get(p.market) ?? null) : null, hours: round1(p.minutes / 60) }))
           .sort((a, b) => b.hours - a.hours),
         stations: stationList,
-        relays
+        relays,
+        otherApps
       };
     },
 

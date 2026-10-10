@@ -58,7 +58,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.channel_items",
     "broadcast.translator_sessions",
     // Added 2026-09-29 (migration 0021): captions prepared with each item.
-    "broadcast.prepared_captions"
+    "broadcast.prepared_captions",
+    // Added 2026-10-10 (migration 0063, programming Phase 4): break points suggested for a file as it's prepared.
+    "broadcast.break_suggestions"
   ],
   catalog: ["catalog.*"],
   spots: ["spots.*"],
@@ -104,5 +106,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
   ],
   // Added 2026-09-30 (follow-up Phase 4): direct uploads, from their parts to what they made.
   uploads: ["broadcast.uploads"],
+  // Added 2026-10-10 (programming Phase 5): the dial in other apps, the channel list and guide. Reads through the other services only.
+  iptv: [],
+  // Added 2026-10-10 (migration 0067, programming Phase 6): network licences and what each covers.
+  licences: ["network.network_licences", "network.network_licence_covers"],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };

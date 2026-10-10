@@ -49,6 +49,8 @@ export interface JobResults {
   platforms?: import("./modules/platforms/service.js").PlatformsTick | null;
   /** Relay viewers' parts of airings settled, not billed or returned this minute (added 2026-09-30). */
   relayViewers?: { settled: number; notBilled: number; returned: number } | null;
+  /** Other apps viewers' parts of airings settled or not billed this minute (added 2026-10-10, P5.1). */
+  otherAppViewers?: { settled: number; notBilled: number } | null;
   /** The old translators' plain stream keys moved to sealed storage (added 2026-09-30; hourly, and at the first tick). Null in other minutes. */
   translatorKeys?: { moved: number; waiting: number; failed: number } | null;
   /**
@@ -56,6 +58,12 @@ export interface JobResults {
    * uploads abandoned for 24 hours aborted, and (hourly) multipart uploads left open in the store aborted.
    */
   uploads?: { resumed: number; abandoned: number; orphans: number } | null;
+  /**
+   * Where it can air (added 2026-10-10, programming Phase 6), hourly: makers told once that carriers
+   * can send their programs to relays (P6.1); stations and the Network desk told once that a licence
+   * ends within two weeks (P6.8). Null in other minutes.
+   */
+  whereItAirs?: { makers: number; licenceStations: number; licenceDesk: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -87,6 +95,7 @@ export function createJobs(deps: Deps, services: Services) {
     const hour = now.toISOString().slice(0, 13);
     let templates: JobResults["templates"] = null;
     let reservations: JobResults["reservations"] = null;
+    let whereItAirs: JobResults["whereItAirs"] = null;
     if (hour !== lastHour) {
       lastHour = hour;
       templates = await services.log.templates.generateAll().catch((error) => {
@@ -97,6 +106,18 @@ export function createJobs(deps: Deps, services: Services) {
         console.error("[jobs] reserved call signs failed", error);
         return null;
       });
+      // Where it can air: each letter goes once (its notice's key), so a pass that finds nothing new sends nothing.
+      const [makers, licences] = await Promise.all([
+        services.catalog.tellMakersAboutRelays().catch((error) => {
+          console.error("[jobs] telling makers about relays failed", error);
+          return null;
+        }),
+        services.licences.tellEnding().catch((error) => {
+          console.error("[jobs] licences ending failed", error);
+          return null;
+        })
+      ]);
+      whereItAirs = makers === null && licences === null ? null : { makers: makers ?? 0, licenceStations: licences?.stations ?? 0, licenceDesk: licences?.desk ?? 0 };
     }
     const onAir = await services.playout.onAirStations();
     await services.log.checkDeadAir(onAir);
@@ -143,6 +164,11 @@ export function createJobs(deps: Deps, services: Services) {
     });
     const relayViewers = await services.spots.settleRelayViewers().catch((error) => {
       console.error("[jobs] relay viewers failed", error);
+      return null;
+    });
+    // Other apps viewers (P5.1): each airing's part, once the playlist polls after the spot are in.
+    const otherAppViewers = await services.spots.settleOtherApps().catch((error) => {
+      console.error("[jobs] other apps viewers failed", error);
       return null;
     });
     // The old translators' stream keys, out of plain text into the platforms module's sealed storage.
@@ -224,7 +250,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, analyticsTotals, watchDataPurged, billing, platforms, relayViewers, translatorKeys, uploads };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, analyticsTotals, watchDataPurged, billing, platforms, relayViewers, otherAppViewers, translatorKeys, uploads, whereItAirs };
   }
 
   let timer: NodeJS.Timeout | undefined;

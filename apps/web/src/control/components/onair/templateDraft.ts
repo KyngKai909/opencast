@@ -12,6 +12,7 @@ import { STATION_TZ } from "../../../lib/clock";
 import { isMember } from "./blockHandles";
 import { isBlockChange, type DraftEntry, type DraftSpan } from "./logEdit";
 import { localParts, localTime } from "./time";
+import { settingInput, settingOf, type SlotSetting } from "./whatAirs";
 
 const MIN = 60_000;
 const t = (s: string) => Date.parse(s);
@@ -86,15 +87,32 @@ export function minuteBreaks(entries: Array<Pick<DraftEntry, "endsAt">>): BreakS
   });
 }
 
-/** The draft's entries as `updateTemplate.entries`, keeping what each had (its episode, note). */
-export function entriesInput(entries: DraftEntry[], tpl: Pick<DayTemplate, "entries">): DayTemplateEntryInput[] {
+/**
+ * The draft's entries as `updateTemplate.entries`, keeping what each had (its episode, note).
+ * Programming Phase 3: each sends its slot id back (so its walk carries on), with what airs from it
+ * (`setting`: the draft's, else as saved). A slot walking its programs has no episode of its own.
+ */
+export function entriesInput(entries: DraftEntry[], tpl: Pick<DayTemplate, "entries">, setting: (e: DraftEntry) => SlotSetting | null = () => null): DayTemplateEntryInput[] {
   return [...entries]
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .map((e) => {
       const was = tpl.entries.find((x) => x.id === e.id);
       const startTime = wallClockOf(e.startsAt);
       const lengthMs = Math.max(MIN, t(e.endsAt) - t(e.startsAt));
+      const s = e.kind === "program" ? (setting(e) ?? (was ? settingOf(was) : null)) : null;
+      if (s && s.whatAirs !== "this_episode") {
+        return {
+          startTime,
+          lengthMs,
+          kind: e.kind,
+          ...(e.itemId ? { itemId: e.itemId } : {}),
+          ...((was?.localNote ?? e.localNote) ? { localNote: (was?.localNote ?? e.localNote)! } : {}),
+          ...(e.keepTime ? { keepTime: true } : {}),
+          ...settingInput(s, was?.slotId)
+        };
+      }
       return {
+        ...(was?.slotId ? { slotId: was.slotId } : {}),
         startTime,
         lengthMs,
         kind: e.kind,

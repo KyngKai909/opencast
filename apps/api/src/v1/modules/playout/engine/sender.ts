@@ -24,6 +24,9 @@
 //     prepared station ID slate in place of every segment in a break; time ads from partners would
 //     fill always shows the slate. Spots and credits aired are reported (`onPaidPromotion`) so the
 //     platforms can be marked as carrying paid promotion;
+//   - (programming Phase 6) a program not cleared for relays (`licences.clearance`, no viewer
+//     country) goes as the station's "Airing on Opencast, channel 12.1" slate, prepared once, for
+//     the program's length (relayBreaks.ts);
 //   - captions are drawn into the picture only if the station chose that (`burnCaptions`, off by
 //     default; X2): each segment with cues is re-encoded on its own, with its timestamps kept.
 //   - "Live shows only" (`relayMode: live_only`, a radio station's): only live rows are sent.
@@ -509,7 +512,16 @@ export class StationSender {
   private async segment(row: typeof CI.$inferSelect, index: number): Promise<{ buf: Buffer; item: string; ms: number; code: CodeWindow | null; startsAt: number } | null> {
     const ms = row.segmentMs[index];
     const startsAt = row.startsAt.getTime() + row.segmentMs.slice(0, index).reduce((a, b) => a + b, 0);
-    const picture = relayPicture(row, this.settings);
+    const picture = relayPicture(row, this.settings, await this.clearedForRelays(row));
+    if (picture.show === "airing_on_opencast") {
+      // Programming Phase 6: a program not cleared for relays. The station's "Airing on Opencast,
+      // channel 12.1" slate in its place, a slate per segment, for as long as it airs.
+      const seconds = Math.max(1, Math.min(4, Math.round(ms / 1000)));
+      const key = await this.options.preparer.slate(await this.options.slates.airingOnOpencast(this.options.look), seconds, this.options.look.band);
+      const slate = await this.object(`${objectKey.prepared(key, this.rendition)}/seg_00000.ts`);
+      if (slate) this.elsewhereSegments++;
+      return slate ? { buf: slate, item: `${row.id}:${index}`, ms, code: null, startsAt } : null;
+    }
     if (picture.show === "station_id_slate") {
       // The station ID slate in place of the break (the station's choice, or partner time), a slate
       // per segment (and not the spot's code).
@@ -559,6 +571,34 @@ export class StationSender {
   codeSegments = 0;
   /** Segments sent as the station ID slate (breaks, or partner time). */
   slateSegments = 0;
+  /** Programming Phase 6: segments sent as the "Airing on Opencast" slate (programs not cleared for relays). */
+  elsewhereSegments = 0;
+  /** Each row's clearance for relays, looked up once (rows are relayed in order). */
+  private clearances = new Map<string, boolean>();
+  private timeZone?: string;
+
+  /**
+   * Programming Phase 6: whether a program row may go out on relays (its rights, the agreement it's
+   * carried under, its network licences; relays have no viewer country). Breaks, live blocks and
+   * rows without an item go as before. A lookup that fails sends it as aired, as before Phase 6.
+   */
+  private async clearedForRelays(row: typeof CI.$inferSelect): Promise<boolean> {
+    if (row.inBreak || row.kind !== "prepared" || !row.assetId) return true;
+    const known = this.clearances.get(row.id);
+    if (known !== undefined) return known;
+    let cleared = true;
+    try {
+      this.timeZone ??= await this.ctx.services.stations.timezoneOf(this.stationId);
+      const [answer] = await this.ctx.services.licences.clearance([{ assetId: row.assetId, agreementId: row.agreementId }], "relays", null, { at: row.startsAt, timeZone: this.timeZone });
+      cleared = answer.cleared;
+      if (!cleared) this.log(`${row.label} isn't cleared for relays (${answer.reason.replace(/_/g, " ")}): the "Airing on Opencast" slate in its place for ${Math.round((row.endsAt.getTime() - row.startsAt.getTime()) / 1000)} s`);
+    } catch (error) {
+      this.log(`couldn't check ${row.label} for relays (${(error as Error).message.slice(0, 200)}): sent as aired`);
+    }
+    this.clearances.set(row.id, cleared);
+    if (this.clearances.size > 200) this.clearances.delete(this.clearances.keys().next().value!);
+    return cleared;
+  }
   /** The last row reported as paid promotion (once per row). */
   private lastPaid: string | null = null;
   /** Live segments sent (from Livepeer's playback, or the worker's radio ingest). */

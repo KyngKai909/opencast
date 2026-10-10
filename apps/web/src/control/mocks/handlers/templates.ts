@@ -9,7 +9,7 @@ import { getDb, saveDb } from "../db";
 import { saveOnAirState } from "../fixtures/onair";
 import { fail, path, reply } from "../respond";
 import { setTemplateBlocks } from "../blocks";
-import { createTemplate, offAirHoursOf, removeTemplate, resetTemplateDate, ResetRefused, templateById, templatesOf, templateView, TemplateInputError, updateTemplate } from "../schedule";
+import { createTemplate, offAirHoursOf, previewSlot, removeTemplate, resetTemplateDate, ResetRefused, templateById, templatesOf, templateView, TemplateInputError, updateTemplate } from "../schedule";
 import { roleOn } from "./log";
 
 const uuid = () => crypto.randomUUID();
@@ -91,6 +91,18 @@ export const templateHandlers = [
       if (e instanceof ResetRefused) return fail(e.status, e.code, e.message);
       throw e;
     }
+  }),
+
+  // Programming Phase 3: what a slot would air on the template's next dates.
+  http.post(path(logApi.previewTemplateSlot), async ({ request, params }) => {
+    const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
+    if (r instanceof Response) return r;
+    const t = templateById(r.station.ident.id, String(params.templateId));
+    if (!t) return fail(404, "not_found", "That template wasn't found.");
+    const body = logApi.previewTemplateSlot.body!.safeParse(await request.json().catch(() => null));
+    if (!body.success) return fail(400, "bad_request", "Say what the slot airs.");
+    if (body.data.entry.order === "marathon" && (body.data.entry.programIds?.length ?? 1) < 2) return fail(400, "bad_request", "Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time.");
+    return reply(logApi.previewTemplateSlot.response, previewSlot(t, body.data.entry, body.data.count));
   }),
 
   http.delete(path(logApi.removeTemplate), ({ request, params }) => {

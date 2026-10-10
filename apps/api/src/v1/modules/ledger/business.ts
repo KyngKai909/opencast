@@ -11,7 +11,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { relayViewersLabel, relayWaitingLabel, type Receipt, type Statement } from "@opencast/contracts";
+import { OTHER_APPS_LABEL, relayViewersLabel, relayWaitingLabel, type Receipt, type Statement } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { conflict, notFound } from "../../errors.js";
 import { publicUrl } from "../../lib/url.js";
@@ -103,7 +103,12 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
         push({ group: "balance", kind: "relay_viewers", label, detail: plural(settled.length, "airing"), amountMicros: settled.reduce((s, e) => s + e.net, 0), airings: settled.length, relay: { platform } });
       }
     }
-    const returned = inside.filter((x) => x.entry.kind === "release" && (x.entry.sourceType === "as_run" || x.entry.sourceType === "relay_viewers"));
+    // Other apps viewers (P5.1): their settled parts, one line, added in.
+    const otherApps = inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "other_app_viewers");
+    if (otherApps.length) {
+      push({ group: "balance", kind: "other_apps", label: OTHER_APPS_LABEL, detail: plural(otherApps.length, "airing"), amountMicros: otherApps.reduce((s, e) => s + e.net, 0), airings: otherApps.length });
+    }
+    const returned = inside.filter((x) => x.entry.kind === "release" && (x.entry.sourceType === "as_run" || x.entry.sourceType === "relay_viewers" || x.entry.sourceType === "other_app_viewers"));
     const returnedMicros = returned.reduce((s, e) => s + e.toAvailable, 0);
     push({
       group: "balance",
@@ -140,13 +145,13 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
 
     // Spent, by spot and station: the biggest first.
     const bySpotStation = new Map<string, { spotId: string; stationId: string; micros: number; airings: number }>();
-    for (const e of [...aired, ...inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "relay_viewers")]) {
+    for (const e of [...aired, ...inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "relay_viewers"), ...otherApps]) {
       const hold = e.holdId ? holds.get(e.holdId) : undefined;
       if (!hold?.spotId || !hold.stationId) continue;
       const key = `${hold.spotId}:${hold.stationId}`;
       const row = bySpotStation.get(key) ?? { spotId: hold.spotId, stationId: hold.stationId, micros: 0, airings: 0 };
       row.micros += -e.net;
-      // Relay viewers are part of an airing already counted.
+      // Relay viewers and Other apps viewers are part of an airing already counted.
       if (e.entry.sourceType === "as_run") row.airings++;
       bySpotStation.set(key, row);
     }
@@ -264,7 +269,7 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
       for (const s of await issuedStatements(businessId, available)) {
         const from = new Date(`${s.periodStart}T00:00:00Z`);
         const p = await period(businessId, from, new Date(new Date(`${s.periodEnd}T00:00:00Z`).getTime() + DAY));
-        const spent = p.lines.filter((l) => l.group === "balance" && ["aired", "sponsorship", "order"].includes(l.kind ?? "")).reduce((sum, l) => sum - l.amountMicros, 0);
+        const spent = p.lines.filter((l) => l.group === "balance" && ["aired", "relay_viewers", "other_apps", "sponsorship", "order"].includes(l.kind ?? "")).reduce((sum, l) => sum - l.amountMicros, 0);
         receipts.push({
           id: s.id,
           kind: "statement",

@@ -53,7 +53,19 @@ export const NoticeKind = z.enum([
    * shares an owner with X.1 ("12.2 BEAT Beat Tapes no longer shares an owner with 12.1 BEAT Inland
    * Beat"). Once per split; nothing changes on air by itself. Push and email on by default.
    */
-  "call_sign_owners"
+  "call_sign_owners",
+  /**
+   * Programming Phase 6 (added 2026-10-10, P6.1), station owners, once per station: carriers can
+   * send its carried programs to their relays, which stays on unless the maker turns it off. Email
+   * on, push off by default.
+   */
+  "carriage_outlets",
+  /**
+   * P6.8 (added 2026-10-10), station owners, once per licence and station: a network licence for
+   * something on the log ends within two weeks; the Network desk, once per licence. Push and email
+   * on by default.
+   */
+  "licence_ending"
 ]);
 
 export const Notice = z.object({

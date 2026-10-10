@@ -1399,3 +1399,101 @@ For review. Viewers see nothing new: a guide's shows appear in the guide, on the
 | Network desk, External sources table, What's on | "Guide needs a channel" / "Pick one: Find this channel's guide"; "Channel not in the guide" / "What it listed before stays"; "Guide too big to read" / "What it listed before stays" |
 | Network desk, a listing's details, What's on | "Channel in the guide": "{ANIME x HIDIVE} ({6793eaa4bc03978b9bc63db1}), one of {427} channels"; "What was read": "{Read 32 airings to come for ANIME x HIDIVE, one of 427 channels in the guide}. {965 KB as it downloads (gzipped), 7.4 MB unzipped}. Last read {September 26 at 8:42 pm}" with "; not changed since, at {September 26 at 9:42 pm}"; "How often": "Read every hour (every 30 minutes at most while it runs out), asking first whether it changed." (a small guide: "Read every hour, asking first whether it changed."); notes: "This guide has {427 channels}, and none is picked, so nothing from it is listed. Change, then Find this channel's guide (or add #channel= and its id to the address)."; "The channel in its address isn't in the guide right now: what it listed before stays. Change, then Find this channel's guide for another file."; "{It's over 300 MB unzipped / It's over 40 MB as it downloads / It lists over 5,000 airings to come for the channel / It took over 90 seconds to read}, so it wasn't read: what it listed before stays." |
 | Viewer settings, Privacy | "Counting devices" / "Opencast counts devices with a random number kept on this device. It isn't tied to your account, and only totals are kept after 30 days." (A251, 2026-10-06) |
+
+## Cleaner pictures (programming Phase 1, 2026-10-09)
+
+For review. A library item says what preparing did to its picture, after its size, in the item's "Prepared for air".
+
+| Where | Words |
+|---|---|
+| Control room, a library item, Prepared for air, Picture | "{1920 by 1080}. Converted from HDR" (an HDR file, phone video mostly, tonemapped); "{1920 by 1080}. Deinterlaced"; both: "{1920 by 1080}. Converted from HDR, deinterlaced". Nothing more for a file that needed neither |
+
+## Seasons and playback orders (programming Phase 2, 2026-10-09)
+
+For review. No frame draws these; they follow the item page's and the Add drawer's voice.
+
+| Where | Words |
+|---|---|
+| A library item's page, a program: the section "Episode" | the row "{Season 2, episode 5}" ("Episode {5}" without a season; ". Part {2} of {The Long Night}" for a multi-part episode, "A part of …" without a number; "Not numbered" when it has none) with "Repeats and next-episode slots air in season, then episode order. A multi-part episode's parts air together."; fields "Season", "Episode", "Part of" (placeholder "The Long Night", help "For a multi-part episode: the same words on each part."), "Part" (off until Part of has words); "A whole number, or leave it empty." under a field that isn't one; "Save" |
+| The item's picture placeholder | the same words as the row ("Season 2, episode 5", "Episode 5") |
+| The Add drawer's fit badges | "Never aired", and its line's lead "Never aired. " (as "Next episode. ") |
+| "Repeat from your library" (the Fill pane and the Add drawer) | with a season: "{Late Crate} season {2}, episodes {3} to {6}, in order, with your break rule" (the short line stays "{Late Crate} {3} to {6}, until {2:00 am}") |
+| Playback orders (contracts' `PLAYBACK_ORDER_WORDS`, for Phase 3's select) | "In order": "Season, then episode, then date added"; "Newest first": "The newest episode not yet aired from this slot, then back through the rest"; "Shuffle": "Every episode once, in a random order, before any repeats; then a new random order"; "Shuffle shows, keep each in order": "Which program is random, and each program's episodes stay in order"; "Marathon": "A whole season in a row, then the next season" (the prompt's words) |
+
+## Suggested break points (programming Phase 4, 2026-10-10)
+
+For review. No frame draws these; they follow the item page's voice (the "Episode" section's rows and buttons).
+
+| Where | Words |
+|---|---|
+| A library item's page, a program: the section "Break points" | its own: "{3} break points" ("1 break point") / "At {8:00, 22:10 and 33:40}." Suggested: "Suggested break points: {3}, from chapter marks" (or "from fades to black") / "Found in the file. Nothing changes until you choose: listen to each first.", with "Use these" and "Dismiss"; then a row per point, "{22:10}", with "Preview" ("Stop" while it plays; read aloud as "Preview the break at {22:10}") and, while it plays, "Playing from {22:08}" |
+| Under the points | "The preview is still being made." (not prepared yet); "The preview couldn't be played." |
+| Toasts | "{3} break points set." ("1 break point set."); "Suggestions dismissed." |
+| The API's refusal (and the mock's) | "There are no suggested break points to answer." (409 `no_suggestions`) |
+
+## Template slots that air the next episode (programming Phase 3, 2026-10-10)
+
+For review. No frame draws these; they follow the template editor's and the Add drawer's voice.
+
+| Where | Words |
+|---|---|
+| The template editor, a program picked: "What airs" under it | the segmented control "This episode", "Next episode", "Fill the slot", "Same as earlier slot" (contracts' `WHAT_AIRS_WORDS`; Same as earlier slot is off with no earlier program slot); for Next episode and Fill the slot, "Program" (or "Programs (a mix)" with more than one) and a checkbox a program, "Order" (a select: In order, Newest first, Shuffle; with a mix also "Shuffle shows, keep each in order" and "Marathon"; the order's meaning under it), "At the end" with "Start over" and "Stop"; for Same as earlier slot "Repeats" ("Choose an earlier slot", then "{Late Crate}, {8:00 pm}") |
+| The preview line, under it | "Next {4} {Saturdays}: ep. {13, 14, 15, 16}" ("Next {Saturday}: …" for one; "days", "weekdays"; a template made once: "{Sat Oct 31}: …"); a full slot's episodes as ranges, "ep. {1–4}, {5–8}", "{10} and {1–3}" where it starts over; a mix: "{Late Crate} ep. {13}, {Slow Hours} ep. {4}"; seasons that differ: "ep. S{1}E{1}"; episodes without numbers by title; a slot that stops: "…: ep. {2, 3}, then nothing: it stops at the end"; "No dates ahead"; while it misses something: "Choose the program it airs the next episode of." / "Choose the earlier slot it repeats." (the tray says the same, and it blocks saving) |
+| The template editor's tray, a What airs changed | "{Late Crate} airs the next episode each date, {in order}"; "{Late Crate} fills its slot with next episodes, {from Late Crate and Slow Hours}, {shuffle}" (", and stops at the end" with Stop); "{Late Crate} airs again what {Late Crate} aired"; "{Late Crate} airs the same episode every date"; each with "Undo" |
+| The Add drawer, template mode | the same segmented control above the library (without Same as earlier slot), "Order", then the programs with "Next episode" or "Fill the slot" as the badge; a program picked shows the preview line and "Add {Late Crate}"; "No programs with episodes that can air yet." |
+| The log, a row from a Next episode or Fill the slot slot | the mark "Next episode" (its title: "From the {Every Saturday} template") |
+| The log, above the rundown | a list "From your templates" (for screen readers) with the warnings below, in amber |
+| The log, an entry's details | "Template": "{Next episode}, from the {8:00 pm} slot of {Every Saturday}" ("{After work} ({Weekdays})" for a named template; "From the {8:00 pm} slot of …" for This episode) |
+| Log and template warnings (the API's) | "{Late Crate} airs its last new episode {Sat Oct 24}, then starts over." (on the log from a week before); with Stop: "{Late Crate} airs its last new episode {Sat Oct 24}, then stops. Its slot is dead air after that."; "{Late Crate, ep. 14} would push {Night Desk} {10} min past {8:30 pm} on {Sat Oct 24}, where it's kept. What doesn't fit before {8:30 pm} isn't placed that day." |
+| The API's refusals | "Choose the program it airs the next episode of."; "Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time."; "Say how long the slot runs."; "Choose the earlier slot it repeats."; "Choose an earlier program slot on this template." |
+| Viewer, You, a reminder | "{Late Crate}, {Episode 14}": the episode after the title when the airing has one |
+
+## The dial in other apps (programming Phase 5, 2026-10-10)
+
+For review. No frame draws these; the section follows You's Invite friends (ruled rows, a quiet lede).
+
+| Where | Words |
+|---|---|
+| Viewer, You (web and phone), after Invite friends | the section "Watch in other apps" (web: with "TiviMate, Jellyfin, Channels DVR, Kodi, VLC" beside it); "Opencast's stations in an IPTV app: paste the channel list, then the guide."; rows "Channel list" M3U and "Guide" XMLTV, each with its address and "Copy" (read aloud as "Copy the channel list address", "Copy the guide address"); toasts "Channel list copied." and "Guide copied." |
+| The apps, one line each | "TiviMate: Add playlist, then enter the channel list’s address. It finds the guide on its own; if not, add the guide under EPG."; "Jellyfin: Live TV: add an M3U tuner with the channel list, and an XMLTV guide provider with the guide."; "Channels DVR: Add a source, Custom Channels: the channel list as M3U, the guide as XMLTV."; "Kodi: Install the PVR IPTV Simple Client add-on, then give it the channel list (M3U) and the guide (XMLTV)."; "VLC: Open Network Stream with the channel list. VLC plays the channels; it doesn’t show a guide."; "Plex: Plex has no M3U support of its own. Run Threadfin on the same network as your Plex server, give it both addresses, then add it in Plex under Live TV & DVR. Needs Plex Pass." (Phase 7) |
+| Under them | "Other apps show the programs, station IDs and spots, but not the bug, lower thirds, or a spot's code and QR." |
+| The channel list (in the apps) | each channel "{BEAT} · {Inland Beat}", grouped by market ("Inland Empire") |
+| The guide (in the apps) | planned off air: "Off air" / "Back at {6:00 am}." ("Back {Monday} at {6:00 am}." when it's a day or more away); live blocks under the category "Live"; an episode with no season "Episode {14}"; a program with no TV rating, its advisory: "Language", "Mature" |
+| The API's refusals | "The band is tv or radio."; "Choose a market by its slug."; "That market wasn't found." |
+| Business results, an airing's Other apps line (P5.1, 2026-10-10) | "Other apps" with "{3} × {$8.00} ÷ 1,000 = {$0.02}" (local: "{2} in your area (of {4}) × {$8.00} ÷ 1,000 = {$0.02}"; cut short: "… ÷ 1,000 × {50}% aired = …"); while it counts, "{$0.40} held until the apps' viewers are counted"; not billed: "Nobody watched through the spot in another app", "Nobody watching in another app was placed inside your area" |
+| Business results, the period's Other apps line | "Other apps" with "{12} airings, {40} sessions added up, {22} billed"; the note "Viewers who tuned in from Opencast's channel list in apps like TiviMate, Jellyfin and Kodi, counted when their app was playing through the whole spot. With a location or a service area, you pay only for those Opencast places inside it." |
+| Business statements | "Other apps" with "{1 airing}"; the ledger's return: "Returned: what Other apps viewers didn't use" |
+
+## Where it can air (programming Phase 6, 2026-10-10)
+
+For review. No frame draws these; the desk pages follow the catalog's shelf, the offer form's section its Limits.
+
+| Where | Words |
+|---|---|
+| Outlets (contracts' `OUTLET_WORDS`) | "Opencast": "Our own apps, web, TV and Cast. Always on"; "Other apps": "The channel list and guide, played in apps like TiviMate, Jellyfin and VLC"; "Relays": "YouTube, Twitch, Facebook and the other relay platforms"; "FAST platforms": "Free ad-supported channels on other services"; "Recording": "Viewers may record it" |
+| The relay's slate, in place of a program not cleared for relays | the call sign above, then "Airing on Opencast, channel {12.1}" ("Airing on Opencast" without a channel), in the station's colour |
+| Master control, Offer a program (02.1): a section under Limits | "Where carriers can send it" / "Opencast is always on", a checkbox per outlet (Opencast ticked and off); the pane: "Where it can go": "{Opencast and Relays}", "{Opencast only}", "{Opencast, Other apps and Relays}" |
+| The log, an entry's quiet note | "Not on your {YouTube} relay" ("Not on your {YouTube and Twitch} relays"; "Not on your relays" with no platform named; later "Not in other apps") |
+| Log warnings (the API's) | "The licence for {Prairie Westerns} from {Prairie Films} ends {Sat Oct 31}. It's off the air after that." (from two weeks before); "{Prairie Westerns} won't air: its licence from {Prairie Films} ended {Sat Oct 31}." |
+| The API's refusals | "Its licence from {Prairie Films} ended {Sat Oct 31}." (422 `licence_ended`); "Its licence from {Prairie Films} hasn't started by then." (422 `licence_not_started`); "It has to end on or after the day it starts."; "Choose the countries it covers, or worldwide." |
+| The relay's log line | "{Night Reel} isn't cleared for relays ({not in carriage}): the "Airing on Opencast" slate in its place for {12} s" |
+| Network desk, Catalog | the link "Network licences" in the title's end |
+| Network desk, Network licences | "Network licences" / "What Opencast licenses from distributors: where it can air, and until when."; "New licence"; columns "Licensor" ("{Westerns package}. {Licensed catalogs}"; "{Licensed catalogs} and {2} more"; "Nothing yet"), "Where it can air", "Territory" ("Worldwide", "{US, CA}"), "Dates" ("{Jul 1} to {Oct 8, 2026}", the deal under it: "{12.5}% revenue share", "{$500.00} a month", "{$2,000.00} for the term", "No fee"), "State" ("Ends in {11} days" amber, "Ends today", "Active", "Starts {Nov 1, 2026}", "Ended"); empty: "No licences yet. Add one when a distributor's catalog comes onto the shelf."; under it: "Anything a licence covers is off the air once it ends. Stations airing it see a warning on their log from two weeks before." |
+| Network desk, a licence | the crumb "Network licences / {Prairie Films}"; its state and "Edit"; the notice "Ends {Oct 8, 2026}. What it covers is off the air after that, and stations airing it see a warning on their log from two weeks before."; "Covers", "Where it can air", "Territory", "Dates", "Deal", "Notes"; "Minutes aired" / "From the as-run log, for the licensor", "Earlier", "{September 2026}", "Later" (read aloud "Back to {August 2026}", "On to {October 2026}"), "Download CSV"; "Minutes aired on Opencast", "Airings", "Viewer hours, where counted"; columns "Station", "Airings", "Minutes aired", "Viewer hours" ("Not counted"); "By outlet" / "{Opencast 5,220} min, {Relays 1,395} min"; "Nothing it covers aired in {November 2026}."; "Opencast's own viewers come from its players; relay viewers from the platforms that report them; other apps' from their sessions (runs of playlist polls)." |
+| Network desk, New licence (a modal) | "New licence" ("{Prairie Films}'s licence" when changing one) / "What Opencast licenses from a distributor: where it can air, and until when."; "Licensor", "Name" (Optional), "What it covers" (the catalog's programs; "No catalog programs yet."), "Where it can air" (the outlets), "Territory" ("Worldwide", "Some countries"; "Countries", "Two-letter codes: US, CA"), "Starts", "Ends" ("Its last day on the air"), "Deal" ("No fee", "Revenue share", "Flat fee"; "Share, %"; "Fee, $" with "A month" / "For the term"), "Notes"; "No money moves yet: the deal is kept for the licensor's monthly report."; "Add licence" / "Save licence"; checks: "Say who licenses it.", "Two-letter country codes, like US, CA.", "The first day it can air.", "The last day it can air.", "On or after the day it starts.", "A share from 0 to 100, like 12.5.", "An amount in dollars, like 500." |
+| The minutes CSV | columns "Month, Licensor, Licence, Station, Outlet, Airings, Minutes aired, Viewer hours", a row per station and outlet, then "All stations", "all"; named `minutes-{prairie-films}-{2026-10}.csv` |
+
+## Where it can air: the emails and the rights dialog (programming Phase 6, P6.1, P6.8, P6.13, 2026-10-10)
+
+For review. The emails are notices (in the app too), laid out by `renderEmail`.
+
+| Where | Words |
+|---|---|
+| Email to a maker's owners, once (P6.1) | subject "Stations carrying your programs can send them to relays"; "Stations that carry {Night Reel} can send it to their relays too: YouTube, Twitch and the other platforms. They always could. Now you choose, and it stays on unless you turn it off." ("{Crate Sessions and Night Reel} … send them", "{A, B} and {2} more"); "To turn it off, open an offer and untick Relays under "Where carriers can send it". The change is for new carriers. Stations carrying it now keep what they agreed to."; the button "See your offers" (Offered); under it "Opencast sends this once, to the owners of stations whose programs other stations can carry." |
+| Email to a station's owners, once per licence (P6.8) | subject "{Prairie Westerns} comes off the air after {Sat Oct 31}" ("{2} programs on your log come off the air after {Sat Oct 31}"); "Opencast's licence from {Prairie Films} for {Prairie Westerns} ends {Sat Oct 31}. It can't air on {KRAT 33.1} after that day." ("They can't"); "On your log:", then a line an entry, "{Prairie Westerns, ep. 1}, {Sat Oct 24} at {8:00 pm}" (", after the end" on one after its last day; six at most, then "and {3} more"); "What's on the log after {Sat Oct 31} won't air: station ID and bumpers air in its place. Replace it when you can." (nothing after the end: "Nothing on your log is after {Sat Oct 31}. The log won't take it after that day."); the button "Open the log" (the Schedule); under it "Opencast sends this once for each licence, to the owners of stations with something it covers on their log." |
+| Email to the Network desk, once per licence (P6.8) | subject "The licence from {Prairie Films} ends {Sat Oct 31}"; "{Westerns package}, from {Prairie Films}, covers {High Noon Again, Prairie Westerns and Trail Dust}. Unless another licence covers them, they're off the air after {Sat Oct 31}." (no name: "It covers …"; nothing covered: "It covers nothing now. It ends {Sat Oct 31}."); "Something it covers is on the log at {KRAT 33.1}. Its owners have been told." ("Their owners" for several) or "Nothing it covers is on a station's log."; "If the deal goes on, change its last day on the licence's page."; the button "Open the licence"; under it "You're getting this because you're on Opencast's Network desk." |
+| Master control, the rights dialog (A.3), under "The owner gave permission" (P6.13) | "Where the owner allows it" / "Opencast is always on. Tick what else the owner agreed to."; a checkbox per outlet in `OUTLET_WORDS`' words ("Opencast" ticked and off, "Other apps", "Relays", "FAST platforms", "Recording"); Opencast and Relays ticked to start, or what was confirmed before |
+| Other apps (the `via=iptv` stream), in place of a program not cleared for them | the same slate as the relay's: the call sign above, then "Airing on Opencast, channel {12.1}", in the station's colour (silence on the radio band) |
+| The guide (XMLTV), a slot not cleared for other apps | title "Airing on Opencast"; description "On Opencast only. Watch it on {BEAT}, channel {12.1}, in the Opencast app." (no sub-title, category, episode or rating) |
+| By outlet, on the licence's minutes | "{Opencast 5,220} min, {Relays 1,395} min, {Other apps 310} min" (the outlet's words from `OUTLET_WORDS`) |
+| The API's log line (playout), when the other apps' slate isn't prepared | "{BEAT}: the other apps' "Airing on Opencast" slate isn't prepared yet, so {Night Reel} (not cleared for them) shows the station ID in its place" ("… holds the playlist until it is" with no station ID ready either) |

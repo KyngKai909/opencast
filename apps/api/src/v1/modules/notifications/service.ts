@@ -1,7 +1,7 @@
 // Notices in the app, and pushes and emails, from events the other modules emit.
 // Some can't be turned off: dead air coming, spots about to pause, rights claims.
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { EmailNotice } from "../../email.js";
@@ -36,7 +36,9 @@ type Kind =
   | "station_account"
   | "relay"
   | "external_station"
-  | "call_sign_owners";
+  | "call_sign_owners"
+  | "carriage_outlets"
+  | "licence_ending";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -48,6 +50,10 @@ export interface NoticeInput {
   scope: Scope;
   /** The same key never makes a second notice (one warning per gap, one reminder per airing). */
   dedupeKey?: string;
+  /** The email's button, when it says more than the app's name ("See your offers"). */
+  action?: string;
+  /** The email's line under the signature, when it isn't about the person's settings (a one-time letter). */
+  footer?: string;
 }
 
 export interface NoticeView {
@@ -93,7 +99,12 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     // External stations (2026-09-30): the Network desk, when one leaves the dial for a stream that's down and when it's back.
     external_station: { push: true, email: true },
     // A234 (2026-09-30): the Network desk, when a station sharing X.1's call sign no longer shares an owner with it.
-    call_sign_owners: { push: true, email: true }
+    call_sign_owners: { push: true, email: true },
+    // Programming Phase 6 (2026-10-10, P6.1): once, to the owners of stations whose carried programs
+    // can go to carriers' relays, which stays on unless they turn it off.
+    carriage_outlets: { push: false, email: true },
+    // P6.8: the owners, when a network licence for something on their log ends within two weeks; the Network desk too.
+    licence_ending: { push: true, email: true }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -138,6 +149,11 @@ export interface NotificationsService {
   forgetUser(userId: string): Promise<void>;
   /** Emails an invite (made, or sent again). Rejects when the email couldn't be sent. */
   sendInvite(invite: InviteEmail): Promise<void>;
+  /**
+   * Programming Phase 6: the dedupe keys anyone has had a notice for, so a letter sent once to a
+   * station (not a person) isn't sent again when its team changes.
+   */
+  told(dedupeKeys: string[]): Promise<Set<string>>;
 }
 
 export type InviteEmail = Omit<Events["invite.created"], "phone"> & { email: string };
@@ -184,7 +200,7 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
    * Master control's pages a station notice can open; anything else opens the monitor. A246: the
    * log, the as-run log and the breaks are the Schedule (the old pages still redirect there).
    */
-  const CONTROL_PAGES: Record<string, string> = { schedule: "schedule", log: "schedule", "as-run": "schedule", live: "live", sponsors: "sponsors", rights: "rights", "spot-market": "spot-market", carriage: "market", breaks: "schedule", earnings: "earnings", library: "library", settings: "settings" };
+  const CONTROL_PAGES: Record<string, string> = { schedule: "schedule", log: "schedule", "as-run": "schedule", live: "live", sponsors: "sponsors", rights: "rights", "spot-market": "spot-market", carriage: "market", offered: "market/offered", breaks: "schedule", earnings: "earnings", library: "library", settings: "settings" };
 
   /**
    * A notice's link as a full address in the right app, for its email. Notices keep app-neutral
@@ -261,8 +277,8 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
             const letter: EmailNotice = {
               ...deliver,
               link: await emailLink(notice.scope, deliver.link),
-              action: notice.scope.kind === "business" ? "Open Opencast for business" : notice.scope.kind === "station" ? "Open master control" : "Open Opencast",
-              footer: always ? "Opencast always sends this one; it can't be turned off." : "You can turn these emails off in Settings, Notifications.",
+              action: notice.action ?? (notice.scope.kind === "business" ? "Open Opencast for business" : notice.scope.kind === "station" ? "Open master control" : "Open Opencast"),
+              footer: notice.footer ?? (always ? "Opencast always sends this one; it can't be turned off." : "You can turn these emails off in Settings, Notifications."),
               // One email per notice, however many times it's tried.
               key: `notice:${row.id}`,
               kind: notice.kind
@@ -317,6 +333,17 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     async sendInvite(invite) {
       const { notice } = inviteEmail(invite, { app: appOrigin, business: businessOrigin });
       await deps.notifier.email(invite.email, notice);
+    },
+
+    async told(dedupeKeys) {
+      const keys = [...new Set(dedupeKeys)];
+      if (!keys.length) return new Set();
+      // Each person's notice has the key with their id after it.
+      const rows = await db
+        .select({ key: N.dedupeKey })
+        .from(N)
+        .where(or(...keys.map((k) => like(N.dedupeKey, `${k.replace(/[\\%_]/g, "\\$&")}:%`))));
+      return new Set(keys.filter((k) => rows.some((r) => r.key?.startsWith(`${k}:`))));
     },
 
     async setPrefs(userId, scope, prefs) {

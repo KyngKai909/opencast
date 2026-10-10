@@ -1,7 +1,10 @@
 // 04.1 a library item (/:callSign/library/items/:itemId?folder=:folderId): the file, how it was
 // prepared for air, its rights, whether it's offered for carriage, where it's scheduled and every
 // time it has aired (L5), replacing its file (L6), and removing it (guarded while anything uses it).
-// "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared.
+// "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared. What
+// preparing did to the picture (programming Phase 1) follows its size: "1920 by 1080. Converted from HDR".
+// Programming Phase 2: a program's season, episode and part, to correct what the upload guessed.
+// Programming Phase 4: a program's break points, and those suggested from its file (BreakFields).
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -15,9 +18,11 @@ import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { bumperCount, FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
 import { AirWindowSection, BlockSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
+import { EpisodeSection, episodeWords } from "../../components/live/EpisodeFields";
+import { BreakSection } from "../../components/live/BreakFields";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
-import { preparationWords } from "../../components/onair/readiness";
+import { conversionWords, preparationWords } from "../../components/onair/readiness";
 import { SecTop } from "../../components/live/Studio";
 import { UploadList } from "@opencast/ui/upload";
 import { useUpload } from "../../components/live/upload";
@@ -89,6 +94,7 @@ export default function LibraryItem() {
   const captions = item.captions === "none" ? "None" : `${item.captions === "generated" ? "Generated" : "Uploaded"}${h?.captionLanguage ? `, ${languageName(h.captionLanguage)}` : ""}`;
   const contentId = item.storage?.contentId;
   const prepared = preparationWords(h?.preparation?.status);
+  const converted = conversionWords(h?.preparation?.converted);
 
   return (
     <div className="cc-libwrap">
@@ -152,7 +158,7 @@ export default function LibraryItem() {
         <div className="cc-item__grid">
           <div>
             <PictureFrame label={`${item.title}, the picture`}>
-              <PicturePlaceholder scene="reel" title={program?.title ?? item.title} subtitle={item.episodeNumber ? `Episode ${item.episodeNumber}` : undefined} />
+              <PicturePlaceholder scene="reel" title={program?.title ?? item.title} subtitle={item.episodeNumber || item.seasonNumber || item.partOf ? episodeWords(item) : undefined} />
             </PictureFrame>
             {item.status !== "ready" && (
               <div className="cc-item__status">
@@ -212,7 +218,8 @@ export default function LibraryItem() {
               <KeyValueList
                 className="cc-item__kv"
                 items={[
-                  { label: "Picture", value: item.picture ? `${item.picture.width} by ${item.picture.height}` : item.mediaKind === "audio" ? "Audio only" : "Not yet" },
+                  // Cleaner pictures: an HDR phone clip tonemapped, an interlaced one deinterlaced, said after its size.
+                  { label: "Picture", value: [item.picture ? `${item.picture.width} by ${item.picture.height}` : item.mediaKind === "audio" ? "Audio only" : "Not yet", converted].filter(Boolean).join(". ") },
                   ...(sound ? [{ label: "Sound", value: sound }] : []),
                   { label: "Captions", value: captions },
                   ...(item.storage ? [{ label: "Stored", value: item.storage.sharedWith > 0 ? "Once, shared by every station airing it" : "Once" }] : []),
@@ -225,6 +232,10 @@ export default function LibraryItem() {
               {item.status === "ready" && !sound && <small className="cc-item__quiet">{readyLine(item)}</small>}
             </section>
 
+            {/* Programming Phase 2: a program's season, episode and part. */}
+            {typeOf(item) === "PGM" && <EpisodeSection item={item} canEdit={s.can("programming")} />}
+            {/* Programming Phase 4: its break points, and those suggested from the file, previewed and used or dismissed. */}
+            {typeOf(item) === "PGM" && <BreakSection item={item} canEdit={s.can("programming")} />}
             {/* A243: a bumper's role, and when bumpers, station IDs, openers and closers air. */}
             {typeOf(item) === "BMP" && <BumperRoleSection item={item} radio={s.station.band === "radio"} canEdit={s.can("programming")} />}
             {WINDOWED.includes(typeOf(item)) && <AirWindowSection item={item} canEdit={s.can("programming")} />}

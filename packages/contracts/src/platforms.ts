@@ -146,6 +146,55 @@ export const RelayViewersLine = z.object({
 });
 export type RelayViewersLine = z.infer<typeof RelayViewersLine>;
 
+// ---- Other apps viewers on results and statements (added 2026-10-10, programming Phase 5, P5.1) ----
+
+/** "Other apps": viewers tuned from Opencast's channel list in TiviMate, Jellyfin, Channels DVR, Kodi or VLC. */
+export const OTHER_APPS_LABEL = "Other apps";
+
+/**
+ * Where one airing's Other apps part stands:
+ * - `counting`: waiting for the playlist polls after the spot (a couple of minutes after it aired);
+ * - `settled`: billed;
+ * - `not_billed`: nobody watched through it in another app, or (local businesses) nobody placed
+ *   inside the area did.
+ */
+export const OtherAppsPartStatus = z.enum(["counting", "settled", "not_billed"]);
+export type OtherAppsPartStatus = z.infer<typeof OtherAppsPartStatus>;
+
+/** One airing's Other apps viewers (a business's results). */
+export const OtherAppsPart = z.object({
+  /** "Other apps". */
+  label: z.string(),
+  status: OtherAppsPartStatus,
+  /** Why it isn't billed ("Nobody watched through the spot in another app"); null otherwise. */
+  reason: z.string().nullable(),
+  /** Sessions in other apps that watched through the spot (one per connection); null until counted. */
+  sessions: z.number().int().nullable(),
+  /** Of those, the ones billed (local businesses: placed inside your area); null until counted. */
+  billedSessions: z.number().int().nullable(),
+  costMicros: Micros,
+  /** Still held for it while it counts. */
+  heldMicros: Micros,
+  /** "3 × $8.00 ÷ 1,000 = $0.02"; null until counted. */
+  working: z.string().nullable()
+});
+export type OtherAppsPart = z.infer<typeof OtherAppsPart>;
+
+/** A period's Other apps viewers, added up (results). */
+export const OtherAppsLine = z.object({
+  /** "Other apps". */
+  label: z.string(),
+  airings: z.number().int(),
+  /** Sessions that watched through the spots, added up across airings (never reach). */
+  sessionsAddedUp: z.number().int(),
+  billedSessionsAddedUp: z.number().int(),
+  spentMicros: Micros,
+  /** Held while the polls after a spot come in. */
+  waitingMicros: Micros,
+  waitingAirings: z.number().int()
+});
+export type OtherAppsLine = z.infer<typeof OtherAppsLine>;
+
 // ---- Endpoints ----
 
 const StationParams = z.object({ stationId: Id });

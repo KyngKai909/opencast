@@ -59,5 +59,25 @@ export function blockCardKey(look: StationLook, band: Band, block: { name: strin
   return `blk-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
 }
 
-/** Anything Opencast makes over the soft bed: the generated station ID, the automatic opener and closer, and (A244) a block's automatic cards. */
+// The other apps' slate (programming Phase 6, added 2026-10-10): "Airing on Opencast, channel 12.1"
+// (slates.ts, `airingOnOpencast`), for other apps (the `via=iptv` playlists), in place of a program not cleared for them. One slate
+// per segment length, 1 to 4 seconds (a program's segments are 4 seconds, its last one shorter),
+// over silence, prepared once per station look under a key made from what it shows, so the API can
+// name it without drawing it. Its keys start `slate-`, like every slate (never planned around).
+
+/** Bumped when the picture changes. */
+const ELSEWHERE_VERSION = 1;
+/** The slate lengths prepared: one for each whole second a segment rounds to. */
+export const ELSEWHERE_SECONDS = [1, 2, 3, 4] as const;
+
+/** The other-apps "Airing on Opencast" slate `seconds` long, as its prepared key (`slate-aoo-…`). */
+export function elsewhereSlateKey(look: Pick<StationLook, "callSign" | "channel" | "name" | "colour">, band: Band, seconds: number): string {
+  const content = { callSign: look.callSign, channel: look.channel, name: look.name, colour: look.colour, band, seconds, v: ELSEWHERE_VERSION };
+  return `slate-aoo-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
+}
+
+/** The slate length for a segment `ms` long (as the relay's, 1 to 4 seconds). */
+export const elsewhereSeconds = (ms: number) => Math.max(1, Math.min(4, Math.round(ms / 1000)));
+
+/** Anything Opencast makes over the soft bed:the generated station ID, the automatic opener and closer, and (A244) a block's automatic cards. */
 export const isGeneratedIdent = (key: string) => /^(sid|opn|cls|blk)-/.test(key);

@@ -41,3 +41,12 @@ a.cc-tcard:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px
 @media (max-width: 1100px) {
   .cc-tpls { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; }
 }
+
+/* Programming Phase 3: What airs, under a template's program (the pane, and the Add drawer's template mode). */
+.cc-whatairs { display: grid; gap: 10px; }
+.cc-whatairs__h { margin: 0; font: 600 13px var(--font-text); color: var(--ink); }
+.cc-whatairs__seg { max-width: 100%; overflow-x: auto; }
+.cc-whatairs__progs { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
+.cc-whatairs__progs legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--ink-70); }
+.cc-whatairs__end { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; color: var(--ink-70); }
+.cc-whatairs__preview { margin: 0; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }

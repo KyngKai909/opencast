@@ -15,7 +15,9 @@
 //   /desk/rights-claims                          desk-pages 01 rights claims (?tab=closed|stations, ?claim=<id>)
 //   /desk/reserved-call-signs[/:marketSlug]      desk-pages 02 reserved call signs (the remembered market without one)
 //   /desk/catalog-sponsors                       desk-pages 03 Catalog sponsors (?market=los-angeles filters, ?sel= picks, ?add=offer|assign)
-//   /desk/settings/:section                      desk-pages 04 Settings: team, rules, markets, signers, log, you
+//   /desk/licences                               programming Phase 6: network licences (?new=1 opens New licence)
+//   /desk/licences/:licenceId                    a licence and its monthly minutes (?month=2026-10)
+//   /desk/settings/:section                     desk-pages 04 Settings: team, rules, markets, signers, log, you
 // The creator's permission page (06.1, 06.2) is the viewer area's /permission/:token.
 
 import { Navigate, Route, Routes } from "react-router";
@@ -41,6 +43,8 @@ import Reserved from "./pages/Reserved";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
 import Sponsors from "./pages/Sponsors";
+import Licences from "./pages/Licences";
+import Licence from "./pages/Licence";
 import Setup from "./pages/Setup";
 import SignIn from "./pages/SignIn";
 import { deskPath } from "../areas";
@@ -76,6 +80,8 @@ export function AppRoutes() {
         <Route path="reserved-call-signs/:marketSlug" element={<Reserved />} />
         <Route path="rights-claims" element={<Claims />} />
         <Route path="catalog-sponsors" element={<Sponsors />} />
+        <Route path="licences" element={<Licences />} />
+        <Route path="licences/:licenceId" element={<Licence />} />
         <Route path="settings" element={<Navigate to="rules" replace />} />
         <Route path="settings/:section" element={<Settings />} />
         <Route path="*" element={<NotFound />} />

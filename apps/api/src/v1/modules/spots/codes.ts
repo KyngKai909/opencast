@@ -10,6 +10,7 @@ import type { ModuleContext } from "../../context.js";
 import { conflict, notFound } from "../../errors.js";
 import { localDate, localDay } from "../../lib/time.js";
 import { createRelayViewers } from "./relayViewers.js";
+import { createOtherAppViewers } from "./otherAppViewers.js";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -59,6 +60,7 @@ export function createCodes(ctx: ModuleContext): CodesPart {
   const { deps, services } = ctx;
   const { db } = deps;
   const relay = createRelayViewers(ctx);
+  const otherApps = createOtherAppViewers(ctx, relay);
   const C = schema.codes;
   const EV = schema.codeEvents;
   const AI = schema.airings;
@@ -332,7 +334,7 @@ export function createCodes(ctx: ModuleContext): CodesPart {
       const { from, to, shownFrom } = await rangeOf(period, spots);
       const spotIds = spots.map((s) => s.id);
       const aired = await airedAirings(spotIds, from, to);
-      const [costs, idents, contexts, events, relayParts] = await Promise.all([
+      const [costs, idents, contexts, events, relayParts, otherAppsParts] = await Promise.all([
         services.ledger.costsOfAsRun(aired.map((a) => a.run.id)),
         services.stations.idents(aired.map((a) => a.airing.stationId)),
         services.log.breakContexts(aired.map((a) => a.airing.breakId)),
@@ -344,7 +346,9 @@ export function createCodes(ctx: ModuleContext): CodesPart {
               .where(and(inArray(C.spotId, spotIds), gte(EV.occurredAt, from), lt(EV.occurredAt, to)))
           : Promise.resolve([]),
         // Relay viewers (2026-09-30): each airing's parts on YouTube and Twitch.
-        relay.parts(aired.map((a) => a.airing.id))
+        relay.parts(aired.map((a) => a.airing.id)),
+        // Other apps viewers (P5.1): each airing's part.
+        otherApps.parts(aired.map((a) => a.airing.id))
       ]);
       const tz = "America/Los_Angeles";
       const airings: Results["airings"] = [];
@@ -364,6 +368,7 @@ export function createCodes(ctx: ModuleContext): CodesPart {
             ? `${who} × ${fmt(airing.rateMicros)} ÷ 1,000${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`
             : `${fmt(airing.rateMicros)} an airing${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`;
         const relayViewers = relayParts.get(airing.id);
+        const otherAppsPart = otherAppsParts.get(airing.id);
         airings.push({
           asRunId: run.id,
           station,
@@ -381,6 +386,7 @@ export function createCodes(ctx: ModuleContext): CodesPart {
           shortReason: partial ? "The break was cut short" : null,
           proofCapturedAt: run.proofFrameAt?.toISOString() ?? null,
           ...(relayViewers?.length ? { relayViewers } : {}),
+          ...(otherAppsPart ? { otherApps: otherAppsPart } : {}),
           scansNextHour: events.filter(
             (e) =>
               e.event.kind === "scan" &&
@@ -390,8 +396,10 @@ export function createCodes(ctx: ModuleContext): CodesPart {
         });
       }
       airings.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-      const relaySpent = (a: Results["airings"][number]) => (a.relayViewers ?? []).reduce((sum, p) => sum + p.costMicros, 0);
+      // Relay viewers and (P5.1) Other apps viewers, beside Opencast's own.
+      const relaySpent = (a: Results["airings"][number]) => (a.relayViewers ?? []).reduce((sum, p) => sum + p.costMicros, 0) + (a.otherApps?.costMicros ?? 0);
       const relayLines = relay.lines(airings.flatMap((a) => (a.relayViewers ? [a.relayViewers] : [])));
+      const otherAppsLine = otherApps.line(airings.flatMap((a) => (a.otherApps ? [a.otherApps] : [])));
       const customers = events.filter((e) => e.event.kind === "use" && e.event.countsAsCustomer);
       const byStation = new Map<string, { airings: number; tunedIn: number; spent: number; customers: number }>();
       for (const a of airings) {
@@ -427,7 +435,7 @@ export function createCodes(ctx: ModuleContext): CodesPart {
           airings: airings.length,
           // People tuned in, added up across airings: never reach or unique viewers.
           tunedInAddedUp: airings.reduce((s, a) => s + a.tunedIn, 0),
-          // Opencast viewers and relay viewers together (relay viewers added 2026-09-30).
+          // Opencast viewers, relay viewers and Other apps viewers together (relay viewers added 2026-09-30, Other apps 2026-10-10).
           spentMicros: airings.reduce((s, a) => s + a.costMicros + relaySpent(a), 0),
           scans: events.filter((e) => e.event.kind === "scan").length,
           saves: events.filter((e) => e.event.kind === "save").length,
@@ -435,7 +443,8 @@ export function createCodes(ctx: ModuleContext): CodesPart {
           customers: customers.length,
           ...(relayLines.length
             ? { relaySpentMicros: relayLines.reduce((sum, l) => sum + l.spentMicros, 0), relayWaitingMicros: relayLines.reduce((sum, l) => sum + l.waitingMicros, 0) }
-            : {})
+            : {}),
+          ...(otherAppsLine ? { otherAppsSpentMicros: otherAppsLine.spentMicros, otherAppsWaitingMicros: otherAppsLine.waitingMicros } : {})
         },
         byStation: [...byStation].flatMap(([id, r]) => {
           const station = stationIdents.get(id);
@@ -454,7 +463,8 @@ export function createCodes(ctx: ModuleContext): CodesPart {
           }))
           .filter((s) => s.airings || s.customers),
         airings,
-        ...(relayLines.length ? { relayViewers: relayLines } : {})
+        ...(relayLines.length ? { relayViewers: relayLines } : {}),
+        ...(otherAppsLine ? { otherApps: otherAppsLine } : {})
       };
     },
 

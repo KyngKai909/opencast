@@ -1,10 +1,10 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { and, asc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { IDENT_LEGACY_CODE, isIdentCode, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem } from "@opencast/contracts";
-import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
+import { IDENT_LEGACY_CODE, isIdentCode, outletsWithOpencast, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem, type Outlet } from "@opencast/contracts";
+import { guessEpisode, iabContentCategories, isChildrensRating, nextEpisodes, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
@@ -21,6 +21,8 @@ export { toWebVtt };
 /** A library item's type: a log code, or (A242) an opener, closer or off-air card. */
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN" | IdentCode;
 
+type RightsBasisRow = (typeof schema.rightsConfirmations.$inferSelect)["basis"];
+
 /** What other modules need to know about a library item. */
 export interface ItemRef {
   id: string;
@@ -28,6 +30,10 @@ export interface ItemRef {
   programId: string | null;
   title: string;
   episodeNumber: number | null;
+  /** Programming Phase 2: its season, and a multi-part episode's shared words and part number. */
+  seasonNumber: number | null;
+  partOf: string | null;
+  partNumber: number | null;
   /** The episode's description (up to 160 characters). */
   episodeDescription: string | null;
   code: LogCode;
@@ -72,6 +78,8 @@ export interface ProgramRef {
   description: string | null;
   category: string | null;
   advisory: "none" | "language" | "mature";
+  /** Programming Phase 5: its TV rating (TV-Y to TV-MA), or null: the guide in other apps. */
+  rating: "TV-Y" | "TV-Y7" | "TV-G" | "TV-PG" | "TV-14" | "TV-MA" | null;
   live: boolean;
   attribution: string | null;
   rightsNote: string | null;
@@ -95,6 +103,12 @@ export interface LibraryService {
   itemsSharingContent(itemIds: string[]): Promise<string[]>;
   /** Every item's current content ID. */
   currentContent(itemIds: string[]): Promise<Map<string, string>>;
+  /**
+   * Programming Phase 4 (2026-10-10): the files programs in stations' own libraries air from now
+   * (each item's current file, not archived), at least `minMs` long, by content ID in order: those
+   * among `among`, or a page after `after`. Where break points are looked for.
+   */
+  programFiles(options: { minMs: number; among?: string[]; after?: string; limit?: number }): Promise<Array<{ contentId: string; durationMs: number; mediaKind: "video" | "audio" }>>;
   /** The desk's station file (added 2026-10-07): every item a station has, archived ones too, newest first, with its rights and program. */
   stationUploads(stationId: string): Promise<Array<{ id: string; title: string; program: string | null; code: string; source: "upload" | "link" | "creator_work" | "library"; sourceUrl: string | null; originalFilename: string | null; mediaKind: "video" | "audio"; durationMs: number | null; status: "preparing" | "ready" | "failed"; addedAt: Date; archivedAt: Date | null; archivedBy: string | null; archivedReason: string | null; rights: { basis: string; note: string | null; confirmedAt: Date } | null; contentId: string | null }>>;
   /**
@@ -111,6 +125,11 @@ export interface LibraryService {
   exportToIpfs(itemId: string): Promise<{ contentId: string; ipfsCid: string; url: string }>;
   titles(input: { itemIds: string[]; programIds: string[] }): Promise<{ items: Map<string, string>; programs: Map<string, string> }>;
   itemsByIds(ids: string[]): Promise<Map<string, ItemRef>>;
+  /**
+   * Programming Phase 6: what clearance reads of each item's rights (its basis, the outlets
+   * recorded, its licence record's id), and its program, by item id. Items without rights are left out.
+   */
+  rightsOf(ids: string[]): Promise<Map<string, { basis: RightsBasisRow; outlets: Outlet[]; licenceRecordId: string | null; programId: string | null; stationId: string }>>;
   programsByIds(ids: string[]): Promise<Map<string, ProgramRef>>;
   programsForStation(stationId: string): Promise<ProgramRef[]>;
   /** A program's episodes, in episode order. */
@@ -142,6 +161,16 @@ export interface LibraryService {
   blocks: BlockOps;
   /** Programs ready to repeat (for filling dead air), most recent first. */
   repeatable(stationId: string, limit: number): Promise<ItemRef[]>;
+  /**
+   * Programming Phase 2: what the episode walker needs for each of a station's programs: its
+   * episodes, which of them can be repeated now, and what aired on the station.
+   */
+  episodeWalks(stationId: string, programIds: string[]): Promise<Map<string, EpisodeWalk>>;
+  /**
+   * Programming Phase 3: a station's programs' episodes (`PGM`, not archived), in episode order, for
+   * template slots (they count their own airings, so no as-run here).
+   */
+  programEpisodes(stationId: string, programIds: string[]): Promise<ItemRef[]>;
   /** A claimable station's import of a covered creator work (the file comes later). */
   addCreatorWork(db: Executor, input: { stationId: string; creatorWorkId: string; title: string; durationMs: number | null; sourceUrl: string; programId?: string }): Promise<string>;
 
@@ -159,10 +188,12 @@ export interface LibraryService {
    */
   upload(stationId: string, file: UploadedFile, fields: ItemFields & { captions?: string; captionLanguage?: string }, options?: { id?: string }): Promise<LibraryItem>;
   updateItem(itemId: string, fields: Partial<ItemFields>): Promise<LibraryItem>;
+  /** Programming Phase 4: uses (they become its break points) or dismisses a program's suggested break points. */
+  answerBreakSuggestions(itemId: string, answer: "use" | "dismiss"): Promise<LibraryItem>;
   archiveItem(itemId: string): Promise<void>;
   /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
   archiveForClaim(itemId: string): Promise<void>;
-  confirmRights(user: CurrentUser, itemId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string }): Promise<LibraryItem>;
+  confirmRights(user: CurrentUser, itemId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string; outlets?: Outlet[] }): Promise<LibraryItem>;
   importLinks(stationId: string, input: { urls: string[]; expandPlaylists: boolean; code: LogCode; programId?: string }): Promise<ImportJobView>;
   importJob(stationId: string, jobId: string): Promise<ImportJobView>;
   createFolder(stationId: string, input: { name: string; parentFolderId: string | null }): Promise<FolderView>;
@@ -201,6 +232,10 @@ export interface ItemFields {
   programId?: string | null;
   folderId?: string | null;
   episodeNumber?: number | null;
+  /** Programming Phase 2: guessed at upload when not sent (season and episode from the file's name, the part from the title). */
+  seasonNumber?: number | null;
+  partOf?: string | null;
+  partNumber?: number | null;
   episodeDescription?: string | null;
   breakPointsMs?: number[];
   /** A243: a bumper's role (null: Any). */
@@ -209,6 +244,31 @@ export interface ItemFields {
   airs?: AirWindowRef | null;
   /** A244: the programming block it belongs to (null: the station's). */
   programBlockId?: string | null;
+}
+
+/** Programming Phase 2: one program's episodes on a station, for the walker (`@opencast/domain`'s `walkEpisodes`). */
+export interface EpisodeWalk {
+  /** Its programs (`PGM`), not archived, in episode order. */
+  episodes: ItemRef[];
+  /** Those that can be repeated now: ready, rights confirmed, a length, the file available, not taken off air. */
+  repeatable: Set<string>;
+  /** Its episodes' airings on the station, oldest first (the as-run log: the last 5,000 rows of the programs read together). */
+  aired: string[];
+}
+
+/** Where each episode comes in its program's walk, In order from what aired (0 airs next), and what airs next. */
+export function upNextOf(walk: EpisodeWalk): { ranks: Map<string, number>; next: Set<string> } {
+  const ranks = new Map<string, number>();
+  const next = new Set<string>();
+  const episodes = walk.episodes.map((e) => ({ ...e, ready: walk.repeatable.has(e.id) }));
+  for (const [i, airing] of nextEpisodes({ episodes, order: "in_order", seed: "", position: walk.aired }, episodes.length).entries()) {
+    if (ranks.has(airing.episodes[0].id)) break;
+    for (const e of airing.episodes) {
+      ranks.set(e.id, ranks.size);
+      if (i === 0) next.add(e.id);
+    }
+  }
+  return { ranks, next };
 }
 
 export interface FolderView {
@@ -322,6 +382,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       programId: r.programId,
       title: r.title,
       episodeNumber: r.episodeNumber,
+      seasonNumber: r.seasonNumber,
+      partOf: r.partOf,
+      partNumber: r.partNumber,
       episodeDescription: r.episodeDescription,
       code: r.code,
       durationMs: r.durationMs,
@@ -356,6 +419,21 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       db.select({ assetId: schema.captionTracks.assetId, language: schema.captionTracks.language }).from(schema.captionTracks).where(inArray(schema.captionTracks.assetId, ids))
     ]);
     const trackLanguage = new Map(tracks.map((t) => [t.assetId, t.language]));
+    // Programming Phase 4: break points suggested for a program with none of its own, until the
+    // station answers them for its current file; with the preview to hear each one from.
+    const askingCid = new Map<string, string>();
+    for (const r of rows) {
+      const cid = files.get(r.id)?.contentId;
+      if (r.code === "PGM" && cid && !breakPoints.some((p) => p.assetId === r.id) && r.breakSuggestionsAnswered !== cid) askingCid.set(r.id, cid);
+    }
+    const suggested = askingCid.size ? await services.playout.breakSuggestions([...askingCid.values()]) : new Map<string, { source: "chapter" | "fade"; offsetsMs: number[] }>();
+    const suggestedRows = rows.filter((r) => suggested.has(askingCid.get(r.id) ?? ""));
+    // A video's TV preview when it has one, else the radio band's sound.
+    const previews = suggestedRows.length
+      ? await services.playout.previews(
+          suggestedRows.flatMap((r) => (["radio", "tv"] as const).filter((band) => band === "radio" || r.mediaKind === "video").map((band) => ({ contentId: askingCid.get(r.id)!, mediaKind: r.mediaKind, band, durationMs: r.durationMs })))
+        )
+      : new Map<string, { url: string | null }>();
     const info = await content.info([...files.values()].flatMap((f) => [f.contentId, f.originalContentId]).filter((v): v is string => Boolean(v)));
     const names = await services.accounts.displayNames(rights.map((r) => r.confirmedBy).filter((v): v is string => Boolean(v)));
     const rightsBy = new Map(rights.map((r) => [r.assetId, r]));
@@ -395,7 +473,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
               basis: right.basis,
               confirmedBy: right.confirmedBy ? (names.get(right.confirmedBy) ?? null) : null,
               confirmedAt: right.confirmedAt.toISOString(),
-              note: right.note
+              note: right.note,
+              // Programming Phase 6: where it may air; everywhere for what the station made or is public domain.
+              outlets: right.basis === "made_it" || right.basis === "public_domain" ? ["opencast", "other_apps", "relays", "fast", "recording"] : outletsWithOpencast(right.outlets as Outlet[])
             }
           : null,
         offerable: r.source !== "link",
@@ -421,6 +501,14 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         airs,
         airingNow: airs ? eligible({ airs }, now, zones.get(r.stationId) ?? "UTC") : true,
         programBlockId: r.programBlockId ?? null,
+        seasonNumber: r.seasonNumber,
+        partOf: r.partOf,
+        partNumber: r.partNumber,
+        suggestedBreakPoints: (() => {
+          const cid = askingCid.get(r.id);
+          const found = cid ? suggested.get(cid) : undefined;
+          return found ? { source: found.source, pointsMs: found.offsetsMs, previewUrl: previews.get(cid!)?.url ?? null } : null;
+        })(),
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -440,6 +528,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       description: p.description,
       category: p.category,
       advisory: p.advisory,
+      rating: p.rating,
       live: p.isLive,
       attribution: p.attribution,
       rightsNote: p.rightsNote
@@ -734,6 +823,28 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return new Map([...files].flatMap(([id, f]) => (f.contentId ? [[id, f.contentId] as [string, string]] : [])));
     },
 
+    async programFiles({ minMs, among, after, limit = 100 }) {
+      if (among && !among.length) return [];
+      const rows = await db
+        .selectDistinctOn([F.contentId], { contentId: F.contentId, durationMs: A.durationMs, mediaKind: A.mediaKind })
+        .from(F)
+        .innerJoin(A, eq(A.id, F.assetId))
+        .where(
+          and(
+            eq(A.code, "PGM"),
+            isNull(A.archivedAt),
+            isNotNull(F.contentId),
+            gte(A.durationMs, minMs),
+            sql`${F.version} = (select max(g.version) from ${F} g where g.asset_id = ${F.assetId})`,
+            among ? inArray(F.contentId, among) : undefined,
+            after ? sql`${F.contentId} > ${after}` : undefined
+          )
+        )
+        .orderBy(F.contentId)
+        .limit(limit);
+      return rows.map((r) => ({ contentId: r.contentId!, durationMs: r.durationMs!, mediaKind: r.mediaKind }));
+    },
+
     async preparableSince(since, limit) {
       const rows = await db
         .selectDistinct({ asset: A })
@@ -768,6 +879,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (!ids.length) return new Map();
       const rows = await db.select().from(A).where(inArray(A.id, [...new Set(ids)]));
       return new Map((await toRefs(rows)).map((r) => [r.id, r]));
+    },
+
+    async rightsOf(ids) {
+      if (!ids.length) return new Map();
+      const rows = await db
+        .select({ id: R.assetId, basis: R.basis, outlets: R.outlets, licenceRecordId: R.licenceRecordId, programId: A.programId, stationId: A.stationId })
+        .from(R)
+        .innerJoin(A, eq(A.id, R.assetId))
+        .where(inArray(R.assetId, [...new Set(ids)]));
+      return new Map(rows.map((r) => [r.id, { basis: r.basis, outlets: r.outlets as Outlet[], licenceRecordId: r.licenceRecordId, programId: r.programId, stationId: r.stationId }]));
     },
 
     async programsByIds(ids) {
@@ -886,6 +1007,39 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).slice(0, limit);
     },
 
+    async programEpisodes(stationId, programIds) {
+      const ids = [...new Set(programIds)];
+      if (!ids.length) return [];
+      const rows = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), inArray(A.programId, ids), eq(A.code, "PGM"), isNull(A.archivedAt)))
+        .orderBy(sql`${A.seasonNumber} nulls last`, sql`${A.episodeNumber} nulls last`, asc(A.createdAt), asc(A.id));
+      return toRefs(rows);
+    },
+
+    async episodeWalks(stationId, programIds) {
+      const ids = [...new Set(programIds)];
+      if (!ids.length) return new Map();
+      const refs = await service.programEpisodes(stationId, ids);
+      const [offAir, aired] = await Promise.all([
+        services.trust.offAirItems(refs.map((r) => r.id)),
+        services.playout.airedHistory(stationId, refs.map((r) => r.id), 5000)
+      ]);
+      const history = [...aired].reverse();
+      const walks = new Map<string, EpisodeWalk>();
+      for (const programId of ids) {
+        const episodes = refs.filter((r) => r.programId === programId);
+        const mine = new Set(episodes.map((e) => e.id));
+        walks.set(programId, {
+          episodes,
+          repeatable: new Set(episodes.filter((r) => r.status === "ready" && r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).map((r) => r.id)),
+          aired: history.filter((id) => mine.has(id))
+        });
+      }
+      return walks;
+    },
+
     async addCreatorWork(tx, input) {
       const [row] = await tx
         .insert(A)
@@ -939,6 +1093,22 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       ]);
       let items = await toItems(rows);
       if (filter.needsAttention) items = items.filter((i) => !i.rights || i.status !== "ready");
+      // Programming Phase 2: what the station's as-run log says about each item, and where each
+      // program's episodes come in its walk (In order, as dead-air fill and repeats choose).
+      const ids = items.map((i) => i.id);
+      const [lastAired, walks] = await Promise.all([
+        services.playout.lastAired(stationId, ids),
+        service.episodeWalks(stationId, items.filter((i) => i.code === "PGM" && i.programId).map((i) => i.programId!))
+      ]);
+      const last = lastAired;
+      const ranks = new Map<string, number>();
+      const next = new Set<string>();
+      for (const walk of walks.values()) {
+        const up = upNextOf(walk);
+        for (const [id, rank] of up.ranks) ranks.set(id, rank);
+        for (const id of up.next) next.add(id);
+      }
+      items = items.map((i) => ({ ...i, neverAired: !last.get(i.id), lastAiredAt: last.get(i.id)?.toISOString() ?? null, upNext: ranks.get(i.id) ?? null, nextEpisode: next.has(i.id) }));
       const perFolder = new Map<string, number>();
       for (const row of all) if (row.folderId) perFolder.set(row.folderId, (perFolder.get(row.folderId) ?? 0) + 1);
       return {
@@ -996,6 +1166,12 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         await fs.copyFile(file.path, kept);
       }
 
+      const title = fields.title ?? file.originalName.replace(/\.[^.]+$/, "");
+      // Programming Phase 2: a program's season and episode from the file's name, and its part from
+      // the title, unless they were sent. The station corrects them on the item's page.
+      const guess = (fields.code ?? guessCode(probe.durationMs)) === "PGM" ? guessEpisode(file.originalName, title) : null;
+      const numbered = fields.seasonNumber !== undefined || fields.episodeNumber !== undefined;
+      const parted = fields.partOf !== undefined || fields.partNumber !== undefined;
       const item = await db.transaction(async (tx) => {
         const [row] = await tx
           .insert(A)
@@ -1004,8 +1180,11 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             stationId,
             programId: fields.programId ?? null,
             folderId: fields.folderId ?? null,
-            title: fields.title ?? file.originalName.replace(/\.[^.]+$/, ""),
-            episodeNumber: fields.episodeNumber ?? null,
+            title,
+            episodeNumber: numbered ? (fields.episodeNumber ?? null) : (guess?.episodeNumber ?? null),
+            seasonNumber: numbered ? (fields.seasonNumber ?? null) : (guess?.seasonNumber ?? null),
+            partOf: parted ? (fields.partOf ?? null) : (guess?.partOf ?? null),
+            partNumber: parted ? (fields.partNumber ?? null) : (guess?.partNumber ?? null),
             episodeDescription: fields.episodeDescription ?? null,
             code: fields.code ?? guessCode(probe.durationMs),
             source: "upload",
@@ -1055,7 +1234,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const timing = airingFields(code, fields);
       await db.transaction(async (tx) => {
         const patch: Partial<typeof A.$inferInsert> = { ...timing };
-        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription", "bumperRole", "programBlockId"] as const) {
+        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "seasonNumber", "partOf", "partNumber", "episodeDescription", "bumperRole", "programBlockId"] as const) {
           if (fields[key] !== undefined) (patch as Record<string, unknown>)[key] = fields[key];
         }
         if (code !== "BMP" && row.bumperRole !== null) patch.bumperRole = null;
@@ -1063,6 +1242,19 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         if (!WINDOWED.includes(code) && windowOf(row)) Object.assign(patch, { airsFrom: null, airsUntil: null, dailyFrom: null, dailyUntil: null });
         if (Object.keys(patch).length) await tx.update(A).set(patch).where(eq(A.id, itemId));
         if (fields.breakPointsMs) await setBreakPoints(tx, itemId, fields.breakPointsMs);
+      });
+      return service.item(itemId);
+    },
+
+    async answerBreakSuggestions(itemId, answer) {
+      const row = await itemRow(itemId);
+      const [item] = await toItems([row]);
+      const suggested = item.suggestedBreakPoints;
+      const cid = item.storage?.contentId ?? (await currentFiles([itemId])).get(itemId)?.contentId;
+      if (!suggested || !cid) throw new HttpError(409, "no_suggestions", "There are no suggested break points to answer.");
+      await db.transaction(async (tx) => {
+        await tx.update(A).set({ breakSuggestionsAnswered: cid }).where(eq(A.id, itemId));
+        if (answer === "use") await setBreakPoints(tx, itemId, suggested.pointsMs);
       });
       return service.item(itemId);
     },
@@ -1100,10 +1292,12 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
 
     async confirmRights(user, itemId, input) {
       await itemRow(itemId);
+      // Programming Phase 6: the outlets the owner allows (opencast always; opencast and relays when not said).
+      const outlets = outletsWithOpencast(input.outlets);
       await db
         .insert(R)
-        .values({ assetId: itemId, basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now() })
-        .onConflictDoUpdate({ target: R.assetId, set: { basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now() } });
+        .values({ assetId: itemId, basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now(), outlets })
+        .onConflictDoUpdate({ target: R.assetId, set: { basis: input.basis, confirmedBy: user.id, note: input.note ?? null, confirmedAt: deps.clock.now(), outlets } });
       return service.item(itemId);
     },
 
@@ -1232,7 +1426,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         row.programId && row.source !== "link" ? services.catalog.openOfferTerms(row.programId) : Promise.resolve(null)
       ]);
       const idents = await services.stations.idents([row.stationId, ...schedule.entries.map((e) => e.stationId), ...aired.map((a) => a.stationId)]);
-      const preparation = ref && (ref.contentId || ref.location) ? await services.playout.preparation(ref, idents.get(row.stationId)?.band ?? "tv") : { status: "not_asked" as const, renditions: [], preparedAt: null };
+      const preparation = ref && (ref.contentId || ref.location) ? await services.playout.preparation(ref, idents.get(row.stationId)?.band ?? "tv") : { status: "not_asked" as const, renditions: [], preparedAt: null, converted: [] };
       const agreements = await services.catalog.agreementsByIds(aired.map((a) => a.carriageAgreementId).filter((v): v is string => Boolean(v)));
       const term = terms?.[0];
       return {

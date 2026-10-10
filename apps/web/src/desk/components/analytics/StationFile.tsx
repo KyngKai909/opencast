@@ -5,11 +5,12 @@
 // the station off the air and hold it there, lift that, or archive an upload, each with a reason
 // the station's people are told.
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { accountsApi, analyticsApi, RIGHTS_BASIS_LABELS, type AnalyticsStationFile } from "@opencast/contracts";
 import { Button, Modal, TextAreaField, useToast } from "@opencast/ui";
 import { ApiError } from "../../../api/client";
 import { useApi, useApiMutation } from "../../../api/hooks";
+import { PreparedVideo } from "../../../lib/preview";
 import { errorText } from "../../pages/common";
 import { clockText, dateOf, minutesText, num, shortDate } from "./span";
 
@@ -340,36 +341,10 @@ export function UploadsView({ file, admin }: { file: File; admin: boolean }) {
 
 /** A prepared file's preview: native HLS where the browser has it (Safari), hls.js elsewhere. */
 function Preview({ url, title, audio }: { url: string; title: string; audio: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    const video = ref.current;
-    if (!video) return;
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = url;
-      return;
-    }
-    let destroy: (() => void) | undefined;
-    let gone = false;
-    void import("hls.js")
-      .then(({ default: Hls }) => {
-        if (gone) return;
-        if (!Hls.isSupported()) return setFailed(true);
-        const hls = new Hls();
-        hls.on(Hls.Events.ERROR, (_e, data) => data.fatal && setFailed(true));
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        destroy = () => hls.destroy();
-      })
-      .catch(() => setFailed(true));
-    return () => {
-      gone = true;
-      destroy?.();
-    };
-  }, [url]);
   return (
     <div className={`nd-an__preview${audio ? " nd-an__preview--audio" : ""}`}>
-      <video ref={ref} controls autoPlay playsInline aria-label={`Preview of ${title}`} />
+      <PreparedVideo url={url} title={title} onFailed={() => setFailed(true)} />
       {failed && <p className="nd-an__none">The preview couldn&rsquo;t be played.</p>}
     </div>
   );

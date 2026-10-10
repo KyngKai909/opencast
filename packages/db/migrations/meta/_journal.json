@@ -414,6 +414,55 @@
       "when": 1791427759418,
       "tag": "0060_invite_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791586873053,
+      "tag": "0061_cleaner_pictures",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791588745162,
+      "tag": "0062_seasons_and_parts",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1791591537729,
+      "tag": "0063_suggested_break_points",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791595112215,
+      "tag": "0064_template_slots",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1791600312139,
+      "tag": "0065_other_app_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791604120254,
+      "tag": "0066_other_app_charges",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1791606483692,
+      "tag": "0067_where_it_can_air",
+      "breakpoints": true
     }
   ]
 }

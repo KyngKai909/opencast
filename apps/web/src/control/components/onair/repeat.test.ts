@@ -48,6 +48,23 @@ describe("planRepeat", () => {
     expect(plan.short).toBe("Late Crate 11 to 15, until 2:00 am");
   });
 
+  it("takes the next episodes after the program's last airing, when the library says (upNext)", () => {
+    // Aired up to ep. 6: ep. 7 airs next, then on to 15, then 1 to 6.
+    const walked = lateCrate.map((i, n) => ({ ...i, upNext: (n + 15 - 6) % 15 }));
+    const plan = planRepeat(walked, [{ id: LATE, title: "Late Crate" }], gap, 2 * MIN, "America/Los_Angeles")!;
+    expect(plan.itemIds).toEqual(lateCrate.slice(6, 11).map((i) => i.id));
+    expect(plan.long).toBe("Late Crate episodes 7 to 11, in order, with your break rule");
+    expect(plan.short).toBe("Late Crate 7 to 11, until 2:00 am");
+  });
+
+  it("names the season, and never cuts a multi-part episode between its parts", () => {
+    const eps = [1, 2, 3, 4, 5, 6].map((e) => item({ title: `S2E${e}`, programId: "s", seasonNumber: 2, episodeNumber: e, durationMs: 28 * MIN, upNext: e - 1, ...(e >= 5 ? { partOf: "Finale", partNumber: e - 4 } : {}) }));
+    const plan = planRepeat(eps, [{ id: "s", title: "Late Crate" }], gap, 2 * MIN, "America/Los_Angeles")!;
+    // 140 minutes: four episodes and their breaks cover 120, the fifth covers it, and its second part comes too.
+    expect(plan.itemIds).toEqual(eps.map((i) => i.id));
+    expect(plan.long).toBe("Late Crate season 2, episodes 1 to 6, in order, with your break rule");
+  });
+
   it("leaves out what can't air: unconfirmed rights, still preparing, not a program", () => {
     const items = [item({ title: "Link import", rights: null }), item({ title: "Preparing", status: "preparing" }), item({ title: "ID", code: "SID" })];
     expect(planRepeat(items, [], gap, 2 * MIN)).toBeNull();

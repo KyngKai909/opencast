@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { BlockBand, BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
-import { Captions, Program } from "./library.js";
+import { Captions, PlaybackOrder, Program } from "./library.js";
 import { BlockSpan, DayTemplateBlock } from "./blocks.js";
 import { BreakRule } from "./stations.js";
+import { Outlet } from "./licences.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -30,9 +31,52 @@ export const LogEntry = z.object({
    * rows around it in master control stops here, and a live block ending early doesn't move it up.
    * Left out: false.
    */
-  keepTime: z.boolean().optional()
+  keepTime: z.boolean().optional(),
+  /**
+   * Programming Phase 3 (added 2026-10-10): the day template slot that made it, and what airs from
+   * it. An entry from a Next episode or Fill the slot slot shows a small "Next episode" mark, and
+   * its details say which slot and template ("From the 8:00 pm slot of Every Saturday"). Absent or
+   * null: put on by hand (or made before 2026-10-10).
+   */
+  templateSlot: z
+    .object({
+      slotId: Id,
+      templateId: Id,
+      templateName: z.string().nullable(),
+      /** "Every Saturday". */
+      label: z.string(),
+      /** The slot's start, "20:00". */
+      startTime: z.string(),
+      whatAirs: z.enum(["this_episode", "next_episode", "fill", "same_as"])
+    })
+    .nullable()
+    .optional(),
+  /**
+   * Programming Phase 6 (added 2026-10-10): quiet notes, not warnings: it isn't cleared for an outlet
+   * the station uses ("Not on your YouTube relay": the relay shows the station's slate for it).
+   * Absent: none.
+   */
+  notes: z.array(z.object({ code: z.literal("not_cleared"), outlet: Outlet, message: z.string() })).optional()
 });
 export type LogEntry = z.infer<typeof LogEntry>;
+
+/**
+ * Programming Phase 6 (added 2026-10-10): an entry whose network licence ends. `licence_ending`:
+ * it ends within two weeks ("The licence for Prairie Westerns from Prairie Films ends Sat Oct 31.
+ * It's off the air after that."); `licence_ended`: the entry is after the end, and won't air
+ * ("Prairie Westerns won't air: its licence from Prairie Films ended Sat Oct 31.").
+ */
+export const LicenceWarning = z.object({
+  code: z.enum(["licence_ending", "licence_ended"]),
+  entryId: Id,
+  licenceId: Id,
+  licensor: z.string(),
+  /** The licence's last day. */
+  endsOn: DateOnly,
+  startsAt: Timestamp,
+  message: z.string()
+});
+export type LicenceWarning = z.infer<typeof LicenceWarning>;
 
 /**
  * G1 (added 2026-09-29): one thing in a break, in the order it airs. Spots placed in the break
@@ -132,6 +176,45 @@ export const OffAirHours = z.object({
 });
 export type OffAirHours = z.infer<typeof OffAirHours>;
 
+/**
+ * Programming Phase 3 (added 2026-10-10): what airs from a day template's program slot.
+ * - `this_episode`: the item chosen, every date (as before; the default).
+ * - `next_episode`: the next episode of its program, or of several (a mix), in its order: one step
+ *   each date the slot actually airs.
+ * - `fill`: next episodes, as many as fit the slot's length, in the order; never past its end.
+ * - `same_as`: what an earlier slot on the same template aired that date (a same-day rerun).
+ */
+export const WhatAirs = z.enum(["this_episode", "next_episode", "fill", "same_as"]);
+export type WhatAirs = z.infer<typeof WhatAirs>;
+export const WHAT_AIRS_WORDS: Record<WhatAirs, { label: string; meaning: string }> = {
+  this_episode: { label: "This episode", meaning: "The same item every date" },
+  next_episode: { label: "Next episode", meaning: "The next episode each date it airs, in the order" },
+  fill: { label: "Fill the slot", meaning: "Next episodes, as many as fit the slot, in the order" },
+  same_as: { label: "Same as earlier slot", meaning: "What an earlier slot aired that day" }
+};
+
+/** Programming Phase 3: at the end of a program's episodes, start over (the default) or stop (the slot is dead air from then on). */
+export const AtProgramEnd = z.enum(["start_over", "stop"]);
+export type AtProgramEnd = z.infer<typeof AtProgramEnd>;
+
+/**
+ * Programming Phase 3 (added 2026-10-10): a warning from making a template's dates. `last_episode`:
+ * a Next episode slot airs its program's last new episode on `date` ("Late Crate airs its last new
+ * episode Sat Oct 24, then starts over"), shown on the log from a week before. `pushes_kept`: an
+ * episode longer than its slot would push an entry kept at its time ("Late Crate, ep. 14 runs 6 min
+ * into Night Desk, kept at 9:00 pm, on Sat Oct 24. It isn't placed that day.").
+ */
+export const TemplateWarning = z.object({
+  code: z.enum(["last_episode", "pushes_kept"]),
+  templateId: Id,
+  slotId: Id,
+  /** The broadcast date it's about. */
+  date: DateOnly,
+  startsAt: Timestamp,
+  message: z.string()
+});
+export type TemplateWarning = z.infer<typeof TemplateWarning>;
+
 /** One thing in a day template, at its local time. */
 export const DayTemplateEntry = z.object({
   id: Id,
@@ -152,7 +235,19 @@ export const DayTemplateEntry = z.object({
   episodeDescription: z.string().nullable(),
   localNote: z.string().nullable(),
   /** G18 (added 2026-10-03): "Keep at this time", copied to each date it makes. Left out: false. */
-  keepTime: z.boolean().optional()
+  keepTime: z.boolean().optional(),
+  /**
+   * Programming Phase 3 (added 2026-10-10): the slot's lasting id (`id` changes on each save; send
+   * this back with the entry to keep the slot's walk), and what airs from it. `programIds`, `order`
+   * and `atEnd` for Next episode and Fill the slot; `sameAsSlotId` for Same as earlier slot. Left
+   * out: This episode.
+   */
+  slotId: Id.optional(),
+  whatAirs: WhatAirs.optional(),
+  programIds: z.array(Id).optional(),
+  order: PlaybackOrder.optional(),
+  atEnd: AtProgramEnd.optional(),
+  sameAsSlotId: Id.nullable().optional()
 });
 export type DayTemplateEntry = z.infer<typeof DayTemplateEntry>;
 
@@ -169,7 +264,21 @@ export const DayTemplateEntryInput = z.object({
   episodeDescription: z.string().max(160).optional(),
   localNote: z.string().max(160).optional(),
   /** G18 (added 2026-10-03): "Keep at this time". Left out: false. */
-  keepTime: z.boolean().optional()
+  keepTime: z.boolean().optional(),
+  /**
+   * Programming Phase 3 (added 2026-10-10): the entry's `slotId` as read, so the slot keeps its walk
+   * (left out, or not one of this template's: a new slot). What airs (left out: This episode). Next
+   * episode and Fill the slot need `programIds` (the station's own programs; `programId` or the
+   * item's program will do for one) and take `order` (default In order; Marathon only for several
+   * programs) and `atEnd` (default start over); `itemId` is then optional. Same as earlier slot
+   * needs `sameAsSlotId`, an earlier slot on the template that airs episodes.
+   */
+  slotId: Id.optional(),
+  whatAirs: WhatAirs.optional(),
+  programIds: z.array(Id).max(20).optional(),
+  order: PlaybackOrder.optional(),
+  atEnd: AtProgramEnd.optional(),
+  sameAsSlotId: Id.optional()
 });
 export type DayTemplateEntryInput = z.infer<typeof DayTemplateEntryInput>;
 
@@ -200,7 +309,16 @@ export const DayTemplate = z.object({
   timezone: z.string(),
   entries: z.array(DayTemplateEntry),
   /** Dates from tomorrow on that were generated from it, and whether each was edited since. */
-  dates: z.array(z.object({ date: DateOnly, edited: z.boolean(), entries: z.number().int(), skipped: z.number().int() })),
+  dates: z.array(
+    z.object({
+      date: DateOnly,
+      edited: z.boolean(),
+      entries: z.number().int(),
+      skipped: z.number().int(),
+      /** Programming Phase 3 (added 2026-10-10): warnings from making it. Absent: none. */
+      warnings: z.array(TemplateWarning).optional()
+    })
+  ),
   createdAt: Timestamp,
   updatedAt: Timestamp.nullable(),
   /**
@@ -286,8 +404,80 @@ export const ProgramLog = z.object({
    * where it airs (its members), and what to look at (a member running past its end, nothing in
    * it yet, no room for its intro).
    */
-  blocks: z.array(BlockSpan).optional()
+  blocks: z.array(BlockSpan).optional(),
+  /**
+   * Programming Phase 3 (added 2026-10-10): day template warnings for the window's dates, and a
+   * program's last new episode from a week before it airs. Absent: none.
+   */
+  warnings: z.array(TemplateWarning).optional(),
+  /** Programming Phase 6 (added 2026-10-10): entries whose network licence ends within two weeks, or has ended. Absent: none. */
+  licenceWarnings: z.array(LicenceWarning).optional()
 });
+
+/**
+ * Programming Phase 3 (added 2026-10-10): `previewTemplateSlot`'s answer: what a slot would air on
+ * the template's next dates (up to four), from where its walk is now, and the line the editor shows
+ * ("Next 4 Saturdays: ep. 13, 14, 15, 16"). A date with nothing is a slot that stopped at its
+ * program's end (or nothing can air).
+ */
+export const TemplateSlotPreview = z.object({
+  dates: z.array(
+    z.object({
+      date: DateOnly,
+      episodes: z.array(z.object({ itemId: Id, title: z.string(), programId: Id.nullable(), seasonNumber: z.number().int().nullable(), episodeNumber: z.number().int().nullable() }))
+    })
+  ),
+  line: z.string()
+});
+export type TemplateSlotPreview = z.infer<typeof TemplateSlotPreview>;
+
+type PreviewEpisode = TemplateSlotPreview["dates"][number]["episodes"][number];
+
+/**
+ * Programming Phase 3: the preview line under a template's What airs ("Next 4 Saturdays: ep. 13,
+ * 14, 15, 16"). `days` says which dates ("Saturdays", "days", "weekdays"; a template made once
+ * names its date). Several episodes on a date are a range ("ep. 1–4, 5–8"); a mix names each
+ * program ("Late Crate ep. 13, Slow Hours ep. 4"); episodes with no number go by title. A slot
+ * that stops at its program's end says so ("ep. 13, 14, then nothing: it stops at the end").
+ */
+export function slotPreviewLine(dates: TemplateSlotPreview["dates"], days: { one: string; many: string } | string, programTitle: (programId: string | null) => string = () => ""): string {
+  if (!dates.length) return "No dates ahead";
+  const head = typeof days === "string" ? days : dates.length === 1 ? `Next ${days.one}` : `Next ${dates.length} ${days.many}`;
+  const all = dates.flatMap((d) => d.episodes);
+  const mixed = new Set(all.map((e) => e.programId)).size > 1;
+  const numbered = all.every((e) => e.episodeNumber != null);
+  const seasons = new Set(all.map((e) => e.seasonNumber ?? null)).size > 1;
+  const num = (e: PreviewEpisode) => (seasons && e.seasonNumber != null ? `S${e.seasonNumber}E${e.episodeNumber}` : String(e.episodeNumber));
+  const one = (e: PreviewEpisode) => (mixed ? (numbered ? `${programTitle(e.programId) || e.title} ep. ${num(e)}` : e.title) : numbered ? num(e) : e.title);
+  const tokens: string[] = [];
+  let stopped = 0;
+  for (const d of dates) {
+    if (!d.episodes.length) {
+      stopped++;
+      continue;
+    }
+    // A gap in the middle (nothing could air that date) is said in its place.
+    for (; stopped; stopped--) tokens.push("nothing");
+    const eps = d.episodes;
+    if (eps.length > 1 && !mixed && numbered) {
+      // Runs of episodes in a row as ranges: "1–4", "10 and 1–3" where it starts over.
+      const runs: PreviewEpisode[][] = [];
+      for (const e of eps) {
+        const run = runs[runs.length - 1];
+        const prev = run?.[run.length - 1];
+        if (prev && (prev.seasonNumber ?? null) === (e.seasonNumber ?? null) && e.episodeNumber === prev.episodeNumber! + 1) run.push(e);
+        else runs.push([e]);
+      }
+      tokens.push(runs.map((r) => (r.length > 1 ? `${one(r[0])}–${one(r[r.length - 1])}` : one(r[0]))).join(" and "));
+    } else {
+      tokens.push(eps.map(one).join(" and "));
+    }
+  }
+  const prefix = !mixed && numbered && tokens.length ? "ep. " : "";
+  const list = tokens.join(", ");
+  if (!tokens.length) return `${head}: nothing (it stopped at the end)`;
+  return stopped ? `${head}: ${prefix}${list}, then nothing: it stops at the end` : `${head}: ${prefix}${list}`;
+}
 
 /**
  * A246 (added 2026-10-03): `previewBreakRule`'s answer: the rule as it would be saved (after the
@@ -650,6 +840,21 @@ export const logApi = {
     params: z.object({ stationId: Id, templateId: Id, date: DateOnly }),
     response: z.object({ template: DayTemplate, generated: TemplateGeneration }),
     status: 200
+  }),
+  /**
+   * Programming Phase 3 (added 2026-10-10): what a slot would air on the template's next four dates
+   * (those it makes that weren't edited), as the editor's preview line. `entry` is the slot as the
+   * editor has it, saved or not; its `slotId` (when it's one of the template's) says where its walk
+   * is. Reads only.
+   */
+  previewTemplateSlot: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/templates/:templateId/preview",
+    auth: "user",
+    summary: "What a day template's slot would air on its next four dates, and the editor's line for it (owner, operator). Reads only.",
+    params: z.object({ stationId: Id, templateId: Id }),
+    body: z.object({ entry: DayTemplateEntryInput, count: z.number().int().min(1).max(8).optional() }),
+    response: TemplateSlotPreview
   }),
   getOffAirHours: endpoint({
     method: "GET",

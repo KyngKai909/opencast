@@ -3,7 +3,7 @@
 
 import { http } from "msw";
 import { blockById } from "../blocks";
-import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
+import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, Outlet, outletsWithOpencast, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { inWindow } from "../../components/live/bumpers";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
@@ -61,7 +61,9 @@ const withProbe = (i: LibraryItem): LibraryItem => ({
   airs: i.airs ?? null,
   airingNow: inWindow(i.airs, now()),
   // A244: the programming block it belongs to.
-  programBlockId: i.programBlockId ?? null
+  programBlockId: i.programBlockId ?? null,
+  // Programming Phase 4: suggested break points, offered only while it has none of its own.
+  suggestedBreakPoints: i.breakPointsMs.length ? null : (i.suggestedBreakPoints ?? null)
 });
 
 /** Programs with their listing status computed from what they air this week. */
@@ -97,6 +99,9 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
     programId: null,
     folderId: null,
     episodeNumber: null,
+    seasonNumber: null,
+    partOf: null,
+    partNumber: null,
     episodeDescription: null,
     code: "PGM",
     source: "upload",
@@ -116,6 +121,32 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
     createdAt: now().toISOString(),
     ...o
   };
+}
+
+/**
+ * Programming Phase 2, as the API: what aired (the mock's log before now stands in for the as-run
+ * log), and where each program's episodes come, In order, picking up after its last airing.
+ */
+export function airedFacts(items: LibraryItem[]): Map<string, Pick<LibraryItem, "neverAired" | "lastAiredAt" | "upNext" | "nextEpisode">> {
+  const t = now().toISOString();
+  const last = new Map<string, string>();
+  for (const e of getDb().log) if (e.itemId && e.endsAt <= t && (last.get(e.itemId) ?? "") < e.startsAt) last.set(e.itemId, e.startsAt);
+  const facts = new Map(items.map((i) => [i.id, { neverAired: !last.has(i.id), lastAiredAt: last.get(i.id) ?? null, upNext: null as number | null, nextEpisode: false }]));
+  const nulls = (a: number | null | undefined, b: number | null | undefined) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);
+  for (const programId of new Set(items.flatMap((i) => (i.programId && i.code === "PGM" ? [i.programId] : [])))) {
+    const all = getDb().library.items.filter((i) => i.programId === programId && i.code === "PGM");
+    const ready = all
+      .filter((i) => i.status === "ready" && i.rights && i.durationMs)
+      .sort((a, b) => nulls(a.seasonNumber, b.seasonNumber) || nulls(a.episodeNumber, b.episodeNumber) || a.createdAt.localeCompare(b.createdAt) || nulls(a.partNumber, b.partNumber));
+    const latest = all.reduce<LibraryItem | null>((m, i) => ((last.get(i.id) ?? "") > (m ? (last.get(m.id) ?? "") : "") ? i : m), null);
+    const from = latest ? ready.findIndex((i) => i.id === latest.id) + 1 : 0;
+    ready.forEach((_, n) => {
+      const i = ready[(from + n) % ready.length];
+      const f = facts.get(i.id);
+      if (f) Object.assign(f, { upNext: n, nextEpisode: n === 0 || (!!i.partOf && i.partOf === ready[from % ready.length].partOf) });
+    });
+  }
+  return facts;
 }
 
 /** A242: an item's type as the API stores it, as `code` (what apps built before read) and `identCode`. */
@@ -188,9 +219,10 @@ export const libraryHandlers = [
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
     // A244: a programming block's items.
     if (q.get("programBlockId")) items = items.filter((i) => i.programBlockId === q.get("programBlockId"));
+    const facts = airedFacts(items);
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
-      items: items.map(withProbe),
+      items: items.map(withProbe).map((i) => ({ ...i, ...facts.get(i.id) })),
       folders: lib.folders.map((f) => ({ ...f, itemCount: all.filter((i) => i.folderId === f.id).length })),
       programs: programsOf(id),
       needsAttention: { rightsToConfirm: all.filter((i) => !i.rights).length, preparing: all.filter((i) => i.status === "preparing").length },
@@ -322,6 +354,24 @@ export const libraryHandlers = [
     return reply(libraryApi.getItem.response, withProbe(item));
   }),
 
+  // Programming Phase 4, as the API: Use these makes them the item's break points; either answer ends them.
+  http.post(path(libraryApi.answerBreakSuggestions), async ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const item = itemById(String(params.itemId));
+    if (!item) return fail(404, "not_found", "That item wasn't found.");
+    const denied = programs(item.stationId, p);
+    if (denied) return denied;
+    const parsed = libraryApi.answerBreakSuggestions.body.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return fail(400, "invalid", "Use them or dismiss them.");
+    const suggested = withProbe(item).suggestedBreakPoints;
+    if (!suggested) return fail(409, "no_suggestions", "There are no suggested break points to answer.");
+    if (parsed.data.answer === "use") item.breakPointsMs = [...suggested.pointsMs];
+    item.suggestedBreakPoints = null;
+    saveDb();
+    return reply(libraryApi.answerBreakSuggestions.response, withProbe(item));
+  }),
+
   http.delete(path(libraryApi.deleteItem), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
@@ -365,7 +415,10 @@ export const libraryHandlers = [
     if (denied) return denied;
     const parsed = libraryApi.confirmRights.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "choose", "Choose which of the three is true.");
-    item.rights = { basis: parsed.data.basis, confirmedBy: p.displayName ?? p.email, confirmedAt: now().toISOString(), note: parsed.data.note ?? null };
+    // Programming Phase 6 (P6.13), as the API: made it and public domain go everywhere; the owner's
+    // permission where it allows (opencast always; opencast and relays when not said).
+    const outlets = parsed.data.basis === "owner_permission" ? outletsWithOpencast(parsed.data.outlets) : [...Outlet.options];
+    item.rights = { basis: parsed.data.basis, confirmedBy: p.displayName ?? p.email, confirmedAt: now().toISOString(), note: parsed.data.note ?? null, outlets };
     saveDb();
     return reply(libraryApi.getItem.response, withProbe(item));
   }),
