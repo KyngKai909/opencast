@@ -548,7 +548,9 @@ New service methods: `ledger.earningRows`, `usageTotals`, `opencastShareBetween`
 | **How far back fill reads.** The walker replays the as-run log to know where each program's cycle is: the last 5,000 rows of the programs read together (a program split around breaks is a row a piece). Recommendation: enough for months of a busy station; if it isn't, read each program's own last rows | `library.episodeWalks` | 5,000 rows |
 | **"Never aired" on every new item.** A new station's whole library reads "Never aired" in the Add drawer. Recommendation: keep it (it's true and quiet), or show it only for a series' episodes | `AddDrawer.tsx` (`fitOf`) | shown when it fits |
 
-## Suggested break points, programming Phase 4 (2026-10-10)
+## Suggested break points, programming Phase 4 (2026-10-10; the user's decision 2026-10-10)
+
+**Decided:** every recommendation below, as given.
 
 | # | Decision | Where it lives | Default |
 |---|---|---|---|
