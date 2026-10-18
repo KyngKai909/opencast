@@ -16,6 +16,11 @@ export function vercelConfig(origin) {
     installCommand: "cd ../.. && npm ci",
     buildCommand: "cd ../.. && npm run build -w @opencast/site",
     outputDirectory: "dist",
+    // The project builds from Git on every push to the repository; this skips the build (exit 0)
+    // on branches where apps/site is still the old Vite site, and on commits that touch neither
+    // the site, the contracts it imports, nor the lockfile. Those old branches have no vercel.json,
+    // so the project's settings carry the same command (docs/site/deploy.md).
+    ignoreCommand: "[ ! -f astro.config.mjs ] || git diff --quiet HEAD^ HEAD -- . ../../packages/contracts ../../package-lock.json",
     // /run/index.html is /run; /run/ and /run.html redirect to it. 404.html is the 404.
     cleanUrls: true,
     trailingSlash: false,

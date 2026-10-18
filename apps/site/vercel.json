@@ -4,6 +4,7 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build -w @opencast/site",
   "outputDirectory": "dist",
+  "ignoreCommand": "[ ! -f astro.config.mjs ] || git diff --quiet HEAD^ HEAD -- . ../../packages/contracts ../../package-lock.json",
   "cleanUrls": true,
   "trailingSlash": false,
   "redirects": [
