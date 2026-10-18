@@ -1,19 +1,18 @@
-// The site's production server: serves apps/site/dist with clean URLs (/run → run/index.html,
-// /run/ → 301 /run), SITE-SPEC §1's redirects as 301s, the 404 page, long cache headers on hashed
-// assets and short ones on HTML, gzip, and security headers with a CSP that allows only the site's
-// own origin and PUBLIC_API_URL. No dependencies. Run: `node scripts/serve.mjs` (PORT, default 8080).
+// The site's production rules on a local server. Vercel hosts the site (vercel.json, written from
+// the same scripts/http.mjs); this serves dist the same way for local checks and the Playwright
+// suite: clean URLs (/run → run/index.html, /run/ → 301 /run), SITE-SPEC §1's redirects as 301s,
+// the 404 page, long cache headers on hashed assets and short ones on HTML, gzip, and the security
+// headers with the CSP. No dependencies. Run: `node scripts/serve.mjs` (PORT, default 8080).
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { CACHE, REDIRECTS, securityHeaders } from "./http.mjs";
 
 const DIST = resolve(process.env.DIST ?? fileURLToPath(new URL("../dist", import.meta.url)));
 const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? "0.0.0.0";
-
-/** SITE-SPEC §1. */
-const REDIRECTS = { "/spot-market": "/spots", "/about": "/network", "/stations": "/run" };
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -32,39 +31,9 @@ const TYPES = {
 };
 const COMPRESS = new Set([".html", ".js", ".css", ".json", ".webmanifest", ".xml", ".txt", ".svg"]);
 
-function apiOrigin() {
-  try {
-    return process.env.PUBLIC_API_URL ? new URL(process.env.PUBLIC_API_URL).origin : "";
-  } catch {
-    return "";
-  }
-}
+const SECURITY = securityHeaders();
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  // Grid spans and station colours are inline style attributes.
-  "style-src 'self' 'unsafe-inline'",
-  // The grain is a canvas turned into a data: URL.
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  `connect-src 'self'${apiOrigin() ? ` ${apiOrigin()}` : ""}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'"
-].join("; ");
-
-const SECURITY = {
-  "Content-Security-Policy": CSP,
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
-};
-
-const cacheFor = (path) => (path.startsWith("/_astro/") ? "public, max-age=31536000, immutable" : extname(path) === ".html" ? "public, max-age=60, must-revalidate" : "public, max-age=86400");
+const cacheFor = (path) => (path.startsWith("/_astro/") ? CACHE.hashed : extname(path) === ".html" ? CACHE.page : CACHE.other);
 
 /** In-memory copies, gzipped once. dist doesn't change while the server runs. */
 const memo = new Map();
