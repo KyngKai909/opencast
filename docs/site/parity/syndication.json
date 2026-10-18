@@ -1,0 +1,1671 @@
+{
+  "page": "syndication",
+  "slug": "syndication",
+  "route": "/syndication",
+  "generated": "2026-10-18T06:13:02.979Z",
+  "settings": {
+    "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
+    "widths": [
+      "1440x900",
+      "820x1180",
+      "390x844"
+    ],
+    "seed": 1814,
+    "reduced": false,
+    "reference": "docs/reference/site/pages/syndication.html",
+    "built": "apps/site/dist/syndication",
+    "pixelThreshold": 40,
+    "rectTolerance": 2
+  },
+  "order": [
+    "header",
+    "hero",
+    "offer",
+    "fits",
+    "terms",
+    "rights",
+    "escrow",
+    "outlets",
+    "faq",
+    "footer"
+  ],
+  "captures": [
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 1440,
+      "mode": "header",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        68
+      ],
+      "builtSize": [
+        1440,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/header-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1409
+      ],
+      "builtSize": [
+        1440,
+        1409
+      ],
+      "sectionHeight": [
+        1408,
+        1408
+      ],
+      "maskedCanvases": 20,
+      "cropped": false,
+      "image": "syndication/hero-1440.jpg"
+    },
+    {
+      "section": "offer",
+      "capture": "offer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        996
+      ],
+      "builtSize": [
+        1440,
+        996
+      ],
+      "sectionHeight": [
+        995,
+        995
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/offer-1440.jpg"
+    },
+    {
+      "section": "fits",
+      "capture": "fits",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1501
+      ],
+      "builtSize": [
+        1440,
+        1501
+      ],
+      "sectionHeight": [
+        1500,
+        1500
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/fits-1440.jpg"
+    },
+    {
+      "section": "terms",
+      "capture": "terms",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 1.19,
+      "refSize": [
+        1440,
+        1763
+      ],
+      "builtSize": [
+        1440,
+        1763
+      ],
+      "sectionHeight": [
+        1763,
+        1763
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/terms-1440.jpg"
+    },
+    {
+      "section": "rights",
+      "capture": "rights",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        838
+      ],
+      "builtSize": [
+        1440,
+        838
+      ],
+      "sectionHeight": [
+        837,
+        837
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/rights-1440.jpg"
+    },
+    {
+      "section": "escrow",
+      "capture": "escrow",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        912
+      ],
+      "builtSize": [
+        1440,
+        912
+      ],
+      "sectionHeight": [
+        911,
+        911
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/escrow-1440.jpg"
+    },
+    {
+      "section": "outlets",
+      "capture": "outlets",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        737
+      ],
+      "builtSize": [
+        1440,
+        737
+      ],
+      "sectionHeight": [
+        736,
+        736
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/outlets-1440.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.04,
+      "refSize": [
+        1440,
+        652
+      ],
+      "builtSize": [
+        1440,
+        652
+      ],
+      "sectionHeight": [
+        651,
+        651
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/faq-1440.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1219
+      ],
+      "builtSize": [
+        1440,
+        1219
+      ],
+      "sectionHeight": [
+        1219,
+        1219
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/footer-1440.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 820,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        68
+      ],
+      "builtSize": [
+        820,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/header-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1316
+      ],
+      "builtSize": [
+        820,
+        1316
+      ],
+      "sectionHeight": [
+        1315,
+        1315
+      ],
+      "maskedCanvases": 20,
+      "cropped": false,
+      "image": "syndication/hero-820.jpg"
+    },
+    {
+      "section": "offer",
+      "capture": "offer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1380
+      ],
+      "builtSize": [
+        820,
+        1380
+      ],
+      "sectionHeight": [
+        1379,
+        1379
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/offer-820.jpg"
+    },
+    {
+      "section": "fits",
+      "capture": "fits",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1464
+      ],
+      "builtSize": [
+        820,
+        1464
+      ],
+      "sectionHeight": [
+        1463,
+        1463
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/fits-820.jpg"
+    },
+    {
+      "section": "terms",
+      "capture": "terms",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 2.12,
+      "refSize": [
+        820,
+        2208
+      ],
+      "builtSize": [
+        820,
+        2208
+      ],
+      "sectionHeight": [
+        2207,
+        2207
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/terms-820.jpg"
+    },
+    {
+      "section": "rights",
+      "capture": "rights",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1251
+      ],
+      "builtSize": [
+        820,
+        1251
+      ],
+      "sectionHeight": [
+        1250,
+        1250
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/rights-820.jpg"
+    },
+    {
+      "section": "escrow",
+      "capture": "escrow",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1172
+      ],
+      "builtSize": [
+        820,
+        1172
+      ],
+      "sectionHeight": [
+        1171,
+        1171
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/escrow-820.jpg"
+    },
+    {
+      "section": "outlets",
+      "capture": "outlets",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        830
+      ],
+      "builtSize": [
+        820,
+        830
+      ],
+      "sectionHeight": [
+        829,
+        829
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/outlets-820.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.08,
+      "refSize": [
+        820,
+        914
+      ],
+      "builtSize": [
+        820,
+        914
+      ],
+      "sectionHeight": [
+        913,
+        913
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/faq-820.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1422
+      ],
+      "builtSize": [
+        820,
+        1422
+      ],
+      "sectionHeight": [
+        1421,
+        1421
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/footer-820.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 390,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        60
+      ],
+      "builtSize": [
+        390,
+        60
+      ],
+      "sectionHeight": [
+        60,
+        60
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/header-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        390,
+        1283
+      ],
+      "builtSize": [
+        390,
+        1283
+      ],
+      "sectionHeight": [
+        1282,
+        1282
+      ],
+      "maskedCanvases": 20,
+      "cropped": false,
+      "image": "syndication/hero-390.jpg"
+    },
+    {
+      "section": "offer",
+      "capture": "offer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1417
+      ],
+      "builtSize": [
+        390,
+        1417
+      ],
+      "sectionHeight": [
+        1417,
+        1417
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/offer-390.jpg"
+    },
+    {
+      "section": "fits",
+      "capture": "fits",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1440
+      ],
+      "builtSize": [
+        390,
+        1440
+      ],
+      "sectionHeight": [
+        1438,
+        1438
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/fits-390.jpg"
+    },
+    {
+      "section": "terms",
+      "capture": "terms",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 1.94,
+      "refSize": [
+        390,
+        2770
+      ],
+      "builtSize": [
+        390,
+        2770
+      ],
+      "sectionHeight": [
+        2769,
+        2769
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/terms-390.jpg"
+    },
+    {
+      "section": "rights",
+      "capture": "rights",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        390,
+        1325
+      ],
+      "builtSize": [
+        390,
+        1325
+      ],
+      "sectionHeight": [
+        1324,
+        1324
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/rights-390.jpg"
+    },
+    {
+      "section": "escrow",
+      "capture": "escrow",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1107
+      ],
+      "builtSize": [
+        390,
+        1107
+      ],
+      "sectionHeight": [
+        1106,
+        1106
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/escrow-390.jpg"
+    },
+    {
+      "section": "outlets",
+      "capture": "outlets",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        390,
+        802
+      ],
+      "builtSize": [
+        390,
+        802
+      ],
+      "sectionHeight": [
+        801,
+        801
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/outlets-390.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.11,
+      "refSize": [
+        390,
+        916
+      ],
+      "builtSize": [
+        390,
+        916
+      ],
+      "sectionHeight": [
+        914,
+        914
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/faq-390.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1431
+      ],
+      "builtSize": [
+        390,
+        1431
+      ],
+      "sectionHeight": [
+        1431,
+        1431
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "syndication/footer-390.jpg"
+    }
+  ],
+  "missing": [],
+  "elements": {
+    "header": {
+      "390": {
+        "matched": 2,
+        "refCount": 2,
+        "builtCount": 2,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 4,
+        "refCount": 4,
+        "builtCount": 4,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 13,
+        "refCount": 13,
+        "builtCount": 13,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "hero": {
+      "390": {
+        "matched": 46,
+        "refCount": 48,
+        "builtCount": 48,
+        "mismatches": [
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Aired",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "On air",
+            "count": 2
+          }
+        ]
+      },
+      "820": {
+        "matched": 57,
+        "refCount": 59,
+        "builtCount": 59,
+        "mismatches": [
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
+            ]
+          },
+          {
+            "text": "ORNG",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 632→630"
+            ]
+          },
+          {
+            "text": "Orange County",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "w 63→65"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 259→257"
+            ]
+          },
+          {
+            "text": "Inland Empire",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "w 66→68"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Aired",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "On air",
+            "count": 2
+          }
+        ]
+      },
+      "1440": {
+        "matched": 65,
+        "refCount": 67,
+        "builtCount": 67,
+        "mismatches": [
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 1128→1125",
+              "y 632→630",
+              "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
+            ]
+          },
+          {
+            "text": "ORNG",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 1125→1122"
+            ]
+          },
+          {
+            "text": "Orange County",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "w 74→77"
+            ]
+          },
+          {
+            "text": "$1.00 + 15%",
+            "n": 0,
+            "tag": "div",
+            "diffs": [
+              "x 1123→1120",
+              "w 154→160"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 476→473",
+              "y 1023→1020",
+              "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 473→470"
+            ]
+          },
+          {
+            "text": "Inland Empire",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "w 67→69"
+            ]
+          },
+          {
+            "text": "$2.00 an airing",
+            "n": 0,
+            "tag": "div",
+            "diffs": [
+              "x 471→468",
+              "w 154→160"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Aired",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "On air",
+            "count": 2
+          }
+        ]
+      }
+    },
+    "offer": {
+      "390": {
+        "matched": 31,
+        "refCount": 31,
+        "builtCount": 31,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 32,
+        "refCount": 32,
+        "builtCount": 32,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 32,
+        "refCount": 32,
+        "builtCount": 32,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "fits": {
+      "390": {
+        "matched": 64,
+        "refCount": 64,
+        "builtCount": 64,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 66,
+        "refCount": 66,
+        "builtCount": 66,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 95,
+        "refCount": 95,
+        "builtCount": 95,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "terms": {
+      "390": {
+        "matched": 130,
+        "refCount": 149,
+        "builtCount": 149,
+        "mismatches": [
+          {
+            "text": "14.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 34→274",
+              "y 2271→2315",
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "2.1",
+            "count": 1
+          },
+          {
+            "t": "15.2",
+            "count": 1
+          },
+          {
+            "t": "28.3",
+            "count": 1
+          },
+          {
+            "t": "54.2",
+            "count": 1
+          },
+          {
+            "t": "67.3",
+            "count": 1
+          },
+          {
+            "t": "27.2",
+            "count": 1
+          },
+          {
+            "t": "40.3",
+            "count": 1
+          },
+          {
+            "t": "53.1",
+            "count": 1
+          },
+          {
+            "t": "66.2",
+            "count": 1
+          },
+          {
+            "t": "13.3",
+            "count": 1
+          },
+          {
+            "t": "OCAT",
+            "count": 1
+          },
+          {
+            "t": "26.1",
+            "count": 1
+          },
+          {
+            "t": "39.2",
+            "count": 1
+          },
+          {
+            "t": "52.3",
+            "count": 1
+          },
+          {
+            "t": "65.1",
+            "count": 1
+          },
+          {
+            "t": "12.2",
+            "count": 1
+          },
+          {
+            "t": "25.3",
+            "count": 1
+          },
+          {
+            "t": "38.1",
+            "count": 1
+          },
+          {
+            "t": "51.2",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "12.1",
+            "count": 1
+          },
+          {
+            "t": "24.1",
+            "count": 1
+          },
+          {
+            "t": "33.1",
+            "count": 1
+          },
+          {
+            "t": "19.1",
+            "count": 1
+          },
+          {
+            "t": "27.1",
+            "count": 1
+          },
+          {
+            "t": "31.1",
+            "count": 1
+          },
+          {
+            "t": "7.1",
+            "count": 1
+          },
+          {
+            "t": "88.4",
+            "count": 1
+          },
+          {
+            "t": "92.0",
+            "count": 1
+          },
+          {
+            "t": "104.2",
+            "count": 1
+          },
+          {
+            "t": "60.1",
+            "count": 1
+          },
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": "22.1",
+            "count": 1
+          },
+          {
+            "t": "36.1",
+            "count": 1
+          },
+          {
+            "t": "45.1",
+            "count": 1
+          },
+          {
+            "t": "96.6",
+            "count": 1
+          },
+          {
+            "t": "101.4",
+            "count": 1
+          },
+          {
+            "t": "66.1",
+            "count": 1
+          },
+          {
+            "t": "99.2",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 135,
+        "refCount": 154,
+        "builtCount": 154,
+        "mismatches": [
+          {
+            "text": "14.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 634→66",
+              "y 1732→1832",
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "2.1",
+            "count": 1
+          },
+          {
+            "t": "15.2",
+            "count": 1
+          },
+          {
+            "t": "28.3",
+            "count": 1
+          },
+          {
+            "t": "54.2",
+            "count": 1
+          },
+          {
+            "t": "67.3",
+            "count": 1
+          },
+          {
+            "t": "27.2",
+            "count": 1
+          },
+          {
+            "t": "40.3",
+            "count": 1
+          },
+          {
+            "t": "53.1",
+            "count": 1
+          },
+          {
+            "t": "66.2",
+            "count": 1
+          },
+          {
+            "t": "13.3",
+            "count": 1
+          },
+          {
+            "t": "OCAT",
+            "count": 1
+          },
+          {
+            "t": "26.1",
+            "count": 1
+          },
+          {
+            "t": "39.2",
+            "count": 1
+          },
+          {
+            "t": "52.3",
+            "count": 1
+          },
+          {
+            "t": "65.1",
+            "count": 1
+          },
+          {
+            "t": "12.2",
+            "count": 1
+          },
+          {
+            "t": "25.3",
+            "count": 1
+          },
+          {
+            "t": "38.1",
+            "count": 1
+          },
+          {
+            "t": "51.2",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "12.1",
+            "count": 1
+          },
+          {
+            "t": "24.1",
+            "count": 1
+          },
+          {
+            "t": "33.1",
+            "count": 1
+          },
+          {
+            "t": "19.1",
+            "count": 1
+          },
+          {
+            "t": "27.1",
+            "count": 1
+          },
+          {
+            "t": "31.1",
+            "count": 1
+          },
+          {
+            "t": "7.1",
+            "count": 1
+          },
+          {
+            "t": "88.4",
+            "count": 1
+          },
+          {
+            "t": "92.0",
+            "count": 1
+          },
+          {
+            "t": "104.2",
+            "count": 1
+          },
+          {
+            "t": "60.1",
+            "count": 1
+          },
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": "22.1",
+            "count": 1
+          },
+          {
+            "t": "36.1",
+            "count": 1
+          },
+          {
+            "t": "45.1",
+            "count": 1
+          },
+          {
+            "t": "96.6",
+            "count": 1
+          },
+          {
+            "t": "101.4",
+            "count": 1
+          },
+          {
+            "t": "66.1",
+            "count": 1
+          },
+          {
+            "t": "99.2",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 135,
+        "refCount": 154,
+        "builtCount": 154,
+        "mismatches": [
+          {
+            "text": "14.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 1258→807",
+              "y 1253→1353",
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "2.1",
+            "count": 1
+          },
+          {
+            "t": "15.2",
+            "count": 1
+          },
+          {
+            "t": "28.3",
+            "count": 1
+          },
+          {
+            "t": "54.2",
+            "count": 1
+          },
+          {
+            "t": "67.3",
+            "count": 1
+          },
+          {
+            "t": "27.2",
+            "count": 1
+          },
+          {
+            "t": "40.3",
+            "count": 1
+          },
+          {
+            "t": "53.1",
+            "count": 1
+          },
+          {
+            "t": "66.2",
+            "count": 1
+          },
+          {
+            "t": "13.3",
+            "count": 1
+          },
+          {
+            "t": "OCAT",
+            "count": 1
+          },
+          {
+            "t": "26.1",
+            "count": 1
+          },
+          {
+            "t": "39.2",
+            "count": 1
+          },
+          {
+            "t": "52.3",
+            "count": 1
+          },
+          {
+            "t": "65.1",
+            "count": 1
+          },
+          {
+            "t": "12.2",
+            "count": 1
+          },
+          {
+            "t": "25.3",
+            "count": 1
+          },
+          {
+            "t": "38.1",
+            "count": 1
+          },
+          {
+            "t": "51.2",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "12.1",
+            "count": 1
+          },
+          {
+            "t": "24.1",
+            "count": 1
+          },
+          {
+            "t": "33.1",
+            "count": 1
+          },
+          {
+            "t": "19.1",
+            "count": 1
+          },
+          {
+            "t": "27.1",
+            "count": 1
+          },
+          {
+            "t": "31.1",
+            "count": 1
+          },
+          {
+            "t": "7.1",
+            "count": 1
+          },
+          {
+            "t": "88.4",
+            "count": 1
+          },
+          {
+            "t": "92.0",
+            "count": 1
+          },
+          {
+            "t": "104.2",
+            "count": 1
+          },
+          {
+            "t": "60.1",
+            "count": 1
+          },
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": "22.1",
+            "count": 1
+          },
+          {
+            "t": "36.1",
+            "count": 1
+          },
+          {
+            "t": "45.1",
+            "count": 1
+          },
+          {
+            "t": "96.6",
+            "count": 1
+          },
+          {
+            "t": "101.4",
+            "count": 1
+          },
+          {
+            "t": "66.1",
+            "count": 1
+          },
+          {
+            "t": "99.2",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "rights": {
+      "390": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Cleared",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Cleared",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Cleared",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "escrow": {
+      "390": {
+        "matched": 20,
+        "refCount": 20,
+        "builtCount": 20,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 21,
+        "refCount": 21,
+        "builtCount": 21,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 21,
+        "refCount": 21,
+        "builtCount": 21,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "outlets": {
+      "390": {
+        "matched": 25,
+        "refCount": 25,
+        "builtCount": 25,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 26,
+        "refCount": 26,
+        "builtCount": 26,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 26,
+        "refCount": 26,
+        "builtCount": 26,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "faq": {
+      "390": {
+        "matched": 23,
+        "refCount": 23,
+        "builtCount": 23,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 23,
+        "refCount": 23,
+        "builtCount": 23,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 23,
+        "refCount": 23,
+        "builtCount": 23,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "footer": {
+      "390": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    }
+  },
+  "notes": []
+}

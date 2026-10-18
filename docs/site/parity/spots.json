@@ -1,0 +1,1167 @@
+{
+  "page": "spots",
+  "slug": "spots",
+  "route": "/spots",
+  "generated": "2026-10-18T06:14:06.789Z",
+  "settings": {
+    "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
+    "widths": [
+      "1440x900",
+      "820x1180",
+      "390x844"
+    ],
+    "seed": 1814,
+    "reduced": false,
+    "reference": "docs/reference/site/pages/spots.html",
+    "built": "apps/site/dist/spots",
+    "pixelThreshold": 40,
+    "rectTolerance": 2
+  },
+  "order": [
+    "header",
+    "hero",
+    "who",
+    "plan",
+    "paid",
+    "customers",
+    "ways",
+    "rules",
+    "faq",
+    "footer"
+  ],
+  "captures": [
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 1440,
+      "mode": "header",
+      "mismatch": 0.03,
+      "refSize": [
+        1440,
+        68
+      ],
+      "builtSize": [
+        1440,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/header-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.25,
+      "refSize": [
+        1440,
+        1001
+      ],
+      "builtSize": [
+        1440,
+        1001
+      ],
+      "sectionHeight": [
+        1001,
+        1001
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/hero-1440.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        891
+      ],
+      "builtSize": [
+        1440,
+        891
+      ],
+      "sectionHeight": [
+        890,
+        890
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/who-1440.jpg"
+    },
+    {
+      "section": "plan",
+      "capture": "plan",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.41,
+      "refSize": [
+        1440,
+        1296
+      ],
+      "builtSize": [
+        1440,
+        1296
+      ],
+      "sectionHeight": [
+        1295,
+        1295
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/plan-1440.jpg"
+    },
+    {
+      "section": "paid",
+      "capture": "paid",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1072
+      ],
+      "builtSize": [
+        1440,
+        1072
+      ],
+      "sectionHeight": [
+        1070,
+        1070
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/paid-1440.jpg"
+    },
+    {
+      "section": "customers",
+      "capture": "customers",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1048
+      ],
+      "builtSize": [
+        1440,
+        1048
+      ],
+      "sectionHeight": [
+        1048,
+        1048
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/customers-1440.jpg"
+    },
+    {
+      "section": "ways",
+      "capture": "ways",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1045
+      ],
+      "builtSize": [
+        1440,
+        1045
+      ],
+      "sectionHeight": [
+        1044,
+        1044
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/ways-1440.jpg"
+    },
+    {
+      "section": "rules",
+      "capture": "rules",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        838
+      ],
+      "builtSize": [
+        1440,
+        838
+      ],
+      "sectionHeight": [
+        837,
+        837
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/rules-1440.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        1440,
+        719
+      ],
+      "builtSize": [
+        1440,
+        719
+      ],
+      "sectionHeight": [
+        718,
+        718
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/faq-1440.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1219
+      ],
+      "builtSize": [
+        1440,
+        1219
+      ],
+      "sectionHeight": [
+        1219,
+        1219
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/footer-1440.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 820,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        68
+      ],
+      "builtSize": [
+        820,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/header-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.69,
+      "refSize": [
+        820,
+        1398
+      ],
+      "builtSize": [
+        820,
+        1398
+      ],
+      "sectionHeight": [
+        1397,
+        1397
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/hero-820.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1490
+      ],
+      "builtSize": [
+        820,
+        1490
+      ],
+      "sectionHeight": [
+        1489,
+        1489
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/who-820.jpg"
+    },
+    {
+      "section": "plan",
+      "capture": "plan",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 4.21,
+      "refSize": [
+        820,
+        1958
+      ],
+      "builtSize": [
+        820,
+        2032
+      ],
+      "sectionHeight": [
+        1958,
+        2032
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/plan-820.jpg"
+    },
+    {
+      "section": "paid",
+      "capture": "paid",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1351
+      ],
+      "builtSize": [
+        820,
+        1351
+      ],
+      "sectionHeight": [
+        1350,
+        1350
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/paid-820.jpg"
+    },
+    {
+      "section": "customers",
+      "capture": "customers",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1539
+      ],
+      "builtSize": [
+        820,
+        1539
+      ],
+      "sectionHeight": [
+        1538,
+        1538
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/customers-820.jpg"
+    },
+    {
+      "section": "ways",
+      "capture": "ways",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1577
+      ],
+      "builtSize": [
+        820,
+        1577
+      ],
+      "sectionHeight": [
+        1576,
+        1576
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/ways-820.jpg"
+    },
+    {
+      "section": "rules",
+      "capture": "rules",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1251
+      ],
+      "builtSize": [
+        820,
+        1251
+      ],
+      "sectionHeight": [
+        1250,
+        1250
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/rules-820.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.05,
+      "refSize": [
+        820,
+        1037
+      ],
+      "builtSize": [
+        820,
+        1037
+      ],
+      "sectionHeight": [
+        1037,
+        1037
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/faq-820.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1422
+      ],
+      "builtSize": [
+        820,
+        1422
+      ],
+      "sectionHeight": [
+        1421,
+        1421
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/footer-820.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 390,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        60
+      ],
+      "builtSize": [
+        390,
+        60
+      ],
+      "sectionHeight": [
+        60,
+        60
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/header-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 3.99,
+      "refSize": [
+        390,
+        1211
+      ],
+      "builtSize": [
+        390,
+        1211
+      ],
+      "sectionHeight": [
+        1210,
+        1210
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/hero-390.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.03,
+      "refSize": [
+        390,
+        1454
+      ],
+      "builtSize": [
+        390,
+        1454
+      ],
+      "sectionHeight": [
+        1453,
+        1453
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/who-390.jpg"
+    },
+    {
+      "section": "plan",
+      "capture": "plan",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 4.63,
+      "refSize": [
+        390,
+        1984
+      ],
+      "builtSize": [
+        390,
+        2056
+      ],
+      "sectionHeight": [
+        1984,
+        2056
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/plan-390.jpg"
+    },
+    {
+      "section": "paid",
+      "capture": "paid",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1428
+      ],
+      "builtSize": [
+        390,
+        1428
+      ],
+      "sectionHeight": [
+        1427,
+        1427
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/paid-390.jpg"
+    },
+    {
+      "section": "customers",
+      "capture": "customers",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        390,
+        1319
+      ],
+      "builtSize": [
+        390,
+        1319
+      ],
+      "sectionHeight": [
+        1318,
+        1318
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "spots/customers-390.jpg"
+    },
+    {
+      "section": "ways",
+      "capture": "ways",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        390,
+        1480
+      ],
+      "builtSize": [
+        390,
+        1480
+      ],
+      "sectionHeight": [
+        1479,
+        1479
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/ways-390.jpg"
+    },
+    {
+      "section": "rules",
+      "capture": "rules",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        390,
+        1370
+      ],
+      "builtSize": [
+        390,
+        1370
+      ],
+      "sectionHeight": [
+        1369,
+        1369
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/rules-390.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.08,
+      "refSize": [
+        390,
+        1013
+      ],
+      "builtSize": [
+        390,
+        1013
+      ],
+      "sectionHeight": [
+        1012,
+        1012
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/faq-390.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1432
+      ],
+      "builtSize": [
+        390,
+        1432
+      ],
+      "sectionHeight": [
+        1431,
+        1431
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "spots/footer-390.jpg"
+    }
+  ],
+  "missing": [],
+  "elements": {
+    "header": {
+      "390": {
+        "matched": 2,
+        "refCount": 2,
+        "builtCount": 2,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 4,
+        "refCount": 4,
+        "builtCount": 4,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 13,
+        "refCount": 13,
+        "builtCount": 13,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "hero": {
+      "390": {
+        "matched": 24,
+        "refCount": 29,
+        "builtCount": 28,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Your spot, :15",
+            "count": 1
+          },
+          {
+            "t": "8:14:23",
+            "count": 1
+          },
+          {
+            "t": "34",
+            "count": 1
+          },
+          {
+            "t": "Counting the room",
+            "count": 1
+          },
+          {
+            "t": "$0.27",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Spot, :15",
+            "count": 1
+          },
+          {
+            "t": "8:14:15",
+            "count": 1
+          },
+          {
+            "t": "Waiting for the break",
+            "count": 1
+          },
+          {
+            "t": "$0.00",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 33,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [
+          {
+            "text": "Bumper",
+            "n": 0,
+            "tag": "em/span",
+            "diffs": [
+              "x 157→47",
+              "y 1115→1009",
+              "w 43→74",
+              "h 13→23",
+              "size 11.5px→11px",
+              "weight 600→700",
+              "lh 12.65px→11px",
+              "ls 0px→1.32px",
+              "tt none→uppercase",
+              "bg rgba(0, 0, 0, 0)→rgba(10, 7, 20, 0.78)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Spot, :15",
+            "count": 1
+          },
+          {
+            "t": "8:14:21",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Bumper",
+            "count": 1
+          },
+          {
+            "t": "8:14:14",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 33,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [
+          {
+            "text": "Bumper",
+            "n": 0,
+            "tag": "em/span",
+            "diffs": [
+              "x 759→650",
+              "y 665→559",
+              "w 43→74",
+              "h 13→23",
+              "size 11.5px→11px",
+              "weight 600→700",
+              "lh 12.65px→11px",
+              "ls 0px→1.32px",
+              "tt none→uppercase",
+              "bg rgba(0, 0, 0, 0)→rgba(10, 7, 20, 0.78)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Spot, :15",
+            "count": 1
+          },
+          {
+            "t": "8:14:21",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Bumper",
+            "count": 1
+          },
+          {
+            "t": "8:14:14",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "who": {
+      "390": {
+        "matched": 32,
+        "refCount": 32,
+        "builtCount": 32,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 33,
+        "refCount": 33,
+        "builtCount": 33,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 33,
+        "refCount": 33,
+        "builtCount": 33,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "plan": {
+      "390": {
+        "matched": 73,
+        "refCount": 74,
+        "builtCount": 76,
+        "mismatches": [
+          {
+            "text": "Held to your most per day of $15. Raise it to air more often.",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 1895→1967"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": ":15 Start a spot",
+            "count": 1
+          },
+          {
+            "t": ":15",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 74,
+        "refCount": 75,
+        "builtCount": 77,
+        "mismatches": [
+          {
+            "text": "Held to your most per day of $15. Raise it to air more often.",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 1865→1939"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": ":15 Start a spot",
+            "count": 1
+          },
+          {
+            "t": ":15",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 83,
+        "refCount": 84,
+        "builtCount": 86,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          },
+          {
+            "t": ":15 Start a spot",
+            "count": 1
+          },
+          {
+            "t": ":15",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "paid": {
+      "390": {
+        "matched": 40,
+        "refCount": 40,
+        "builtCount": 40,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 42,
+        "refCount": 42,
+        "builtCount": 42,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 42,
+        "refCount": 42,
+        "builtCount": 42,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "customers": {
+      "390": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 39,
+        "refCount": 39,
+        "builtCount": 39,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 39,
+        "refCount": 39,
+        "builtCount": 39,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "ways": {
+      "390": {
+        "matched": 31,
+        "refCount": 31,
+        "builtCount": 31,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 35,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 35,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "rules": {
+      "390": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Ready to air",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Ready to air",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [
+          {
+            "text": "Ready to air",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "faq": {
+      "390": {
+        "matched": 28,
+        "refCount": 28,
+        "builtCount": 28,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 28,
+        "refCount": 28,
+        "builtCount": 28,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 28,
+        "refCount": 28,
+        "builtCount": 28,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "footer": {
+      "390": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    }
+  },
+  "notes": []
+}

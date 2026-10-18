@@ -23,7 +23,7 @@ const FOR: Record<Role, { lede: string; go: string; about?: string }> = {
 };
 
 /** How the planner's picks read in the sheet. */
-const DETAIL_LABELS: Record<string, string> = { where: "Where you sell", kind: "Kind of business", times: "Time of day", budget: "Budget", cap: "Most a day", program: "Program" };
+const DETAIL_LABELS: Record<string, string> = { where: "Where you sell", kind: "Kinds of station", times: "Time of day", budget: "Budget", cap: "Most a day", program: "Program" };
 
 let ready = false;
 let trap: Trap | null = null;

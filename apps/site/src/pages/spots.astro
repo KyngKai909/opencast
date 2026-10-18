@@ -1,13 +1,220 @@
 ---
-// /spots: the shell until Phase 2 ports the page from docs/reference/site/pages/spots.html.
+// /spots, ported from docs/reference/site/pages/spots.html. Sections: hero (the control room),
+// who, plan (the planner), paid (the receipt), customers, ways, rules, faq. Behaviour:
+// src/scripts/spots/index.ts.
 import Base from "../layouts/Base.astro";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/spots.css";
+import Btn from "../components/Btn.astro";
+import Cell from "../components/Cell.astro";
+import Faq from "../components/Faq.astro";
 import Footer from "../components/Footer.astro";
+import Mf from "../components/Mf.astro";
+import Mh from "../components/Mh.astro";
+import Sheet from "../components/Sheet.astro";
+import Ticker from "../components/Ticker.astro";
 import FooterSpots from "../components/footers/FooterSpots.astro";
+import { contact, orderSpot, startSpot } from "../data/links";
+import { airingsLabel, daysLabel, money, moneyC, pickLabel, plan, SPOT_CPM } from "../data/pricing";
+import { planListHtml, receiptHtml } from "../scripts/spots/markup";
+import { AIRINGS, BOOKED, COUNTED, FUNNEL, KINDS, MARKETS, MONTH, PLAN_START as S0, PLAN_STATIONS, RATE_RANGE, ROOM, SEGMENTS, SPEND_SHARES, SPOT_RULES, SPOTS_FAQ, TIMES, WHO } from "../data/spots";
+
+const KEY = `<span class="key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+const first = plan(PLAN_STATIONS, { where: S0.where, miles: S0.miles, markets: new Set(S0.markets), kinds: new Set(KINDS), times: new Set(TIMES.map((t) => t[0])), rateKind: S0.rateKind, rate: S0.rate, budget: S0.budget, cap: S0.cap });
+const p = (v: number, min: number, max: number) => `--p:${((v - min) / (max - min)) * 100}%`;
+const num = (v: number) => Math.round(v).toLocaleString("en-US");
+const top = Math.log10(FUNNEL[0][1]);
+const a0 = AIRINGS[0]!;
+const r0 = receiptHtml(a0);
 ---
-<Base page="spots">
-  <main id="top" class="shell"><h1 class="sr">Be in the break. Pay for who watched.</h1></main>
+<Base page="spots" st="#E0583A">
+  <main id="top">
+    <section class="blk rhero sp-hero" id="hero">
+      <Sheet>
+        <Cell class="hd rh cr-l" d={5}>
+          <Mh label="Spot market" meta="For advertisers" />
+          <div class="cb">
+            <h1 class="sy-h"><span>Be in <br class="lg" />the break.</span><span class="dim">Pay for <br class="lg" />who watched.</span></h1>
+            <p class="lede">Your :15 or :30 in the breaks of stations people actually sit with: near your shop, or anywhere you ship. Stations choose your spot. You pay only for the people who tuned in.</p>
+            <div class="acts"><Btn cta={startSpot()} live=":15" cur="Plan" data-start="">Start a spot</Btn><Btn cta={orderSpot()} ghost>Order one made</Btn></div>
+          </div>
+          <Mf><span>No minimum spend. No contract. Pause any time.</span></Mf>
+        </Cell>
+        <Cell class="cr" d={7} id="spair">
+          <div class="mh mh-dl"><Ticker label="Just booked" items={BOOKED} interval={3600} id="bkV" /><span class="lv"><i></i>Live</span></div>
+          <div class="cr-mon"><div class="cr-scr"><canvas id="spTv" width="640" height="360" aria-hidden="true"></canvas><span class="cr-bug" id="spBug">12.1</span><span class="cr-chip" id="crChip">Program</span></div></div>
+          <div class="cr-tl" aria-hidden="true"><div class="cr-segs" id="crSegs">{SEGMENTS.map((s, i) => <span class:list={["cr-sg", { you: s.k === "you", on: i === 0 }]} style={`flex:${s.d};--k:${s.c}`}><em>{s.l}</em></span>)}</div><i class="cr-ph" id="crPh"><b id="crClock">8:14:02</b></i></div>
+          <div class="cr-meter">
+            <div><small>Tuned in for your spot</small><b class="tab" id="crTun">0</b><span id="crTunS">Waiting for the break</span></div>
+            <div><small>This airing costs</small><b class="tab" id="crCost">$0.00</b><span>${SPOT_CPM} per 1,000 tuned in</span></div>
+            <div><small>Tonight, of ${ROOM.budget}</small><b class="tab" id="crTot">{moneyC(ROOM.tonight)}</b><span id="crCu">{ROOM.customers} customers from the code</span></div>
+          </div>
+          <p class="sr">An example break on 12.1 BEAT: a program, a bumper, a spot for Juniper Barber Co., your 15-second spot for Orange Street Coffee, a spot for Redlands Hardware and the station ID. About {ROOM.peak} people tuned in for your spot, which cost {moneyC(ROOM.peak * SPOT_CPM / 1000)}.</p>
+          <Mf><span>An example break on one station. Your spot is the cream one.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="who">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="01" label="Who it's for" meta="Three kinds of advertiser" /><div class="cb"><h2>Down the street,<br />or ships anywhere.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why it works" /><div class="cb end"><p class="lede">Local stations used to be where a barber or a hardware store could afford to be on TV. That's the idea here, for anyone with something to sell to the people watching.</p></div></Cell>
+        {WHO.map((w) => {
+          const go = w.L === "C" ? contact("advertisers") : { href: "#plan", attrs: {} };
+          return (
+            <Cell class="side wh" d={4} t={6} m={2} style={`--c:${w.c}`}>
+              <Mh ix={w.L} label={w.t} meta={w.tag} />
+              <div class="cb"><h3>{w.h}</h3><p>{w.p}</p><div class="rrec">{w.rows.map(([k, v]) => <div class="rr-l"><span>{k}</span><b>{v}</b></div>)}</div></div>
+              <a class="mf go" href={go.href} {...go.attrs} data-cur="Plan"><span>{w.go}</span><Fragment set:html={KEY} /></a>
+            </Cell>
+          );
+        })}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="plan">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="02" label="Plan it" meta="Before you spend" /><div class="cb"><h2>Say who it's for.<br />See what it buys.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="How it's priced" /><div class="cb end"><p class="lede">You set the rate and the budget. Stations decide whether your spot fits their breaks, so a fair rate gets picked up by more of them. The planner shows what you'd get before you spend a cent.</p></div></Cell>
+        <Cell class="pl-in" d={5} t={6} m={2}>
+          <Mh label="Who it's for" meta="Change anything" />
+          <div class="cb">
+            <div class="cr"><span class="lb" id="lWhere">Where you sell</span><div class="seg2" id="pWhere" role="group" aria-labelledby="lWhere"><button type="button" data-v="shop" class="on" aria-pressed="true">In a shop</button><button type="button" data-v="online" aria-pressed="false">Online</button></div></div>
+            <div class="cr" id="pDistW"><label for="pDist">Within<b class="tab" id="vDist">{S0.miles} miles</b></label><input id="pDist" type="range" min="2" max="60" step="1" value={S0.miles} aria-valuetext={`${S0.miles} miles`} style={p(S0.miles, 2, 60)} /><small class="crh">Of 1840 Orange St, Riverside. Change the address when you sign up.</small></div>
+            <div class="cr" id="pMktW" hidden><span class="lb" id="lMkt">Markets you ship to</span><div class="chips" id="pMkt" role="group" aria-labelledby="lMkt">{MARKETS.map((m) => <button type="button" data-v={m} aria-pressed={S0.markets.includes(m) ? "true" : "false"}>{m}</button>)}</div></div>
+            <div class="cr"><span class="lb" id="lKind">Kinds of station</span><div class="chips" id="pKind" role="group" aria-labelledby="lKind">{KINDS.map((k) => <button type="button" data-v={k} aria-pressed="true">{k}</button>)}</div></div>
+            <div class="cr"><span class="lb" id="lTime">Times of day</span><div class="chips" id="pTime" role="group" aria-labelledby="lTime">{TIMES.map(([v, l]) => <button type="button" data-v={v} aria-pressed="true">{l}</button>)}</div></div>
+            <div class="cr"><span class="lb" id="lRk">Your rate</span><div class="seg2" id="pKindR" role="group" aria-labelledby="lRk"><button type="button" data-v="k" class="on" aria-pressed="true">Per 1,000 tuned in</button><button type="button" data-v="a" aria-pressed="false">Per airing</button></div></div>
+            <div class="cr"><label for="pRate"><span id="lRate">{RATE_RANGE.k.label}</span><b class="tab" id="vRate">{money(S0.rate)}</b></label><input id="pRate" type="range" min={RATE_RANGE.k.min} max={RATE_RANGE.k.max} step={RATE_RANGE.k.step} value={S0.rate} aria-valuetext={money(S0.rate)} style={p(S0.rate, RATE_RANGE.k.min, RATE_RANGE.k.max)} /></div>
+            <div class="cr"><label for="pBud">Budget<b class="tab" id="vBud">${S0.budget}</b></label><input id="pBud" type="range" min="50" max="2000" step="25" value={S0.budget} aria-valuetext={`$${S0.budget}`} style={p(S0.budget, 50, 2000)} /></div>
+            <div class="cr"><label for="pCap">Most per day<b class="tab" id="vCap">${S0.cap}</b></label><input id="pCap" type="range" min="5" max="150" step="5" value={S0.cap} aria-valuetext={`$${S0.cap}`} style={p(S0.cap, 5, 150)} /></div>
+          </div>
+        </Cell>
+        <Cell class="pl-out" d={7} t={6} m={2}>
+          <Mh label="What it buys" meta="Estimated" />
+          <div class="pl-stats" aria-live="polite">
+            <div><small>Stations that fit</small><b class="tab" id="oSt">{first.fits.length}</b></div>
+            <div><small>Airings a day</small><b class="tab" id="oAd">{airingsLabel(first.airings)}</b></div>
+            <div><small>Tuned in a day</small><b class="tab" id="oTd">{num(first.tuned)}</b></div>
+            <div><small>Budget lasts</small><b class="tab" id="oDays">{daysLabel(first)}</b></div>
+          </div>
+          <div class="pl-pick"><span class="lb">How likely stations are to pick it</span><div class="pk-bar" aria-hidden="true"><i id="pkI" style={`width:${Math.round(first.pick * 100)}%`}></i></div><b id="pkL">{pickLabel(first)}</b></div>
+          <div class="pl-list" id="pList" set:html={planListHtml(first, S0.where)} />
+          <div class="acts pl-go"><Btn cta={startSpot()} live=":15" cur="Start" id="planStart" data-start="">Start a spot</Btn></div>
+          <Mf><span id="pNote">{first.scale < 1 ? `Held to your most per day of $${S0.cap}. Raise it to air more often.` : "Estimates from last month’s viewing. Stations, viewers and costs here are examples."}</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="paid">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="03" label="Paying" meta="Per airing" /><div class="cb"><h2>Every airing,<br />settled honestly.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Held, counted, settled" /><div class="cb end"><p class="lede">Before an airing, the most it could cost is held from your balance. After, it's settled at what it really cost, and the rest comes back. Pick an airing to see how.</p></div></Cell>
+        <Cell class="rct" d={12}>
+          <div class="mh"><span>Three airings of Pumpkin latte</span><span class="rs-k">From the statement</span></div>
+          <div class="rc-tabs"><div class="seg2" id="rcTabs" role="tablist" aria-label="Airings">{AIRINGS.map((a, i) => <button type="button" role="tab" id={`rcT${i}`} aria-controls="rcPanel" data-i={i} class:list={{ on: i === 0 }} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>{a.b[2]}, {a.w.split(", ").pop()}</button>)}</div></div>
+          <div class="rcp" id="rcPanel" role="tabpanel" aria-labelledby="rcT0">
+            <div class="rc-l" id="rcL" set:html={r0.lines} />
+            <div class="rc-r">
+              <div class="rc-steps" id="rcSteps"><div class="on"><i class="tab">01</i><b>Held</b><span id="rcS1">{a0.s[0]}</span></div><div><i class="tab">02</i><b>Counted</b><span id="rcS2">{a0.s[1]}</span></div><div><i class="tab">03</i><b>Settled</b><span id="rcS3">{a0.s[2]}</span></div></div>
+              <div class="vw"><span class="lb">Who tuned in</span><div class="vw-bar" id="vwBar" aria-hidden="true" set:html={r0.bar} /><div class="t-lg" id="vwLg" set:html={r0.legend} /></div>
+              <p class="rc-note" id="rcNote">{a0.note}</p>
+            </div>
+          </div>
+          <Mf><span>On the dial we count viewers with our own player. Relay viewers come from YouTube's and Twitch's own numbers.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="customers">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="04" label="Results" meta="Codes and QR" /><div class="cb"><h2>Count customers,<br />not impressions.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="What counts" /><div class="cb end"><p class="lede">Every spot ends with your offer, a short code and a QR. When someone uses it, at your counter or at checkout online, it's counted against the spot that sent them.</p></div></Cell>
+        <Cell class="endc" d={5} t={6} m={2}>
+          <Mh label="The end card" meta="Added to every spot" />
+          <div class="cb"><div class="ec" aria-hidden="true">
+            <div class="ec-top"><span>Orange Street Coffee</span><span class="tab">0:12</span></div>
+            <div class="ec-mid"><div><small>Show this code</small><b>PUMPKIN</b><p>A free pastry with a latte</p></div><canvas id="qr" width="116" height="116"></canvas></div>
+            <div class="ec-bot"><span>Good for 7 days</span><span>1840 Orange St</span></div>
+          </div>
+          <p class="ec-cap">The last few seconds of every spot, added for you. Viewers can scan it from a TV or save it to their phone for later.</p></div>
+        </Cell>
+        <Cell class="fun" d={7} t={6} m={2} id="fun">
+          <Mh label="One month, one spot" meta="Bars on a log scale" />
+          <div class="cb">
+            <div class="fn" id="fnRows">{FUNNEL.map(([l, n, c]) => <div class="fn-r"><span>{l}</span><div class="fn-t"><i style={`--k:${c};--w:${((Math.log10(n) / top) * 100).toFixed(1)}%`}></i></div><b class="tab">{num(n)}</b></div>)}</div>
+            <div class="fn-tot"><div><small>Spent this month</small><b class="tab">{moneyC(MONTH.spent)}</b></div><div><small>Each customer cost</small><b class="tab hot">{moneyC(MONTH.spent / MONTH.customers)}</b></div></div>
+            <div class="cnt">{COUNTED.map(([b, s, n]) => <div class="c-r"><b>{b}</b><span>{s}</span><em class="tab">{n}</em></div>)}</div>
+          </div>
+          <Mf><span>Not everyone who comes in because of a spot uses the code. These are the customers we can count.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="ways">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="05" label="Buying" meta="Spots, sponsors, made for you" /><div class="cb"><h2>Three ways<br />into the break.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Pick one or all three" /><div class="cb end"><p class="lede">Bring a finished spot, put your name on a show you love, or have one made by people who make TV every day.</p></div></Cell>
+        <Cell class="trm wy" d={4} t={6} m={2} style="--c:#E0583A">
+          <div class="mh"><span><i class="sq"></i>Spots</span><span>Self-serve</span></div>
+          <div class="cb"><div class="len" aria-hidden="true"><i style="flex:15"><span>:15</span></i><i style="flex:30"><span>:30</span></i><i style="flex:60"><span>:60</span></i></div>
+          <h3>Your spot in their breaks</h3><p>Upload a finished :15, :30 or :60. We check it will air cleanly and add your code. Set a rate per 1,000 tuned in or per airing, a budget and a daily cap, and stations choose it.</p></div>
+          <Mf><span class="tab">Any budget. Paid as it airs</span></Mf>
+        </Cell>
+        <Cell class="trm wy" d={4} t={6} m={2} style="--c:#EBA03A">
+          <div class="mh"><span><i class="sq"></i>Sponsorships</span><span>Monthly</span></div>
+          <div class="cb"><div class="cred" aria-hidden="true"><small>Read on air, after the show's open</small><p>Late Crate is brought to you by <b>Orange Street Coffee</b>. Roasted on Orange Street since 2011.</p></div>
+          <h3>Your name on a station or a show</h3><p>Sponsor a whole station or one program, by the month. They thank you on air and on their station page, with one line you write. Each station sets its own minimum.</p></div>
+          <Mf><span class="tab">Renews monthly until you end it</span></Mf>
+        </Cell>
+        <Cell class="trm wy" d={4} t={6} m={2} style="--c:#2F9A72">
+          <div class="mh"><span><i class="sq"></i>Made for you</span><span>Order a spot</span></div>
+          <div class="cb"><ol class="mtl" aria-hidden="true"><li class="on"><i></i>Brief</li><li class="on"><i></i>Quote</li><li><i></i>Made</li><li><i></i>Yours</li></ol>
+          <h3>Have it made</h3><p>Send a brief: what it's about, what it must say, any files. A station that makes spots, or the network's studio, quotes before anything is paid. The finished spot is yours to run anywhere on the network.</p></div>
+          <Mf><span class="tab">The maker is paid for the work, even if it never airs</span></Mf>
+        </Cell>
+        <Cell class="otl is-later" d={12}>
+          <div class="mh"><span><i class="dot"></i>Ad exchanges and VAST partners</span><span>Later</span></div>
+          <div class="cb"><p>Buying programmatically? Stations will be able to fill break time no one has booked through partners like Google Ad Manager, with each station's categories and ratings sent on every request. Spots in the market always air first.</p><label class="tg"><input type="checkbox" disabled aria-label="Open for partners" /><span></span>Not yet open</label></div>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="rules">
+      <Sheet>
+        <Cell class="hd" d={5} t={6}>
+          <Mh ix="06" label="Rules" meta="Five of them" />
+          <div class="cb"><h2>Their breaks.<br />Your spot.</h2><p class="lede">Stations keep their breaks short and local. These are the rules that keep it that way.</p><div class="rrec" aria-hidden="true"><div class="rr-h"><b>Pumpkin latte</b><span class="rr-ok"><i></i>Ready to air</span></div><div class="rr-l"><span>Length</span><b>0:15, exactly</b></div><div class="rr-l"><span>Loudness</span><b>Levelled to broadcast</b></div><div class="rr-l"><span>Picture</span><b>1080p, safe margins</b></div><div class="rr-l"><span>End card</span><b>PUMPKIN and QR added</b></div><div class="rr-l"><span>Category</span><b>Food and drink</b></div></div></div>
+        </Cell>
+        <Cell class="rgl" d={7} t={6}>
+          <Mh label="How the breaks stay good" meta="For everyone" />
+          <ol class="rg">{SPOT_RULES.map(([h, t], k) => <li><i class="tab">{String(k + 1).padStart(2, "0")}</i><div><b>{h}</b><p>{t}</p></div></li>)}</ol>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="faq">
+      <Sheet>
+        <Cell d={5} t={6}>
+          <Mh ix="07" label="Who gets what" meta="Per dollar you spend" />
+          <div class="cb"><div class="shr2" role="table" aria-label="Who gets what, per dollar you spend"><div class="s2 hd2" role="row"><span role="columnheader">Your dollar</span><span role="columnheader">To the station</span><span role="columnheader">We keep</span></div>{SPEND_SHARES.map(([n, s, w]) => <div class="s2" role="row"><b role="rowheader">{n}</b><span class="sk tab" role="cell">{s}</span><span class="nk tab" role="cell">{w}</span></div>)}</div></div>
+          <Mf><span>Shares never change what you pay. Card fees are added when you put money in. Part of what we keep goes back to stations through the co-op pool.</span></Mf>
+        </Cell>
+        <Cell class="faq" d={7} t={6}><Mh label="Questions advertisers ask" meta={`${SPOTS_FAQ.length} answers`} /><Faq items={SPOTS_FAQ} /></Cell>
+      </Sheet>
+    </section>
+  </main>
   <Footer slot="footer"><FooterSpots slot="first" /></Footer>
 </Base>
-<style>.shell{min-height:60svh}</style>
+<script>
+  import { initSpots } from "../scripts/spots/index";
+  initSpots();
+</script>
+<style is:global>
+  /* The planner's Start button (open-questions Q7): the reference had none. */
+  .pl-go{padding:4px var(--pad) 18px}
+</style>
+<style is:global>
+  /* Under 360px the hero's second line ("Pay for who watched.") was wider than the cell. */
+  @media (max-width:359px){ .sp-hero .cr-l h1.sy-h{font-size:9.6vw} }
+</style>

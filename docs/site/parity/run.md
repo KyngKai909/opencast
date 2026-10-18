@@ -1,6 +1,6 @@
 # Visual parity: run (`/run`)
 
-Generated 2026-10-18T05:28:53.567Z by `node apps/site/scripts/parity.mjs run`.
+Generated 2026-10-18T06:11:52.820Z by `node apps/site/scripts/parity.mjs run`.
 
 | Setting | Value |
 |---|---|
@@ -85,7 +85,7 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 **Only in reference:**
 
 - In the break
-- Spot · Juniper Barber
+- Spot · Redlands Hardware
 - 0:30
 - Breaks that build themselves
 - Bumpers, IDs and paid spots from the market, dropped into natural break points.
@@ -106,20 +106,19 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 44/50 matched · 5 with differences · 6 ref-only · 6 built-only</summary>
+<details><summary>820: 44/50 matched · 4 with differences · 6 ref-only · 10 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 02 Prepare | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(91, 123, 224) |
-| 02 | i | color rgb(91, 123, 224)→rgba(255, 255, 255, 0.75) |
-| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
+| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
+| 03 | i | color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75) |
 | 04 Breaks | button | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(235, 160, 58)→rgba(0, 0, 0, 0) |
 | 04 | i | color rgba(255, 255, 255, 0.75)→rgb(235, 160, 58) |
 
 **Only in reference:**
 
 - In the break
-- Spot · Juniper Barber
+- Spot · Redlands Hardware
 - 0:30
 - Breaks that build themselves
 - Bumpers, IDs and paid spots from the market, dropped into natural break points.
@@ -127,21 +126,24 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 **Only in built:**
 
-- Before
-- After
-- 1080i → 1080p
-- Prepared once, on our side
-- Every file is fixed and transcoded one time. No GPU, no server, no fan noise.
-- Once per file
+- Fri
+- Crate Session
+- ● Beat Tape Live
+- Overnight Crates ×2
+- Sat
+- Guest Mix
+- Late Crate
+- A real schedule
+- Your week, by the hour. Live shows get a slot and replays fill the gaps.
+- 7 days ahead
 
 </details>
 
-<details><summary>390: 38/44 matched · 3 with differences · 6 ref-only · 6 built-only</summary>
+<details><summary>390: 38/44 matched · 2 with differences · 6 ref-only · 10 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 02 Prepare | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(91, 123, 224) |
-| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
+| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
 | 04 Breaks | button | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(235, 160, 58)→rgba(0, 0, 0, 0) |
 
 **Only in reference:**
@@ -155,12 +157,16 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 **Only in built:**
 
-- Before
-- After
-- 1080i → 1080p
-- Prepared once, on our side
-- Every file is fixed and transcoded one time. No GPU, no server, no fan noise.
-- Once per file
+- Fri
+- Crate Session
+- ● Beat Tape Live
+- Overnight Crates ×2
+- Sat
+- Guest Mix
+- Late Crate
+- A real schedule
+- Your week, by the hour. Live shows get a slot and replays fill the gaps.
+- 7 days ahead
 
 </details>
 

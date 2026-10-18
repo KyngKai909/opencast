@@ -1,0 +1,1622 @@
+{
+  "page": "network",
+  "slug": "network",
+  "route": "/network",
+  "generated": "2026-10-18T06:15:08.149Z",
+  "settings": {
+    "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
+    "widths": [
+      "1440x900",
+      "820x1180",
+      "390x844"
+    ],
+    "seed": 1814,
+    "reduced": false,
+    "reference": "docs/reference/site/pages/network.html",
+    "built": "apps/site/dist/network",
+    "pixelThreshold": 40,
+    "rectTolerance": 2
+  },
+  "order": [
+    "header",
+    "hero",
+    "what",
+    "dial",
+    "kinds",
+    "money",
+    "locks",
+    "standards",
+    "faq",
+    "footer"
+  ],
+  "captures": [
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 1440,
+      "mode": "header",
+      "mismatch": 0.03,
+      "refSize": [
+        1440,
+        68
+      ],
+      "builtSize": [
+        1440,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/header-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.07,
+      "refSize": [
+        1440,
+        733
+      ],
+      "builtSize": [
+        1440,
+        733
+      ],
+      "sectionHeight": [
+        732,
+        732
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/hero-1440.jpg"
+    },
+    {
+      "section": "what",
+      "capture": "what",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        1440,
+        826
+      ],
+      "builtSize": [
+        1440,
+        826
+      ],
+      "sectionHeight": [
+        825,
+        825
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/what-1440.jpg"
+    },
+    {
+      "section": "dial",
+      "capture": "dial",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 7.99,
+      "refSize": [
+        1440,
+        958
+      ],
+      "builtSize": [
+        1440,
+        1036
+      ],
+      "sectionHeight": [
+        958,
+        1036
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/dial-1440.jpg"
+    },
+    {
+      "section": "kinds",
+      "capture": "kinds",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        1440,
+        920
+      ],
+      "builtSize": [
+        1440,
+        920
+      ],
+      "sectionHeight": [
+        919,
+        919
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/kinds-1440.jpg"
+    },
+    {
+      "section": "money",
+      "capture": "money",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1182
+      ],
+      "builtSize": [
+        1440,
+        1182
+      ],
+      "sectionHeight": [
+        1181,
+        1181
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/money-1440.jpg"
+    },
+    {
+      "section": "locks",
+      "capture": "locks",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        875
+      ],
+      "builtSize": [
+        1440,
+        875
+      ],
+      "sectionHeight": [
+        874,
+        874
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/locks-1440.jpg"
+    },
+    {
+      "section": "standards",
+      "capture": "standards",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1008
+      ],
+      "builtSize": [
+        1440,
+        1008
+      ],
+      "sectionHeight": [
+        1007,
+        1007
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/standards-1440.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.09,
+      "refSize": [
+        1440,
+        718
+      ],
+      "builtSize": [
+        1440,
+        718
+      ],
+      "sectionHeight": [
+        718,
+        718
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/faq-1440.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1220
+      ],
+      "builtSize": [
+        1440,
+        1220
+      ],
+      "sectionHeight": [
+        1219,
+        1219
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/footer-1440.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 820,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        68
+      ],
+      "builtSize": [
+        820,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/header-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.08,
+      "refSize": [
+        820,
+        1165
+      ],
+      "builtSize": [
+        820,
+        1165
+      ],
+      "sectionHeight": [
+        1164,
+        1164
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/hero-820.jpg"
+    },
+    {
+      "section": "what",
+      "capture": "what",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.06,
+      "refSize": [
+        820,
+        948
+      ],
+      "builtSize": [
+        820,
+        948
+      ],
+      "sectionHeight": [
+        947,
+        947
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/what-820.jpg"
+    },
+    {
+      "section": "dial",
+      "capture": "dial",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 9.89,
+      "refSize": [
+        820,
+        1259
+      ],
+      "builtSize": [
+        820,
+        1337
+      ],
+      "sectionHeight": [
+        1258,
+        1336
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/dial-820.jpg"
+    },
+    {
+      "section": "kinds",
+      "capture": "kinds",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.06,
+      "refSize": [
+        820,
+        1016
+      ],
+      "builtSize": [
+        820,
+        1016
+      ],
+      "sectionHeight": [
+        1014,
+        1014
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/kinds-820.jpg"
+    },
+    {
+      "section": "money",
+      "capture": "money",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1475
+      ],
+      "builtSize": [
+        820,
+        1475
+      ],
+      "sectionHeight": [
+        1474,
+        1474
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/money-820.jpg"
+    },
+    {
+      "section": "locks",
+      "capture": "locks",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1158
+      ],
+      "builtSize": [
+        820,
+        1158
+      ],
+      "sectionHeight": [
+        1157,
+        1157
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/locks-820.jpg"
+    },
+    {
+      "section": "standards",
+      "capture": "standards",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1427
+      ],
+      "builtSize": [
+        820,
+        1427
+      ],
+      "sectionHeight": [
+        1425,
+        1425
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/standards-820.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.1,
+      "refSize": [
+        820,
+        1071
+      ],
+      "builtSize": [
+        820,
+        1071
+      ],
+      "sectionHeight": [
+        1071,
+        1071
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/faq-820.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1422
+      ],
+      "builtSize": [
+        820,
+        1422
+      ],
+      "sectionHeight": [
+        1421,
+        1421
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/footer-820.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 390,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        60
+      ],
+      "builtSize": [
+        390,
+        60
+      ],
+      "sectionHeight": [
+        60,
+        60
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/header-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.18,
+      "refSize": [
+        390,
+        1199
+      ],
+      "builtSize": [
+        390,
+        1199
+      ],
+      "sectionHeight": [
+        1199,
+        1199
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/hero-390.jpg"
+    },
+    {
+      "section": "what",
+      "capture": "what",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.09,
+      "refSize": [
+        390,
+        1017
+      ],
+      "builtSize": [
+        390,
+        1017
+      ],
+      "sectionHeight": [
+        1016,
+        1016
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/what-390.jpg"
+    },
+    {
+      "section": "dial",
+      "capture": "dial",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 14.46,
+      "refSize": [
+        390,
+        1351
+      ],
+      "builtSize": [
+        390,
+        1449
+      ],
+      "sectionHeight": [
+        1350,
+        1448
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/dial-390.jpg"
+    },
+    {
+      "section": "kinds",
+      "capture": "kinds",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 1.94,
+      "refSize": [
+        390,
+        1163
+      ],
+      "builtSize": [
+        390,
+        1164
+      ],
+      "sectionHeight": [
+        1162,
+        1162
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/kinds-390.jpg"
+    },
+    {
+      "section": "money",
+      "capture": "money",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 2.81,
+      "refSize": [
+        390,
+        1719
+      ],
+      "builtSize": [
+        390,
+        1719
+      ],
+      "sectionHeight": [
+        1718,
+        1718
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/money-390.jpg"
+    },
+    {
+      "section": "locks",
+      "capture": "locks",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 2.89,
+      "refSize": [
+        390,
+        1295
+      ],
+      "builtSize": [
+        390,
+        1294
+      ],
+      "sectionHeight": [
+        1294,
+        1294
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/locks-390.jpg"
+    },
+    {
+      "section": "standards",
+      "capture": "standards",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 2.81,
+      "refSize": [
+        390,
+        1515
+      ],
+      "builtSize": [
+        390,
+        1515
+      ],
+      "sectionHeight": [
+        1514,
+        1514
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/standards-390.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 7.03,
+      "refSize": [
+        390,
+        1079
+      ],
+      "builtSize": [
+        390,
+        1060
+      ],
+      "sectionHeight": [
+        1079,
+        1059
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/faq-390.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.31,
+      "refSize": [
+        390,
+        1432
+      ],
+      "builtSize": [
+        390,
+        1432
+      ],
+      "sectionHeight": [
+        1431,
+        1431
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "network/footer-390.jpg"
+    }
+  ],
+  "missing": [],
+  "elements": {
+    "header": {
+      "390": {
+        "matched": 2,
+        "refCount": 2,
+        "builtCount": 2,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 4,
+        "refCount": 4,
+        "builtCount": 4,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 13,
+        "refCount": 13,
+        "builtCount": 13,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "hero": {
+      "390": {
+        "matched": 29,
+        "refCount": 30,
+        "builtCount": 30,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Overnight Crates",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Beat Tape Live",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 29,
+        "refCount": 30,
+        "builtCount": 30,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Overnight Crates",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Beat Tape Live",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 29,
+        "refCount": 30,
+        "builtCount": 30,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Overnight Crates",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Beat Tape Live",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "what": {
+      "390": {
+        "matched": 16,
+        "refCount": 16,
+        "builtCount": 16,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 17,
+        "refCount": 17,
+        "builtCount": 17,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 29,
+        "refCount": 29,
+        "builtCount": 29,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "dial": {
+      "390": {
+        "matched": 25,
+        "refCount": 29,
+        "builtCount": 31,
+        "mismatches": [
+          {
+            "text": "Try a call sign",
+            "n": 0,
+            "tag": "label",
+            "diffs": [
+              "w 378→325"
+            ]
+          },
+          {
+            "text": "63.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 362→309"
+            ]
+          },
+          {
+            "text": "TACO is free. Reserve it and we hold it for 120 days.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "w 378→325",
+              "h 33→56"
+            ]
+          },
+          {
+            "text": "How numbers work",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 638→737"
+            ]
+          },
+          {
+            "text": "Five rules",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 638→737"
+            ]
+          },
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 682→781"
+            ]
+          },
+          {
+            "text": "A number in your market",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 682→781"
+            ]
+          },
+          {
+            "text": "TV from 2.1 to 69.9, radio from 88.2 to 107.8. Each number belongs to one station in each market.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 712→810"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "y 812→911"
+            ]
+          },
+          {
+            "text": "A call sign that's yours",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 812→911"
+            ]
+          },
+          {
+            "text": "Three to five letters, unique across the whole network. Pick it once: it can't change after you sign on.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 842→940"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 942→1041"
+            ]
+          },
+          {
+            "text": "Nothing that looks official",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 942→1041"
+            ]
+          },
+          {
+            "text": "No four-letter signs starting with K or W, which look like real FCC stations, and no network or brand names.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 972→1070"
+            ]
+          },
+          {
+            "text": "04",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 1072→1171"
+            ]
+          },
+          {
+            "text": "Hold one before you're ready",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 1072→1171"
+            ]
+          },
+          {
+            "text": "Reserve a call sign and a number on the waitlist. It's held for 120 days, with a reminder before it lapses.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 1102→1200"
+            ]
+          },
+          {
+            "text": "05",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 1202→1301"
+            ]
+          },
+          {
+            "text": "Sign off for good, and it's kept",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 1202→1301"
+            ]
+          },
+          {
+            "text": "Your call sign stays yours for a year. The number goes back to the market after 90 days.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 1232→1330"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "✓ Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Not on the dial yet",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "✓ Yes: Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not on the dial yet",
+            "count": 1
+          },
+          {
+            "t": "63.4 Reserve it",
+            "count": 1
+          },
+          {
+            "t": "63.4",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 25,
+        "refCount": 29,
+        "builtCount": 31,
+        "mismatches": [
+          {
+            "text": "How numbers work",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 636→714"
+            ]
+          },
+          {
+            "text": "Five rules",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 636→714"
+            ]
+          },
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 684→762"
+            ]
+          },
+          {
+            "text": "A number in your market",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 684→762"
+            ]
+          },
+          {
+            "text": "TV from 2.1 to 69.9, radio from 88.2 to 107.8. Each number belongs to one station in each market.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 713→791"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "y 795→873"
+            ]
+          },
+          {
+            "text": "A call sign that's yours",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 795→873"
+            ]
+          },
+          {
+            "text": "Three to five letters, unique across the whole network. Pick it once: it can't change after you sign on.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 825→903"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 907→985"
+            ]
+          },
+          {
+            "text": "Nothing that looks official",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 907→985"
+            ]
+          },
+          {
+            "text": "No four-letter signs starting with K or W, which look like real FCC stations, and no network or brand names.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 936→1014"
+            ]
+          },
+          {
+            "text": "04",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 1018→1096"
+            ]
+          },
+          {
+            "text": "Hold one before you're ready",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 1018→1096"
+            ]
+          },
+          {
+            "text": "Reserve a call sign and a number on the waitlist. It's held for 120 days, with a reminder before it lapses.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 1048→1126"
+            ]
+          },
+          {
+            "text": "05",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "y 1130→1208"
+            ]
+          },
+          {
+            "text": "Sign off for good, and it's kept",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 1130→1208"
+            ]
+          },
+          {
+            "text": "Your call sign stays yours for a year. The number goes back to the market after 90 days.",
+            "n": 0,
+            "tag": "p",
+            "diffs": [
+              "y 1159→1237"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "✓ Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Not on the dial yet",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "✓ Yes: Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not on the dial yet",
+            "count": 1
+          },
+          {
+            "t": "63.4 Reserve it",
+            "count": 1
+          },
+          {
+            "t": "63.4",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 25,
+        "refCount": 29,
+        "builtCount": 31,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "✓ Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Not on the dial yet",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "✓ Yes: Three to five letters, A to Z",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not four letters starting with K or W",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not a network, a brand or an alert word",
+            "count": 1
+          },
+          {
+            "t": "✓ Yes: Not on the dial yet",
+            "count": 1
+          },
+          {
+            "t": "63.4 Reserve it",
+            "count": 1
+          },
+          {
+            "t": "63.4",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "kinds": {
+      "390": {
+        "matched": 20,
+        "refCount": 20,
+        "builtCount": 20,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 25,
+        "refCount": 26,
+        "builtCount": 26,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "60.1 OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "60.1 MATN",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 25,
+        "refCount": 26,
+        "builtCount": 26,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "60.1 OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "60.1 MATN",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "money": {
+      "390": {
+        "matched": 42,
+        "refCount": 42,
+        "builtCount": 42,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 43,
+        "refCount": 43,
+        "builtCount": 43,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 43,
+        "refCount": 43,
+        "builtCount": 43,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "locks": {
+      "390": {
+        "matched": 33,
+        "refCount": 33,
+        "builtCount": 33,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 34,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "standards": {
+      "390": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [
+          {
+            "text": "Dated",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [
+          {
+            "text": "Dated",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [
+          {
+            "text": "Dated",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "bg color(srgb 0.184314 0.603922 0.447059 / 0.22)→rgba(47, 154, 114, 0.22)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "faq": {
+      "390": {
+        "matched": 24,
+        "refCount": 25,
+        "builtCount": 25,
+        "mismatches": [
+          {
+            "text": "High Desert",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "w 226→282"
+            ]
+          },
+          {
+            "text": "Victorville to the Mojave · 3 example stations",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "w 226→282",
+              "h 39→19"
+            ]
+          },
+          {
+            "text": "Markets are sets of ZIP codes. Your market decides which stations come first on your dial.",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 486→467"
+            ]
+          },
+          {
+            "text": "Questions people ask",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 554→534"
+            ]
+          },
+          {
+            "text": "7 answers",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 554→534"
+            ]
+          },
+          {
+            "text": "Who runs the network?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 601→582"
+            ]
+          },
+          {
+            "text": "Where are you starting?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 664→645"
+            ]
+          },
+          {
+            "text": "Is it really free to watch?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 727→708"
+            ]
+          },
+          {
+            "text": "Can I watch on my TV?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 790→771"
+            ]
+          },
+          {
+            "text": "Do I own my station?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 853→834"
+            ]
+          },
+          {
+            "text": "Can my city or school be on the dial?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 916→897"
+            ]
+          },
+          {
+            "text": "Is the software open?",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 979→960"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Opening first",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Later",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 24,
+        "refCount": 25,
+        "builtCount": 25,
+        "mismatches": [
+          {
+            "text": "High Desert",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "w 622→678"
+            ]
+          },
+          {
+            "text": "Victorville to the Mojave · 3 example stations",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "w 622→678"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Opening first",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Later",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 24,
+        "refCount": 25,
+        "builtCount": 25,
+        "mismatches": [
+          {
+            "text": "High Desert",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "w 383→439"
+            ]
+          },
+          {
+            "text": "Victorville to the Mojave · 3 example stations",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "w 383→439"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "Opening first",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Later",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "footer": {
+      "390": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 38,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    }
+  },
+  "notes": []
+}

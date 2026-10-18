@@ -2,7 +2,7 @@
   "page": "run",
   "slug": "run",
   "route": "/run",
-  "generated": "2026-10-18T05:28:53.567Z",
+  "generated": "2026-10-18T06:11:52.820Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -788,23 +788,15 @@
       "390": {
         "matched": 38,
         "refCount": 44,
-        "builtCount": 44,
+        "builtCount": 49,
         "mismatches": [
-          {
-            "text": "02 Prepare",
-            "n": 0,
-            "tag": "button",
-            "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
-              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
-            ]
-          },
           {
             "text": "03 Schedule",
             "n": 0,
             "tag": "button",
             "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
             ]
           },
           {
@@ -845,27 +837,43 @@
         ],
         "builtOnly": [
           {
-            "t": "Before",
+            "t": "Fri",
             "count": 1
           },
           {
-            "t": "After",
+            "t": "Crate Session",
             "count": 1
           },
           {
-            "t": "1080i → 1080p",
+            "t": "● Beat Tape Live",
             "count": 1
           },
           {
-            "t": "Prepared once, on our side",
+            "t": "Overnight Crates",
+            "count": 2
+          },
+          {
+            "t": "Sat",
             "count": 1
           },
           {
-            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
+            "t": "Guest Mix",
             "count": 1
           },
           {
-            "t": "Once per file",
+            "t": "Late Crate",
+            "count": 1
+          },
+          {
+            "t": "A real schedule",
+            "count": 1
+          },
+          {
+            "t": "Your week, by the hour. Live shows get a slot and replays fill the gaps.",
+            "count": 1
+          },
+          {
+            "t": "7 days ahead",
             "count": 1
           }
         ]
@@ -873,31 +881,23 @@
       "820": {
         "matched": 44,
         "refCount": 50,
-        "builtCount": 50,
+        "builtCount": 55,
         "mismatches": [
-          {
-            "text": "02 Prepare",
-            "n": 0,
-            "tag": "button",
-            "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
-              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
-            ]
-          },
-          {
-            "text": "02",
-            "n": 0,
-            "tag": "i",
-            "diffs": [
-              "color rgb(91, 123, 224)→rgba(255, 255, 255, 0.75)"
-            ]
-          },
           {
             "text": "03 Schedule",
             "n": 0,
             "tag": "button",
             "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75)"
             ]
           },
           {
@@ -924,7 +924,7 @@
             "count": 1
           },
           {
-            "t": "Spot · Juniper Barber",
+            "t": "Spot · Redlands Hardware",
             "count": 1
           },
           {
@@ -946,27 +946,43 @@
         ],
         "builtOnly": [
           {
-            "t": "Before",
+            "t": "Fri",
             "count": 1
           },
           {
-            "t": "After",
+            "t": "Crate Session",
             "count": 1
           },
           {
-            "t": "1080i → 1080p",
+            "t": "● Beat Tape Live",
             "count": 1
           },
           {
-            "t": "Prepared once, on our side",
+            "t": "Overnight Crates",
+            "count": 2
+          },
+          {
+            "t": "Sat",
             "count": 1
           },
           {
-            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
+            "t": "Guest Mix",
             "count": 1
           },
           {
-            "t": "Once per file",
+            "t": "Late Crate",
+            "count": 1
+          },
+          {
+            "t": "A real schedule",
+            "count": 1
+          },
+          {
+            "t": "Your week, by the hour. Live shows get a slot and replays fill the gaps.",
+            "count": 1
+          },
+          {
+            "t": "7 days ahead",
             "count": 1
           }
         ]
@@ -1017,7 +1033,7 @@
             "count": 1
           },
           {
-            "t": "Spot · Juniper Barber",
+            "t": "Spot · Redlands Hardware",
             "count": 1
           },
           {

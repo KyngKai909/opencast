@@ -1,6 +1,6 @@
 # Visual parity: home (`/`)
 
-Generated 2026-10-18T05:26:54.605Z by `node apps/site/scripts/parity.mjs home`.
+Generated 2026-10-18T06:10:38.539Z by `node apps/site/scripts/parity.mjs home`.
 
 | Setting | Value |
 |---|---|

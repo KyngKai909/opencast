@@ -182,3 +182,152 @@ export const RUN_DEFAULTS = {
   minutes: 0.5,
   pledges: 50
 };
+
+// ---- Syndication: what a show earns across the network (syndication/synd.js #earn) ----
+
+/** Revenue share: each station's ad revenue (after Dial's share) × the show's share of watch time × the maker's share. Cash: airings a month × price, less Dial's share. */
+export interface CarriageInput {
+  mode: "share" | "cash";
+  stations: number;
+  /** Share: each station's ad revenue a month, $. */
+  revenue: number;
+  /** Share: the show's share of what's watched, 0 to 1. */
+  watch: number;
+  /** Share: the maker's share, capped at MAKER_SHARE_CAP. */
+  share: number;
+  /** Cash: airings a week, per station. */
+  airings: number;
+  /** Cash: price per airing, $. */
+  price: number;
+}
+
+export interface CarriageEarnings {
+  /** Airings a month, one station (cash). */
+  monthly: number;
+  /** Dial's cut, one station (cash). */
+  fee: number;
+  one: number;
+  total: number;
+  year: number;
+}
+
+export function carriage(c: CarriageInput): CarriageEarnings {
+  if (c.mode === "share") {
+    const one = c.revenue * c.watch * Math.min(c.share, MAKER_SHARE_CAP);
+    return { monthly: 0, fee: 0, one, total: one * c.stations, year: one * c.stations * 12 };
+  }
+  const monthly = (c.airings * 52) / 12;
+  const one = monthly * c.price * (1 - SHARES.syndicationCash);
+  return { monthly, fee: monthly * c.price * SHARES.syndicationCash, one, total: one * c.stations, year: one * c.stations * 12 };
+}
+
+/** "$1,284.60" */
+export const moneyC = (v: number) => `$${v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+/** "$6,912" */
+export const wholeC = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
+
+export const SYND_DEFAULTS: CarriageInput = { mode: "share", stations: 12, revenue: 600, watch: 0.2, share: 0.4, airings: 3, price: 2.5 };
+
+// ---- Spots: the planner (spots/spots.js planner) ----
+
+/** What one airing costs at the spot market's rate: 312 tuned in → $2.50. */
+export const airingCost = (viewers: number, cpm = SPOT_CPM) => (viewers * cpm) / 1000;
+
+export type TimeOfDay = "m" | "d" | "p" | "l";
+
+export interface PlanStation {
+  n: string;
+  cs: string;
+  c: string;
+  /** Kind of station. */
+  k: string;
+  city: string;
+  mk: string;
+  /** Miles from the shop. */
+  mi: number;
+  /** Viewers a spot. */
+  aud: number;
+  /** Breaks a day, by time of day. */
+  t: Record<TimeOfDay, number>;
+}
+
+export interface PlanInput {
+  where: "shop" | "online";
+  miles: number;
+  markets: ReadonlySet<string>;
+  kinds: ReadonlySet<string>;
+  times: ReadonlySet<TimeOfDay>;
+  /** Per 1,000 tuned in ("k") or per airing ("a"). */
+  rateKind: "k" | "a";
+  rate: number;
+  budget: number;
+  cap: number;
+}
+
+export interface PlanRow {
+  s: PlanStation;
+  why: string;
+  /** Airings a day before the cap. */
+  ad: number;
+  /** Chance a station picks it. */
+  p: number;
+  cost: number;
+}
+
+export interface Plan {
+  fits: PlanRow[];
+  out: PlanRow[];
+  airings: number;
+  tuned: number;
+  spend: number;
+  /** What the daily cap scaled everything by (1 when it didn't bite). */
+  scale: number;
+  days: number;
+  /** Average chance of being picked, 0 to 1. */
+  pick: number;
+}
+
+/** How likely a station is to pick the spot at this rate (spots.js chance()). */
+export function pickChance(s: PlanStation, rateKind: PlanInput["rateKind"], rate: number): number {
+  const v = rateKind === "k" ? (rate - 2) / 9 : (rate / airingCost(s.aud) - 0.3) / 1.1;
+  return Math.max(0.08, Math.min(0.97, 0.12 + v * 0.85));
+}
+
+export function plan(stations: readonly PlanStation[], f: PlanInput): Plan {
+  const cap = Math.min(f.cap, f.budget);
+  const fits: PlanRow[] = [], out: PlanRow[] = [];
+  for (const s of stations) {
+    let why = "";
+    if (f.where === "shop" && s.mi > f.miles) why = `Farther than ${f.miles} mi`;
+    else if (f.where === "online" && !f.markets.has(s.mk)) why = "Not in your markets";
+    else if (!f.kinds.has(s.k)) why = "Not a kind you picked";
+    let slots = 0;
+    for (const t of f.times) slots += s.t[t];
+    if (!why && !slots) why = "No breaks at those times";
+    const p = pickChance(s, f.rateKind, f.rate);
+    (why ? out : fits).push({ s, why, ad: slots * p, p, cost: f.rateKind === "k" ? (s.aud * f.rate) / 1000 : f.rate });
+  }
+  let airings = 0, tuned = 0, spend = 0, pk = 0;
+  for (const r of fits) {
+    airings += r.ad;
+    tuned += r.ad * r.s.aud;
+    spend += r.ad * r.cost;
+    pk += r.p;
+  }
+  const scale = spend > cap ? cap / spend : 1;
+  airings *= scale;
+  tuned *= scale;
+  spend *= scale;
+  fits.sort((a, b) => b.ad - a.ad);
+  return { fits, out, airings, tuned, spend, scale, days: spend > 0 ? f.budget / spend : 0, pick: fits.length ? pk / fits.length : 0 };
+}
+
+/** "9.5", "12" */
+export const airingsLabel = (a: number) => (a >= 10 ? String(Math.round(a)) : a.toFixed(1));
+/** "20 days", "1 day", "90+ days", "—" */
+export const daysLabel = (p: Plan) => (p.spend > 0 ? (p.days >= 90 ? "90+ days" : `${Math.max(1, Math.round(p.days))}${Math.round(p.days) === 1 ? " day" : " days"}`) : "—");
+/** "Many will" */
+export const pickLabel = (p: Plan) => (!p.fits.length ? "No one yet" : p.pick > 0.75 ? "Most will" : p.pick > 0.5 ? "Many will" : p.pick > 0.3 ? "Some will" : "Few will");
+
+/** The part of Dial's share of spots that goes back to stations through the co-op pool (the Network page's "Follow the dollar"). */
+export const POOL_SHARE_OF_OURS = 0.25;

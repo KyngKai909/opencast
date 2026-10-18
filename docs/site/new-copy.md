@@ -17,6 +17,19 @@ Every visitor-facing string the references don't have, and every change to refer
 | Spots footer, Start a spot / Order one made | scrolled to `#plan` / `#ways` | open the waitlist sheet (business) | SITE-SPEC §6 (Q7) |
 | Run footer, Talk to a person | `/contact` | `/contact?desk=stations` | Opens Contact on the Stations desk |
 
+| Demo station lists | OCAT in Syndication's squares, the Spots planner, the Network tuner and "The catalog" example | MATN | One station list (open-questions Q11) |
+| Syndication, Offer a show (hero, side A, footer) | scrolled to "Two sides" / the footer | opens the waitlist sheet (producer) | SITE-SPEC §6 (Q7) |
+| Syndication, Request / Add it on a market row | toggled to "Sent" / "In your log" | opens the waitlist sheet (station) with the program named; the label stays "Request" / "Add it" | SITE-SPEC §6 |
+| Syndication, station squares | made-up numbers and colours (BEAT 2.1, FM stations on TV numbers) | the stations' real numbers and colours first | SITE-SPEC §3 station squares |
+| Syndication, the wire | CIVC grey and PREP in NITE's blue | the stations' own colours | One station list |
+| Spots, Start a spot (hero, footer) and Order one made | scrolled to `#plan` / `#ways` | open the waitlist sheet (business), Start a spot prefilled from the planner | SITE-SPEC §6 (Q7) |
+| Spots, the planner | no way to start the spot | a "Start a spot" button under the station list, carrying the plan | SITE-SPEC §6 (Q7) |
+| Spots, agency card "Talk to us" | went to `#plan` | `/contact?desk=advertisers` | SITE-SPEC §6 |
+| Spots, receipt | tabs with no panel | tabs with a panel, arrow keys between them | Accessibility |
+| Network, call-sign checker | free result as text only | adds a "Reserve it" button (chip shows the suggested number) that opens the waitlist with the call sign and number | SITE-SPEC §6 (Q7) |
+| Network, call-sign rules | its own brand list, exact matches | the contracts' rules (open-questions Q6): e.g. ESPNX, MSNBC, HULU are refused; UPN, ION, HGTV, QVC no longer are | One shared check |
+| Network, Where | High Desert "Opening first" | "Later" | Matches the FAQ: the Inland Empire first, then Los Angeles and Orange County |
+
 ## New strings
 
 ### Page descriptions (`<meta name="description">`, Open Graph)
@@ -53,7 +66,7 @@ Every visitor-facing string the references don't have, and every change to refer
 | Lede, business | Be in the breaks when the spot market opens near you. We'll write with your first stations. |
 | Role chooser | "I'm joining as": A viewer · A station · A producer · A business (from the earlier site) |
 | Call sign | "Call sign you'd like" (earlier site); hint "Three to five letters. We'll hold it for 120 days."; while checking "XXXX looks free. Checking…"; free "XXXX is free. We'll hold it for 120 days."; asked for by someone else: earlier site's line with Dial for Opencast; refused or taken: the Network checker's lines |
-| What it's for | Label "Your show" (producer) or "Your business" (business); the planner's picks listed as Where you sell, Kind of business, Time of day, Budget, Most a day, Program |
+| What it's for | Label "Your show" (producer) or "Your business" (business); the planner's picks listed as Where you sell, Kinds of station, Time of day, Budget, Most a day, Program |
 | Fields | "Email", "ZIP code"; errors from the earlier site ("Enter an email address", "Enter your ZIP code.", "A ZIP code is five digits.") |
 | Button | "Join the waitlist" (viewer), "Hold my number" (station, chip shows the number), "Join as a producer", "Join as a business" |
 | Offline | "We couldn't reach Dial. Check your connection and try again." (earlier site, Opencast → Dial) |
@@ -69,3 +82,15 @@ Every visitor-facing string the references don't have, and every change to refer
 | Station cells (screen readers) | "Tune to 12.1 BEAT." in place of the bare call sign |
 | Guide rows (screen readers) | "Tune to 12.1 BEAT, Beat Tape TV" (adds the station name) |
 | Crawl | the loop's second copy is hidden from screen readers |
+
+### Syndication, Spots and Network (screen readers)
+
+| Where | Copy |
+|---|---|
+| Syndication, market rows | "Request Tamales for forty" / "Add Silent Hour" as each button's name |
+| Syndication, station squares | "12 of 32 stations on the network carrying it, with 16 numbers still open" (follows the slider) |
+| Syndication, escrow flow | "Airings pay into an escrow contract, about $1,284.60 waiting this week. The maker claims it once verified, after 72 hours in public; if it's never claimed it goes to the creator fund as grants." |
+| Spots, control room | "An example break on 12.1 BEAT: a program, a bumper, a spot for Juniper Barber Co., your 15-second spot for Orange Street Coffee, a spot for Redlands Hardware and the station ID. About 312 people tuned in for your spot, which cost $2.50." |
+| Network, tuner | after a change: "66.1 ROUT, Route 66 Reel. Now: Midnight Reel." |
+| Network, checker rows | each row read with "Yes: " or "No: " before it |
+| Network, the two lock timelines | "Two of three people, held separately, approve it. It waits 72 hours in public, where any one key can stop it. Then it's paid, only to the creator or as a grant." / "The network proposes it. It waits 7 days in public, where every key holder can cancel it. Then it's live; one honest key is enough to stop it." |

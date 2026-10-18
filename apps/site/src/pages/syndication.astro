@@ -1,13 +1,242 @@
 ---
-// /syndication: the shell until Phase 2 ports the page from docs/reference/site/pages/syndication.html.
+// /syndication, ported from docs/reference/site/pages/syndication.html. Sections: hero (the wire),
+// offer, fits (the market), terms (with the earnings calculator), rights, escrow, outlets, faq.
+// Behaviour: src/scripts/syndication/index.ts.
 import Base from "../layouts/Base.astro";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/syndication.css";
+import Btn from "../components/Btn.astro";
+import Cell from "../components/Cell.astro";
+import Faq from "../components/Faq.astro";
 import Footer from "../components/Footer.astro";
+import Mf from "../components/Mf.astro";
+import Mh from "../components/Mh.astro";
+import Sheet from "../components/Sheet.astro";
+import Ticker from "../components/Ticker.astro";
 import FooterSyndication from "../components/footers/FooterSyndication.astro";
+import { offerShow, requestProgram } from "../data/links";
+import { carriage, moneyC, wholeC, MAKER_SHARE_CAP, pct, SHARES, SYND_DEFAULTS as D } from "../data/pricing";
+import { CARRIAGE_NOTE, CARRIAGE_SHARES, CARRIERS, DEALS, ESCROW_START, FILTER_LABELS, FILTER_OPTIONS, FILTER_START, filterPrograms, optionLabel, fitCount, ON_NETWORK, OUTLETS, RIGHTS_RULES, showCount, SIDES, SOURCE, SQUARES, SYND_FAQ, TERMS_CARDS, WIRE_START, type FilterKey } from "../data/syndication";
+
+const KEY = `<span class="key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+const CV = `<svg class="cv" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const est = carriage(D);
+const progs = filterPrograms(FILTER_START);
+const markets = new Set(CARRIERS.map((c) => c.place)).size;
+const keys = Object.keys(FILTER_OPTIONS) as FilterKey[];
+const p = (v: number, min: number, max: number) => `--p:${((v - min) / (max - min)) * 100}%`;
+const offer = offerShow();
+const lenLabel = (len: number) => (len >= 120 ? "2 h" : `${len} min`);
+const termsLabel = { cash: "Cash", share: "Revenue share", free: "Free" } as const;
 ---
-<Base page="syndication">
-  <main id="top" class="shell"><h1 class="sr">Make it once. Air it everywhere.</h1></main>
+<Base page="syndication" st="#EBA03A">
+  <main id="top">
+    <section class="blk rhero sx-hero" id="hero">
+      <Sheet>
+        <Cell class="hd sx-top" d={12}>
+          <Mh label="Syndication market" meta="For makers and stations" />
+          <div class="sx-head">
+            <h1 class="sy-h"><span>Make it once.</span><span class="dim">Air it everywhere.</span></h1>
+            <div class="sx-side">
+              <p class="lede">The syndication market is where shows travel. Makers offer a series or a one-off, stations carry it in their schedule, and every airing pays the maker.</p>
+              <div class="acts"><Btn cta={offer} live="+1" cur="Offer">Offer a show</Btn><Btn href="#fits" ghost>Browse the market</Btn></div>
+            </div>
+          </div>
+        </Cell>
+        <Cell class="sx-map" d={12} id="wire">
+          <div class="mh mh-dl"><Ticker label="On the wire" items={DEALS} id="dlV" /><span class="lv"><i></i>Live</span></div>
+          <div class="sx-viz" id="sxViz">
+            <canvas class="sx-lines" id="sxLines" aria-hidden="true"></canvas>
+            <div class="sx-hub">
+              <div class="sx-scr"><canvas id="wPic" width="320" height="180" aria-hidden="true"></canvas><span class="w-ch">{SOURCE.n}</span><span class="sx-src">Source</span></div>
+              <div class="sx-hub-t"><small>From {SOURCE.n} {SOURCE.cs}, a family kitchen in Fontana</small><b>Tamales for forty</b><span>26 episodes of 30 min</span></div>
+            </div>
+            {CARRIERS.map((c, i) => (
+              <div class:list={["sx-t", { live: i % 3 === 0 }]} style={`--c:${c.c}`} data-i={i}>
+                <div class="ts"><canvas aria-hidden="true"></canvas><span class="badge" style={`background:${c.c}`}>{c.n}</span><em class:list={["st", { on: i % 3 === 0 }]}>{i % 3 === 0 ? "On air" : `In ${15 + i * 17} min`}</em></div>
+                <div class="tm"><b>{c.cs}</b><small>{c.place}</small></div>
+                <div class="tt">{c.tv}</div>
+                <span class="pp">{c.t === "cash" ? `+$${(c.tv.match(/\d+\.\d+/) ?? ["2.50"])[0]}` : c.t === "share" ? "+ watch time" : "+ reach"}</span>
+              </div>
+            ))}
+          </div>
+          <div class="w-foot sx-foot"><div><small>Paid to {SOURCE.cs}</small><b class="tab" id="wPaid">{moneyC(WIRE_START.paid)}</b></div><div><small>Airings</small><b class="tab" id="wAir">{WIRE_START.airings}</b></div><div><small>Stations</small><b class="tab">{CARRIERS.length}</b></div><div><small>Markets</small><b class="tab">{markets}</b></div></div>
+          <Mf><span>An example week. Every line is a station carrying the same show, each on its own schedule and terms.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="offer">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="01" label="How it works" meta="Makers and carriers" /><div class="cb"><h2>Two sides.<br />One handshake.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="The short version" /><div class="cb end"><p class="lede">Makers want more people watching. Stations need good hours to fill. The market puts them in the same room and keeps the paperwork out of it.</p></div></Cell>
+        {SIDES.map((s) => {
+          const go = s.L === "B" ? { href: "#fits", attrs: {} } : offer;
+          return (
+            <Cell class="side" d={6} style={`--c:${s.c}`}>
+              <Mh ix={s.L} label={s.t} meta={s.cta} />
+              <div class="cb"><h3>{s.t}</h3><ol class="stps">{s.steps.map(([h, t], k) => <li><i class="tab">{String(k + 1).padStart(2, "0")}</i><div><b>{h}</b><p>{t}</p></div></li>)}</ol></div>
+              <a class="mf go" href={go.href} {...go.attrs} data-cur="Open"><span>{s.go}</span><Fragment set:html={KEY} /></a>
+            </Cell>
+          );
+        })}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="fits">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="02" label="The market" meta="Built for the gap" /><div class="cb"><h2>Got an open hour?<br />Here's what fits it.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why it starts from the schedule" /><div class="cb end"><p class="lede">Operators told us choosing what airs is the hardest part. So the market starts from your schedule: pick the gap, and it shows only what fits the time, the length and your band.</p></div></Cell>
+        <Cell class="fit" d={12}>
+          <Mh label="Browse" meta="Search, filter, sort" />
+          <div class="f-bar2">
+            <label class="f-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13.5 13.5 17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="fQ" type="search" placeholder="Search shows or stations" aria-label="Search programs" autocomplete="off" /></label>
+            <div class="f-dds">
+              {keys.map((k) => (
+                <>
+                  {k === "sort" && <span class="f-sep" aria-hidden="true"></span>}
+                  <div class="f-dd" data-k={k}>
+                    <button type="button" class="f-dd-b" aria-haspopup="listbox" aria-expanded="false"><span class="k">{FILTER_LABELS[k]}</span><b>{optionLabel(k, FILTER_START[k])}</b><Fragment set:html={CV} /></button>
+                    <div class="f-pop" role="listbox" aria-label={FILTER_LABELS[k]} hidden>
+                      {FILTER_OPTIONS[k].map(([v, l]) => <button type="button" role="option" data-v={v} aria-selected={v === FILTER_START[k] ? "true" : "false"}>{l}</button>)}
+                    </div>
+                  </div>
+                </>
+              ))}
+            </div>
+            <button type="button" class="f-mob" id="fMob" aria-haspopup="dialog" aria-controls="fSheet"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h9M15 6h2M3 14h3M9 14h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="13.5" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="7.5" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>Filters<span class="n" id="fN" hidden>0</span></button>
+          </div>
+          <div class="f-list" id="fList">
+            {progs.map((pr) => {
+              const cta = requestProgram({ id: pr.id, title: pr.t });
+              return (
+                <div class="fp" style={`--c:${pr.c}`}><div class="fp-l"><span class="fp-len tab">{lenLabel(pr.len)}</span><span class="fp-g">{pr.g}</span></div><div class="fp-m"><b>{pr.t}</b><small>{pr.by} · {pr.eps}</small></div><div class="fp-t"><b>{termsLabel[pr.terms]}</b><small>{pr.tv}</small></div><a class="fp-b" href={cta.href} {...cta.attrs} aria-label={`${pr.terms === "free" ? "Add" : "Request"} ${pr.t}`}>{pr.terms === "free" ? "Add it" : "Request"}</a></div>
+              );
+            })}
+          </div>
+          <div class="mf"><span id="fCount" aria-live="polite">{fitCount(progs.length)}</span><span>Examples. The real market shows your market's offers first.</span></div>
+          <div class="f-sheet" id="fSheet" hidden>
+            <div class="f-sh-bg" data-close></div>
+            <div class="f-sh" role="dialog" aria-modal="true" aria-labelledby="fShT">
+              <div class="f-sh-h"><b id="fShT">Filter programs</b><button type="button" class="f-x" data-close aria-label="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+              <div class="f-sh-b">
+                {keys.map((k) => (
+                  <div class="f-grp"><span class="lb" id={`fl-${k}`}>{FILTER_LABELS[k]}</span><div class="seg2" data-k={k} role="group" aria-labelledby={`fl-${k}`}>{FILTER_OPTIONS[k].map(([v, l]) => <button type="button" data-v={v} class:list={{ on: v === FILTER_START[k] }} aria-pressed={v === FILTER_START[k] ? "true" : "false"}>{l}</button>)}</div></div>
+                ))}
+              </div>
+              <div class="f-sh-f"><button type="button" class="btn ghost" id="fClear">Clear</button><button type="button" class="btn" id="fDone" data-close><span id="fShowN">{showCount(progs.length)}</span></button></div>
+            </div>
+          </div>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="terms">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="03" label="Terms" meta="Set by the maker" /><div class="cb"><h2>Three ways<br />to make a deal.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="How carriage is paid" /><div class="cb end"><p class="lede">Stations sell their own breaks. The maker sets how they get paid on each program, and carriers see the terms before they ask.</p></div></Cell>
+        {TERMS_CARDS.map((t) => (
+          <Cell class="trm" d={4} t={2} m={2} style={`--c:${t.c}`}>
+            <div class="mh"><span><i class="sq"></i>{t.n}</span></div>
+            <div class="cb"><div class="t-bar" aria-hidden="true">{t.bar.map(([f, k]) => <i style={`flex:${f};--k:${k}`}><span>{f < 100 ? `${f}%` : ""}</span></i>)}</div><div class="t-lg">{t.bar.map(([, k, l]) => <span><i style={`--k:${k}`}></i>{l}</span>)}</div><h3>{t.t}</h3><p>{t.p}</p></div>
+            <Mf><span class="tab">{t.ex}</span></Mf>
+          </Cell>
+        ))}
+        <Cell class="rsc" id="earn" d={12}>
+          <div class="mh"><span>What a show earns across the network</span><span class="rs-k">Monthly, every carrier added up</span></div>
+          <div class="rs-mode"><div class="seg2" id="rMode" role="group" aria-label="Deal"><button type="button" data-v="share" class="on" aria-pressed="true">Revenue share</button><button type="button" data-v="cash" aria-pressed="false">Cash per airing</button></div><span class="rs-tag">One show. Many dials. One payout.</span></div>
+          <div class="rs">
+            <div class="rs-in">
+              <div class="cr big"><label for="rSt">Stations carrying it<b class="tab" id="vSt">{D.stations}</b></label><input id="rSt" type="range" min="1" max="48" step="1" value={D.stations} aria-valuetext={`${D.stations} stations`} style={p(D.stations, 1, 48)} /><small class="crh">The multiplier. Every station that adds your show pays you on its own, with no extra work from you.</small></div>
+              <div class="cr" data-m="share"><label for="rRev">Each station's ad revenue a month<b class="tab" id="vRev">{wholeC(D.revenue)}</b></label><input id="rRev" type="range" min="100" max="5000" step="50" value={D.revenue} aria-valuetext={wholeC(D.revenue)} style={p(D.revenue, 100, 5000)} /><small class="crh">Spots, sponsorships and partner ads, after our {pct(SHARES.spotsBooked)}. Not pledges: viewers give those to the station.</small></div>
+              <div class="cr" data-m="share"><label for="rWatch">Your show's share of what's watched<b class="tab" id="vWatch">{pct(D.watch)}</b></label><input id="rWatch" type="range" min="1" max="80" step="1" value={D.watch * 100} aria-valuetext={pct(D.watch)} style={p(D.watch * 100, 1, 80)} /><small class="crh">On each station's dial and relays. Where a platform doesn't report viewers, minutes aired stand in.</small></div>
+              <div class="cr" data-m="share"><label for="rShare">Your revenue share<b class="tab" id="vShare">{pct(D.share)}</b></label><input id="rShare" type="range" min="5" max={MAKER_SHARE_CAP * 100} step="5" value={D.share * 100} aria-valuetext={pct(D.share)} style={p(D.share * 100, 5, MAKER_SHARE_CAP * 100)} /><small class="crh">Set by you on the program, up to {pct(MAKER_SHARE_CAP)}. The station always keeps at least a fifth of what your show brings in.</small></div>
+              <div class="cr" data-m="cash" hidden><label for="rAir">Airings a week, per station<b class="tab" id="vAir">{D.airings}</b></label><input id="rAir" type="range" min="1" max="21" step="1" value={D.airings} aria-valuetext={`${D.airings} a week`} style={p(D.airings, 1, 21)} /><small class="crh">A weekly show is 1. A nightly rerun is 7.</small></div>
+              <div class="cr" data-m="cash" hidden><label for="rPrice">Your price per airing<b class="tab" id="vPrice">{moneyC(D.price)}</b></label><input id="rPrice" type="range" min="0.5" max="15" step="0.25" value={D.price} aria-valuetext={moneyC(D.price)} style={p(D.price, 0.5, 15)} /><small class="crh">Charged to the carrier when it airs, never before. You get {pct(1 - SHARES.syndicationCash)}.</small></div>
+            </div>
+            <div class="rs-out" aria-live="polite">
+              <div class="ro"><span id="l1">One station's ad revenue</span><b class="tab" id="o1">{moneyC(D.revenue)}</b></div>
+              <div class="ro op"><span id="l2">&times; your share of what's watched</span><b class="tab" id="o2">{pct(D.watch)}</b></div>
+              <div class="ro op"><span id="l3">&times; your revenue share</span><b class="tab" id="o3">{pct(D.share)}</b></div>
+              <div class="ro"><span>From one station</span><b class="tab" id="oOne">{moneyC(est.one)}</b></div>
+              <div class="ro op mult"><span>&times; stations carrying it</span><b class="tab" id="oSt">{D.stations}</b></div>
+              <div class="ro tot"><span>You're paid this month<small id="oYr">About {wholeC(est.year)} a year</small></span><b class="tab" id="oPay">{moneyC(est.total)}</b></div>
+              <div class="sgrid" id="sGrid" role="img" aria-label={`${D.stations} of ${ON_NETWORK} stations on the network carrying it, with ${SQUARES.length - ON_NETWORK} numbers still open`}>
+                {SQUARES.map((s, i) => <i class:list={{ open: s.open, on: i < D.stations }} style={`--k:${s.c};transition-delay:${s.delay}ms`}><b>{s.n}</b><small>{s.open ? (i < D.stations ? "New" : "Open") : s.cs}</small></i>)}
+              </div>
+              <div class="t-lg sg-lg"><span><i style="--k:#EBA03A"></i>Carrying your show</span><span><i class="sh"></i>On the network, not yet carrying</span><span><i class="dt"></i>Open numbers, stations still to come</span></div>
+            </div>
+          </div>
+          <Mf><span>No channel to grow, no schedule to keep, no going live to stay visible. Make the show; stations bring the audience, the timeslot and the breaks.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="rights">
+      <Sheet>
+        <Cell class="hd" d={5} t={6}>
+          <Mh ix="04" label="Rights" meta="Five rules" />
+          <div class="cb"><h2>Rights first.<br />Always.</h2><p class="lede">Shows only travel when everyone who made them is on the record.</p><div class="rrec" aria-hidden="true"><div class="rr-h"><b>Tamales for forty</b><span class="rr-ok"><i></i>Cleared</span></div><div class="rr-l"><span>Made by</span><b>{SOURCE.cs} {SOURCE.n}</b></div><div class="rr-l"><span>Music</span><b>Original score, owned</b></div><div class="rr-l"><span>Footage</span><b>Shot by the maker</b></div><div class="rr-l"><span>Guests</span><b>3 releases on file</b></div><div class="rr-l"><span>Licence</span><b>Carriage on the network</b></div></div></div>
+        </Cell>
+        <Cell class="rgl" d={7} t={6}>
+          <Mh label="How carriage stays clean" meta="For everyone" />
+          <ol class="rg">{RIGHTS_RULES.map(([h, t], k) => <li><i class="tab">{String(k + 1).padStart(2, "0")}</i><div><b>{h}</b><p>{t}</p></div></li>)}</ol>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="escrow">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="05" label="Escrow" meta="On-chain" /><div class="cb"><h2>Paid before<br />they even join.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why makers can trust it" /><div class="cb end"><p class="lede">Some shows air before their makers have an account, under a licence that allows it or with their yes on record. Whatever they earn waits for them in a contract nobody at the network can touch.</p></div></Cell>
+        <Cell class="esc" d={12}>
+          <Mh label="Where the money goes" meta="Weekly" />
+          <div class="cb"><div class="flow" id="flow" aria-hidden="true">
+            <div class="fl-n" style="--c:#EBA03A"><small>01</small><b>Airings</b><span>Spots and cash from every carrier</span></div>
+            <i class="fl-a"><b></b></i>
+            <div class="fl-n big" style="--c:#5B7BE0"><small>02</small><b>Escrow contract</b><span class="tab" id="escAmt">{moneyC(ESCROW_START)} waiting</span></div>
+            <i class="fl-a"><b></b></i>
+            <div class="fl-s">
+              <div class="fl-n" style="--c:#2F9A72"><small>03a</small><b>The maker claims it</b><span>Verified, then 72 hours in public</span></div>
+              <div class="fl-n dim2" style="--c:#C04A9E"><small>03b</small><b>Or the creator fund</b><span>If it's never claimed. Grants only</span></div>
+            </div>
+          </div><p class="sr">Airings pay into an escrow contract, about {moneyC(ESCROW_START)} waiting this week. The maker claims it once verified, after 72 hours in public; if it's never claimed it goes to the creator fund as grants.</p></div>
+          <Mf><span>The contract can pay only the maker or the creator fund. Never the network. Changes to it wait 7 days in public.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="outlets">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="06" label="Where it can air" meta="Five outlets" /><div class="cb"><h2>Beyond the dial.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Outlets" /><div class="cb end"><p class="lede">The dial is where a show starts. Where else it can air is the maker's call, set per program, and each outlet pays the same way.</p></div></Cell>
+        {OUTLETS.map((o) => (
+          <Cell class:list={["otl", o.on ? "is-on" : "is-later"]} d={o.on ? 3 : 12} t={o.on ? 3 : 6} m={o.on ? 1 : 2}>
+            <div class="mh"><span><i class="dot"></i>{o.n}</span><span>{o.on ? "Live" : "Later"}</span></div>
+            <div class="cb"><p>{o.d}</p><label class="tg"><input type="checkbox" checked={o.on} disabled aria-label={`${o.n} allowed`} /><span></span>Allowed</label></div>
+          </Cell>
+        ))}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="faq">
+      <Sheet>
+        <Cell d={5} t={6}>
+          <Mh ix="07" label="Who gets what" meta="On carriage" />
+          <div class="cb"><div class="shr2" role="table" aria-label="Who gets what on carriage"><div class="s2 hd2" role="row"><span role="columnheader">Source</span><span role="columnheader">Maker keeps</span><span role="columnheader">We keep</span></div>{CARRIAGE_SHARES.map(([n, m, w]) => <div class="s2" role="row"><b role="rowheader">{n}</b><span class="sk tab" role="cell">{m}</span><span class="nk tab" role="cell">{w}</span></div>)}</div></div>
+          <Mf><span>{CARRIAGE_NOTE}</span></Mf>
+        </Cell>
+        <Cell class="faq" d={7} t={6}><Mh label="Questions makers ask" meta={`${SYND_FAQ.length} answers`} /><Faq items={SYND_FAQ} /></Cell>
+      </Sheet>
+    </section>
+  </main>
   <Footer slot="footer"><FooterSyndication slot="first" /></Footer>
 </Base>
-<style>.shell{min-height:60svh}</style>
+<script>
+  import { initSyndication } from "../scripts/syndication/index";
+  initSyndication();
+</script>
+<style is:global>
+  /* Request / Add it are links now (they open the waitlist, or the app in live mode). */
+  a.fp-b{text-decoration:none}
+</style>

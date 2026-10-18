@@ -27,3 +27,8 @@ html.lenis,html.lenis body{height:auto}
    fits (every desktop strip) is unchanged. */
 .mh{flex-wrap:wrap;row-gap:2px}
 .mh>span{white-space:normal}
+
+/* A cell never grows past its grid column (grid items default to min-width:auto): on Network at
+   390px and below, the market buttons and the call-sign checker pushed the page sideways. Rows
+   that are wider than the cell (#tnMk, #fdSeg) already scroll inside it. */
+.sheet > .cell{min-width:0}

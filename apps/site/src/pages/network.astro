@@ -1,13 +1,207 @@
 ---
-// /network: the shell until Phase 2 ports the page from docs/reference/site/pages/network.html.
+// /network, ported from docs/reference/site/pages/network.html. Sections: hero (the tuner), what,
+// dial (the call-sign checker), kinds, money, locks, standards, faq. Behaviour:
+// src/scripts/network/index.ts.
 import Base from "../layouts/Base.astro";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/network.css";
+import Btn from "../components/Btn.astro";
+import Cell from "../components/Cell.astro";
+import Faq from "../components/Faq.astro";
 import Footer from "../components/Footer.astro";
+import Mf from "../components/Mf.astro";
+import Mh from "../components/Mh.astro";
+import Sheet from "../components/Sheet.astro";
 import FooterNetwork from "../components/footers/FooterNetwork.astro";
+import { claim, watch } from "../data/links";
+import { NOW_PLAYING } from "../data/stations";
+import { IE_NUMBERS, takenBy } from "../data/dial";
+import { checkCallSign, suggestNumber } from "../lib/callsign";
+import { CHECK_START, COMPARE, DOLLAR, KINDS, NET_MARKETS, NETWORK_FAQ, NUMBER_RULES, STANDARDS, USAGE, USAGE_NOTE } from "../data/network";
+
+const AR = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const AL = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 10H5M9.5 5.5 5 10l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const np = NOW_PLAYING;
+const ie = NET_MARKETS[0]!;
+const s0 = ie.stations[1]!;
+const pos = (n: string) => (parseFloat(n) >= 88 ? (parseFloat(n) - 88) / 20 : (parseFloat(n) - 2) / 68);
+const ticks = (a: number, b: number, step: number, maj: number, to: (v: number) => number) => {
+  let h = "";
+  for (let v = a; v <= b + 1e-6; v += step) h += `<i class="${Math.abs(v / maj - Math.round(v / maj)) < 1e-6 ? "m" : ""}" style="left:${(to(v) * 100).toFixed(2)}%"></i>`;
+  return h;
+};
+const check = checkCallSign(CHECK_START, takenBy);
+const sug = check.ok ? suggestNumber(check.value, IE_NUMBERS) : "--.-";
+const d0 = DOLLAR[0]!;
 ---
-<Base page="network">
-  <main id="top" class="shell"><h1 class="sr">A network, not a feed.</h1></main>
+<Base page="network" st="#5B7BE0">
+  <main id="top">
+    <section class="blk rhero nt-hero" id="hero">
+      <Sheet>
+        <Cell class="hd rh" d={6}>
+          <Mh label="The network" meta="About" />
+          <div class="cb">
+            <h1 class="sy-h"><span>A network,</span><span class="dim">not a feed.</span></h1>
+            <p class="lede">Local TV used to work like this: a few stations in every town, each with a number on the dial, paid by the businesses down the street, carrying the best shows from everywhere else. We're rebuilding that for anyone with something worth airing.</p>
+            <div class="acts"><a class="btn" href={watch(np.n).href} data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">{np.n}</span></span>Open the dial</a><Btn href="#money" ghost>How the money moves</Btn></div>
+          </div>
+          <Mf><span>Free to watch. No account to tune in.</span><span class="nt-st"><i></i>Before launch</span></Mf>
+        </Cell>
+        <Cell class="tuner" d={6} id="tuner" style={`--c:${s0.c}`}>
+          <Mh label="The dial" meta="Example stations" />
+          <div class="tn-mk"><div class="seg2" id="tnMk" role="group" aria-label="Market">{NET_MARKETS.map((m, i) => <button type="button" data-i={i} class:list={{ on: i === 0 }} aria-pressed={i === 0 ? "true" : "false"}>{m.n}</button>)}</div></div>
+          <div class="tn-read">
+            <div class="tn-num"><b class="tab" id="tnNum">{s0.n}</b><small id="tnBand">TV</small></div>
+            <div class="tn-id"><b id="tnCs">{s0.cs}</b><span id="tnName">{s0.name}</span><small id="tnWho">{s0.who}</small></div>
+          </div>
+          <div class="tn-now"><span class="lb">Now</span><b id="tnNow">{s0.progs[0]}</b><span class="tn-k" id="tnKind">{s0.kind}</span></div>
+          <div class="nw-band" id="bTv" aria-hidden="true"><span class="nw-bl">TV</span><div class="bt"><div class="bk" id="bTvK" set:html={ticks(2, 69, 1, 10, (v) => (v - 2) / 68)} /><div class="bs" id="bTvS">{ie.stations.filter((s) => parseFloat(s.n) < 88).map((s) => <button type="button" tabindex="-1" data-cs={s.cs} class:list={{ on: s === s0 }} style={`left:${(pos(s.n) * 100).toFixed(2)}%;--k:${s.c}`} aria-label={`${s.n} ${s.cs}`}></button>)}</div><i class="nd" id="ndTv" style={`left:${pos(s0.n) * 100}%`}></i></div><span class="br">2&ndash;69</span></div>
+          <div class="nw-band" id="bFm" aria-hidden="true"><span class="nw-bl">FM</span><div class="bt"><div class="bk" id="bFmK" set:html={ticks(88, 108, 0.4, 2, (v) => (v - 88) / 20)} /><div class="bs" id="bFmS">{ie.stations.filter((s) => parseFloat(s.n) >= 88).map((s) => <button type="button" tabindex="-1" data-cs={s.cs} style={`left:${(pos(s.n) * 100).toFixed(2)}%;--k:${s.c}`} aria-label={`${s.n} ${s.cs}`}></button>)}</div><i class="nd idle" id="ndFm" style="left:20%"></i></div><span class="br">88&ndash;108</span></div>
+          <div class="tn-ctl"><button type="button" class="key" id="tnPrev" aria-label="Previous station"><Fragment set:html={AL} /></button><button type="button" class="tn-scan on" id="tnScan" aria-pressed="true"><i></i>Scanning</button><button type="button" class="key" id="tnNext" aria-label="Next station"><Fragment set:html={AR} /></button></div>
+          <p class="sr" id="tnSay" aria-live="polite"></p>
+          <Mf><span>Every number is unique in its market. Radio sits on even tenths, so no number matches a real FM station.</span></Mf>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="what">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="01" label="What it is" meta="Then and now" /><div class="cb"><h2>Old TV's best idea.<br />Open to everyone.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why a network" /><div class="cb end"><p class="lede">Broadcast TV had a schedule, a dial, local ads and shows that travelled. Then the internet gave everyone a channel and took all of that away. We kept what worked and dropped the licence.</p></div></Cell>
+        <Cell class="nw-cmp" d={12} role="table" aria-label="Broadcast TV, streaming platforms and the network, compared">
+          <div class="cm-r hd3" role="row"><span role="columnheader"><span class="sr">Question</span></span><span role="columnheader">Broadcast TV</span><span role="columnheader">Streaming platforms</span><span class="nw-us" role="columnheader">The network</span></div>
+          {COMPARE.map(([q, a, b, c]) => <div class="cm-r" role="row"><b role="rowheader">{q}</b><span role="cell">{a}</span><span role="cell">{b}</span><span class="nw-us" role="cell">{c}</span></div>)}
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="dial">
+      <Sheet>
+        <Cell class="hd" d={5} t={6}>
+          <Mh ix="02" label="The dial" meta="Numbers and call signs" />
+          <div class="cb"><h2>Every station<br />gets a number.</h2><p class="lede">A number you can remember and a call sign you can say out loud. It's how people find you again tomorrow.</p>
+            <div class="nw-cs" id="cs">
+              <label for="csIn" class="lb">Try a call sign</label>
+              <div class="nw-csin"><input id="csIn" type="text" maxlength="5" autocomplete="off" spellcheck="false" autocapitalize="characters" value={CHECK_START} aria-describedby="csOut" /><span class="nw-csch" id="csNum">{sug}</span></div>
+              <ul class="nw-csck" id="csCk">{check.rows.map((r) => <li class:list={{ no: !r.ok }}><i aria-hidden="true">{r.ok ? "✓" : "×"}</i><span class="sr">{r.ok ? "Yes: " : "No: "}</span>{r.text}</li>)}</ul>
+              <p class:list={["nw-csout", check.ok ? "ok" : "no"]} id="csOut" aria-live="polite">{check.message}</p>
+              <div class="acts nw-res" id="csGo" hidden={!check.ok}><Btn cta={claim({ number: sug, callSign: check.value })} live={sug} cur="Reserve" id="csRes">Reserve it</Btn></div>
+            </div></div>
+        </Cell>
+        <Cell class="rgl" d={7} t={6}>
+          <Mh label="How numbers work" meta="Five rules" />
+          <ol class="rg">{NUMBER_RULES.map(([h, t], k) => <li><i class="tab">{String(k + 1).padStart(2, "0")}</i><div><b>{h}</b><p>{t}</p></div></li>)}</ol>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="kinds">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="03" label="On the dial" meta="Who's who" /><div class="cb"><h2>Five kinds<br />of station.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Kinds" /><div class="cb end"><p class="lede">They share the dial, the guide and the remote. What differs is who runs them and where the money goes.</p></div></Cell>
+        {KINDS.map((k, i) => (
+          <Cell class="knd" d={i < 3 ? 4 : 6} t={i === 2 ? 6 : 3} m={2} style={`--c:${k.c}`}><div class="mh"><span><i class="sq"></i>{k.n}</span><span>{k.t}</span></div><div class="cb"><p>{k.p}</p></div><Mf><span class="tab">{k.e}</span></Mf></Cell>
+        ))}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="money">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="04" label="Money" meta="How it moves" /><div class="cb"><h2>Follow<br />the dollar.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="What we keep" /><div class="cb end"><p class="lede">We earn two ways: a small share of what stations earn, and what stations pay for the storage and relays they use. Being on the air is free. Here's where a hundred dollars goes.</p></div></Cell>
+        <Cell class="nw-fd" d={8} t={6} m={2}>
+          <div class="mh"><span>Per $100</span><span>Pick a kind of money</span></div>
+          <div class="fd-seg"><div class="seg2" id="fdSeg" role="group" aria-label="Kind of money">{DOLLAR.map((d, i) => <button type="button" data-i={i} class:list={{ on: i === 0 }} aria-pressed={i === 0 ? "true" : "false"}>{d.label}</button>)}</div></div>
+          <div class="cb">
+            <div class="fd-bar" id="fdBar" aria-hidden="true"><i class="fa" style={`flex:${d0.theirs}`}><span>${d0.theirs}</span></i><i class="fb" style={`flex:${d0.ours - d0.poolPart}`}><span>{d0.ours >= 10 ? `$${d0.ours}` : ""}</span></i><i class="fc" style={`flex:${d0.poolPart || 0.0001}${d0.poolPart ? "" : ";display:none"}`}><span></span></i></div>
+            <div class="fd-rows" aria-live="polite">
+              <div class="fd-r"><i style="--k:#5B7BE0"></i><span id="fdA">{d0.to}</span><b class="tab" id="fdAv">${d0.theirs.toFixed(2)}</b></div>
+              <div class="fd-r"><i style="--k:#EBA03A"></i><span>To the network, to run the dial</span><b class="tab" id="fdBv">${d0.ours.toFixed(2)}</b></div>
+              <div class="fd-r"><i class="pl"></i><span>Part of ours, back to stations through the pool</span><b class="tab" id="fdCv">{d0.pool ? "Shared monthly" : "Not from this kind"}</b></div>
+            </div>
+            <p class="fd-note" id="fdNote">{d0.note}</p>
+          </div>
+        </Cell>
+        <Cell class="use" d={4} t={6} m={2}>
+          <Mh label="What stations pay" meta="Pay as you go" />
+          <div class="cb"><div class="us-r us-big"><span>Being on the air</span><b>Free</b></div>{USAGE.map(([k, v]) => <div class="us-r"><span>{k}</span><b class="tab">{v}</b></div>)}<p class="us-n">{USAGE_NOTE}</p></div>
+        </Cell>
+        <Cell class="pool" d={12}>
+          <div class="mh"><span>The pool</span><span>On the 1st, for last month</span></div>
+          <div class="pl3">
+            <div style="--c:#5B7BE0"><small class="tab">01</small><b>An equal share</b><p>Split evenly between every station that aired last month. The smallest station gets what the biggest gets.</p></div>
+            <div style="--c:#EBA03A"><small class="tab">02</small><b>A watch-time share</b><p>Split by the minutes people spent watching each station. Good programming is paid for twice.</p></div>
+            <div style="--c:#C04A9E"><small class="tab">03</small><b>The creator fund</b><p>Grants for makers, approved in public by people who can't pay themselves or us.</p></div>
+          </div>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="locks">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="05" label="Escrow and the fund" meta="On-chain" /><div class="cb"><h2>Money we<br />can't touch.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why it's built this way" /><div class="cb end"><p class="lede">Earnings for creators who haven't joined yet, and the creator fund, sit in public contracts. They can pay a creator or a grant. There is no way for them to pay us.</p></div></Cell>
+        <Cell class="lk2" d={6} t={6} m={2}>
+          <div class="mh"><span>Paying a creator or a grant</span><span>2 of 3 keys</span></div>
+          <div class="cb"><div class="tl3" data-run aria-hidden="true">
+            <div class="t3 t3-keys"><b>Approve</b><span><i></i><i></i><i class="x"></i></span><small>Two of three people, held separately</small></div>
+            <div class="t3 t3-wait"><b>72 hours in public</b><span class="t3-tb"><i></i></span><small>Anyone can see it. Any one key can stop it</small></div>
+            <div class="t3 t3-done"><b>Paid</b><span class="t3-ok"></span><small>Only to the creator, or as a grant</small></div>
+          </div><p class="sr">Two of three people, held separately, approve it. It waits 72 hours in public, where any one key can stop it. Then it's paid, only to the creator or as a grant.</p></div>
+        </Cell>
+        <Cell class="lk2" d={6} t={6} m={2}>
+          <div class="mh"><span>Changing the contracts</span><span>7-day lock</span></div>
+          <div class="cb"><div class="tl3" data-run aria-hidden="true">
+            <div class="t3 t3-keys"><b>Proposed</b><span><i></i></span><small>By the network</small></div>
+            <div class="t3 t3-wait"><b>7 days in public</b><span class="t3-tb"><i></i></span><small>Every key holder can cancel it</small></div>
+            <div class="t3 t3-done"><b>Live</b><span class="t3-ok"></span><small>One honest key is enough to stop it</small></div>
+          </div><p class="sr">The network proposes it. It waits 7 days in public, where every key holder can cancel it. Then it's live; one honest key is enough to stop it.</p></div>
+        </Cell>
+        <Cell d={12}><div class="nw-facts">
+          <div><small>Unclaimed after</small><b class="tab">3 years</b><span>then it becomes grants</span></div>
+          <div><small>Can pay the network</small><b class="tab">Never</b><span>not a code path that exists</span></div>
+          <div><small>Paid into escrow</small><b class="tab">Weekly</b><span>after the same shares as any station</span></div>
+          <div><small>Anyone can read it</small><b class="tab">Always</b><span>every payment, on chain</span></div>
+        </div></Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="standards">
+      <Sheet>
+        <Cell class="hd" d={5} t={6}>
+          <Mh ix="06" label="Standards" meta="Seven of them" />
+          <div class="cb"><h2>Rules every<br />station keeps.</h2><p class="lede">Few of them, written plainly, the same for the biggest station and the smallest.</p>
+            <div class="rrec" aria-hidden="true"><div class="rr-h"><b>A rule change</b><span class="rr-ok"><i></i>Dated</span></div><div class="rr-l"><span>Takes effect</span><b>From a date, never before today</b></div><div class="rr-l"><span>Backdated</span><b>Never</b></div><div class="rr-l"><span>The old value</span><b>Kept, with who changed it</b></div><div class="rr-l"><span>Past statements</span><b>Read exactly as they did</b></div></div></div>
+        </Cell>
+        <Cell class="rgl" d={7} t={6}>
+          <Mh label="On every station" meta="For everyone" />
+          <ol class="rg">{STANDARDS.map(([h, t], k) => <li><i class="tab">{String(k + 1).padStart(2, "0")}</i><div><b>{h}</b><p>{t}</p></div></li>)}</ol>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="faq">
+      <Sheet>
+        <Cell class="where" d={5} t={6}>
+          <Mh ix="07" label="Where" meta="Markets we're filling first" />
+          <div class="cb"><div class="mk-l" id="mkList">{NET_MARKETS.map((m) => <div class="mk-r"><i class:list={{ soon: !m.on }} style={`--k:${m.c}`}></i><div><b>{m.n}</b><small>{m.d} · {m.stations.length} example stations</small></div><em class:list={{ on: m.on }}>{m.st}</em></div>)}</div></div>
+          <Mf><span>Markets are sets of ZIP codes. Your market decides which stations come first on your dial.</span></Mf>
+        </Cell>
+        <Cell class="faq" d={7} t={6}><Mh label="Questions people ask" meta={`${NETWORK_FAQ.length} answers`} /><Faq items={NETWORK_FAQ} /></Cell>
+      </Sheet>
+    </section>
+  </main>
   <Footer slot="footer"><FooterNetwork slot="first" /></Footer>
 </Base>
-<style>.shell{min-height:60svh}</style>
+<script>
+  import { initNetwork } from "../scripts/network/index";
+  initNetwork();
+</script>
+<style is:global>
+  /* The checker's Reserve it (open-questions Q7): the reference showed the free result as text only. */
+  .nw-res{margin-top:14px}
+</style>
+<style is:global>
+  /* The checker's grid column grew to the input's natural width (378px), past the cell at 390px and below. */
+  .nw-cs{grid-template-columns:minmax(0,1fr)}
+</style>
