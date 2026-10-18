@@ -2,6 +2,7 @@
 // packages/contracts (one file at a time, `@contracts/<file>`), so a call can't drift from what
 // the API mounts. Responses are parsed with the endpoint's schema. With no PUBLIC_API_URL, calls
 // are answered by the in-page mocks (src/mocks), so the site runs with no API.
+import "./zod";
 import { buildPath, ErrorResponse, type EndpointDef } from "@contracts/core";
 import type { z } from "zod";
 import { API_URL } from "../data/links";

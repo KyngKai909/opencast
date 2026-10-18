@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /_kit
+Sitemap: https://usedial.com/sitemap-index.xml

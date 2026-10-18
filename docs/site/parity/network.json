@@ -2,7 +2,7 @@
   "page": "network",
   "slug": "network",
   "route": "/network",
-  "generated": "2026-10-18T06:15:08.149Z",
+  "generated": "2026-10-18T07:29:31.483Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -724,7 +724,16 @@
         "matched": 29,
         "refCount": 30,
         "builtCount": 30,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Station",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "Overnight Crates",
@@ -742,7 +751,16 @@
         "matched": 29,
         "refCount": 30,
         "builtCount": 30,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Station",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "Overnight Crates",
@@ -760,7 +778,16 @@
         "matched": 29,
         "refCount": 30,
         "builtCount": 30,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Station",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "Overnight Crates",
@@ -1265,7 +1292,40 @@
         "matched": 25,
         "refCount": 26,
         "builtCount": 26,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1 BEAT, 24.1 REEL",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          },
+          {
+            "text": "Pomona Vinyl Club",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "18.1 SAZN",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "7.1 CIVC",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "60.1 OCAT",
@@ -1283,7 +1343,40 @@
         "matched": 25,
         "refCount": 26,
         "builtCount": 26,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1 BEAT, 24.1 REEL",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          },
+          {
+            "text": "Pomona Vinyl Club",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "18.1 SAZN",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "7.1 CIVC",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "60.1 OCAT",
@@ -1303,7 +1396,32 @@
         "matched": 42,
         "refCount": 42,
         "builtCount": 42,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1311,7 +1429,32 @@
         "matched": 43,
         "refCount": 43,
         "builtCount": 43,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1319,7 +1462,32 @@
         "matched": 43,
         "refCount": 43,
         "builtCount": 43,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }

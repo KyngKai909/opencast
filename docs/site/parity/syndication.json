@@ -2,7 +2,7 @@
   "page": "syndication",
   "slug": "syndication",
   "route": "/syndication",
-  "generated": "2026-10-18T06:13:02.979Z",
+  "generated": "2026-10-18T07:27:21.967Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -123,7 +123,7 @@
       "capture": "terms",
       "width": 1440,
       "mode": "element",
-      "mismatch": 1.19,
+      "mismatch": 1.35,
       "refSize": [
         1440,
         1763
@@ -167,7 +167,7 @@
       "capture": "escrow",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.1,
       "refSize": [
         1440,
         912
@@ -343,7 +343,7 @@
       "capture": "terms",
       "width": 820,
       "mode": "element",
-      "mismatch": 2.12,
+      "mismatch": 2.34,
       "refSize": [
         820,
         2208
@@ -387,7 +387,7 @@
       "capture": "escrow",
       "width": 820,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.13,
       "refSize": [
         820,
         1172
@@ -497,7 +497,7 @@
       "capture": "hero",
       "width": 390,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.02,
       "refSize": [
         390,
         1283
@@ -563,7 +563,7 @@
       "capture": "terms",
       "width": 390,
       "mode": "element",
-      "mismatch": 1.94,
+      "mismatch": 2.26,
       "refSize": [
         390,
         2770
@@ -607,7 +607,7 @@
       "capture": "escrow",
       "width": 390,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.29,
       "refSize": [
         390,
         1107
@@ -726,11 +726,68 @@
         "builtCount": 48,
         "mismatches": [
           {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "On air",
+            "n": 0,
+            "tag": "em",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "33.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "41.1",
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
+            ]
+          },
+          {
+            "text": "19.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "27.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
             ]
           },
           {
@@ -738,6 +795,7 @@
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
             ]
           },
@@ -746,6 +804,7 @@
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
             ]
           }
@@ -769,10 +828,51 @@
         "builtCount": 59,
         "mismatches": [
           {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "On air",
+            "n": 0,
+            "tag": "em",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "33.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "41.1",
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
             ]
           },
@@ -793,10 +893,27 @@
             ]
           },
           {
+            "text": "19.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "27.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "31.1",
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
             ]
           },
@@ -821,6 +938,7 @@
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
             ]
           }
@@ -844,12 +962,53 @@
         "builtCount": 67,
         "mismatches": [
           {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "On air",
+            "n": 0,
+            "tag": "em",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "33.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "41.1",
             "n": 0,
             "tag": "span",
             "diffs": [
               "x 1128→1125",
               "y 632→630",
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(224, 88, 58)→rgb(235, 160, 58)"
             ]
           },
@@ -879,12 +1038,29 @@
             ]
           },
           {
+            "text": "19.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "27.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "31.1",
             "n": 0,
             "tag": "span",
             "diffs": [
               "x 476→473",
               "y 1023→1020",
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(91, 123, 224)→rgb(52, 120, 198)"
             ]
           },
@@ -918,6 +1094,7 @@
             "n": 0,
             "tag": "span",
             "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgb(154, 156, 171)→rgb(47, 154, 114)"
             ]
           }
@@ -995,13 +1172,637 @@
         "builtCount": 149,
         "mismatches": [
           {
+            "text": "40%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "MESA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ORNG",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "LBCH",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VALE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "14.1",
             "n": 0,
             "tag": "b",
             "diffs": [
               "x 34→274",
               "y 2271→2315",
-              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "CIVC",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "NITE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "FLDR",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VOZE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ECHO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "CORT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "PASA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SURF",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SKAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "TIDE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "ROUT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "LOFI",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "64.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "DUNE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "11.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PALM",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "24.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "MOJO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "37.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FUZZ",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "50.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "VINE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "63.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "HALO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "10.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "GLOW",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "23.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ROOT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "36.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "BOLT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "49.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ARCO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "62.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "LUMA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "9.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FADE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "22.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "35.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "48.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "61.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 3,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "8.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 4,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "21.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 5,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "34.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 6,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "47.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 7,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "60.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 8,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "7.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 9,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "20.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 10,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "33.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 11,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "46.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 12,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "59.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 13,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "6.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 14,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "19.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 15,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
             ]
           }
         ],
@@ -1168,13 +1969,637 @@
         "builtCount": 154,
         "mismatches": [
           {
+            "text": "40%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "MESA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ORNG",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "LBCH",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VALE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "14.1",
             "n": 0,
             "tag": "b",
             "diffs": [
               "x 634→66",
               "y 1732→1832",
-              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "CIVC",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "NITE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "FLDR",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VOZE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ECHO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "CORT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "PASA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SURF",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SKAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "TIDE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "ROUT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "LOFI",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "64.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "DUNE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "11.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PALM",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "24.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "MOJO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "37.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FUZZ",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "50.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "VINE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "63.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "HALO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "10.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "GLOW",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "23.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ROOT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "36.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "BOLT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "49.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ARCO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "62.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "LUMA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "9.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FADE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "22.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "35.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "48.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "61.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 3,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "8.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 4,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "21.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 5,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "34.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 6,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "47.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 7,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "60.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 8,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "7.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 9,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "20.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 10,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "33.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 11,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "46.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 12,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "59.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 13,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "6.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 14,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "19.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 15,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
             ]
           }
         ],
@@ -1341,13 +2766,637 @@
         "builtCount": 154,
         "mismatches": [
           {
+            "text": "40%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60%",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "MESA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "41.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ORNG",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "LBCH",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VALE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
             "text": "14.1",
             "n": 0,
             "tag": "b",
             "diffs": [
               "x 1258→807",
               "y 1253→1353",
-              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42)"
+              "color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "CIVC",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "NITE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "FLDR",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "VOZE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "ECHO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "CORT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "PASA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SURF",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "SKAT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "TIDE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "ROUT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "LOFI",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "64.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "DUNE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "11.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "PALM",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "24.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "MOJO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "37.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FUZZ",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "50.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "VINE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "63.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "HALO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "10.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "GLOW",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "23.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ROOT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "36.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "BOLT",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "49.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "ARCO",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "62.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "LUMA",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "9.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62)"
+            ]
+          },
+          {
+            "text": "FADE",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "22.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "35.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "48.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "61.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 3,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "8.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 4,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "21.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 5,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "34.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 6,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "47.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 7,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "60.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 8,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "7.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 9,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "20.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 10,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "33.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 11,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "46.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 12,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "59.1",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 13,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "6.2",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 14,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
+            ]
+          },
+          {
+            "text": "19.3",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.22)→rgba(243, 234, 217, 0.54)"
+            ]
+          },
+          {
+            "text": "Open",
+            "n": 15,
+            "tag": "small",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.2)→rgba(243, 234, 217, 0.52)"
             ]
           }
         ],
@@ -1567,7 +3616,40 @@
         "matched": 20,
         "refCount": 20,
         "builtCount": 20,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "03a",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "03b",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1575,7 +3657,40 @@
         "matched": 21,
         "refCount": 21,
         "builtCount": 21,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "03a",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "03b",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1583,7 +3698,40 @@
         "matched": 21,
         "refCount": 21,
         "builtCount": 21,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "01",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "03a",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "03b",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }

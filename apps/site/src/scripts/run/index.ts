@@ -4,7 +4,7 @@ import { claim } from "../../data/links";
 import { compare, coverage, estimate, LIBRARY_STOPS, minutesLabel, money, size, type RelayMode } from "../../data/pricing";
 import { PICK_DEFAULT } from "../../data/run";
 import { takenBy } from "../../data/dial";
-import { checkCallSign, cleanCallSign } from "../../lib/callsign";
+import type { checkCallSign as Check } from "../../lib/callsign";
 import { clock, nowMinutes } from "../../lib/clock";
 import { initSliders } from "../../lib/slider";
 import { initChain } from "./chain";
@@ -163,11 +163,14 @@ function picker(): void {
   let sel = PICK_DEFAULT;
   pick.innerHTML = nums.map((n) => `<button type="button" data-n="${n}"${taken.has(n) ? ` disabled aria-label="${n} is taken"` : ` aria-pressed="${n === sel}"`}${n === sel ? ' class="on"' : ""}>${n}</button>`).join("");
   const claims = () => [...document.querySelectorAll<HTMLAnchorElement>("[data-claim], #claimBtn")];
-  const upd = () => {
-    const v = cleanCallSign(csIn.value);
+  // The call-sign rules (and zod, which they bring) load when someone first types.
+  let check: typeof Check | null = null;
+  const upd = async () => {
+    const v = csIn.value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 5);
     if (csIn.value !== v) csIn.value = v;
     csN.textContent = sel;
-    const c = checkCallSign(v, takenBy);
+    if (v && !check) check = (await import("../../lib/callsign")).checkCallSign;
+    const c = check ? check(v, takenBy) : { ok: false, taken: null, message: "" };
     if (!v || v.length < 3) {
       msg.textContent = "Three to five letters.";
       msg.className = "";
@@ -200,10 +203,10 @@ function picker(): void {
       const l = a.querySelector(".live");
       if (l) l.innerHTML = `<i></i>${sel}`;
     }
-    upd();
+    void upd();
   });
-  csIn.addEventListener("input", upd);
-  upd();
+  csIn.addEventListener("input", () => void upd());
+  void upd();
 }
 
 export function initRun(): void {

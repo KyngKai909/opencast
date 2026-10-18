@@ -14,6 +14,7 @@ import "@fontsource/vt323/latin-400.css";
 import "../styles/global.css";
 import display800 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-800-normal.woff2?url";
 import display900 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-900-normal.woff2?url";
+import text400 from "@fontsource/instrument-sans/files/instrument-sans-latin-400-normal.woff2?url";
 import Header from "../components/Header.astro";
 import WaitlistSheet from "../components/WaitlistSheet.astro";
 import type { PageKey } from "../data/links";
@@ -53,6 +54,8 @@ const og = page ? `https://usedial.com/og/${page}.png` : "https://usedial.com/og
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preload" href={display900} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={display800} as="font" type="font/woff2" crossorigin />
+    <!-- Body text: arriving late, it rewrapped the heroes' ledes a line shorter (a 25px shift). -->
+    <link rel="preload" href={text400} as="font" type="font/woff2" crossorigin />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Dial" />
     <meta property="og:title" content={title} />
@@ -66,6 +69,7 @@ const og = page ? `https://usedial.com/og/${page}.png` : "https://usedial.com/og
     <slot name="head" />
   </head>
   <body>
+    <a class="skip" href="#top" data-scroll-own>Skip to content</a>
     <div class="room" aria-hidden="true"></div>
     <div class="grain" id="grain" aria-hidden="true"></div>
     <div class="cur" id="cur" aria-hidden="true"><div class="r"><span id="curL">Tune</span></div><div class="d"></div></div>

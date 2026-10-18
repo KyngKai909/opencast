@@ -36,19 +36,6 @@ export function initWire(): void {
     next: 15 + i * 17
   }));
   let pic = fit($("wPic") as HTMLCanvasElement, 320);
-  const phone = matchMedia("(max-width:699px)");
-  const place = () => {
-    tiles.forEach((t, i) => {
-      if (phone.matches) {
-        t.el.style.left = `${12.5 + 25 * (i % 4)}%`;
-        t.el.style.top = `${i < 4 ? 62 : 85}%`;
-      } else {
-        const r = (t.c.a * Math.PI) / 180;
-        t.el.style.left = `${50 + 40 * Math.cos(r)}%`;
-        t.el.style.top = `${50 + 39 * Math.sin(r)}%`;
-      }
-    });
-  };
   const status = (t: Tile) => {
     const e = t.el.querySelector(".st")!;
     if (t.live) {
@@ -161,11 +148,9 @@ export function initWire(): void {
     for (const t of tiles) (t.live ? draw(t.surf.ctx, t.surf.w, t.surf.h, T, SOURCE) : noise(t.surf));
   };
 
-  place();
   size();
   tiles.forEach(status);
   addEventListener("resize", () => {
-    place();
     size();
     lines(performance.now());
     pictures(0);

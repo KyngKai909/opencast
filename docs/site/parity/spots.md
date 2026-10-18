@@ -1,6 +1,6 @@
 # Visual parity: spots (`/spots`)
 
-Generated 2026-10-18T06:14:06.789Z by `node apps/site/scripts/parity.mjs spots`.
+Generated 2026-10-18T07:28:27.354Z by `node apps/site/scripts/parity.mjs spots`.
 
 | Setting | Value |
 |---|---|
@@ -22,24 +22,24 @@ Status: ✅ ≤ 1% · ⚠️ ≤ 5% · ❌ > 5%. Images: reference | built | dif
 | header | 1440 | 0.03% | 68 / 68 | ✅ | [jpg](spots/header-1440.jpg) |
 | header | 820 | 0.00% | 68 / 68 | ✅ | [jpg](spots/header-820.jpg) |
 | header | 390 | 0.00% | 60 / 60 | ✅ | [jpg](spots/header-390.jpg) |
-| hero | 1440 | 0.25% | 1001 / 1001 | ✅ | [jpg](spots/hero-1440.jpg) |
-| hero | 820 | 0.69% | 1398 / 1398 | ✅ | [jpg](spots/hero-820.jpg) |
-| hero | 390 | 3.99% | 1211 / 1211 | ⚠️ | [jpg](spots/hero-390.jpg) |
+| hero | 1440 | 0.55% | 1001 / 1001 | ✅ | [jpg](spots/hero-1440.jpg) |
+| hero | 820 | 0.32% | 1398 / 1398 | ✅ | [jpg](spots/hero-820.jpg) |
+| hero | 390 | 4.01% | 1211 / 1211 | ⚠️ | [jpg](spots/hero-390.jpg) |
 | who | 1440 | 0.01% | 891 / 891 | ✅ | [jpg](spots/who-1440.jpg) |
 | who | 820 | 0.01% | 1490 / 1490 | ✅ | [jpg](spots/who-820.jpg) |
 | who | 390 | 0.03% | 1454 / 1454 | ✅ | [jpg](spots/who-390.jpg) |
-| plan | 1440 | 0.41% | 1296 / 1296 | ✅ | [jpg](spots/plan-1440.jpg) |
-| plan | 820 | 4.21% | 1958 / 2032 | ⚠️ | [jpg](spots/plan-820.jpg) |
-| plan | 390 | 4.63% | 1984 / 2056 | ⚠️ | [jpg](spots/plan-390.jpg) |
-| paid | 1440 | 0.00% | 1072 / 1072 | ✅ | [jpg](spots/paid-1440.jpg) |
-| paid | 820 | 0.00% | 1351 / 1351 | ✅ | [jpg](spots/paid-820.jpg) |
-| paid | 390 | 0.00% | 1428 / 1428 | ✅ | [jpg](spots/paid-390.jpg) |
-| customers | 1440 | 0.01% | 1048 / 1048 | ✅ | [jpg](spots/customers-1440.jpg) |
-| customers | 820 | 0.01% | 1539 / 1539 | ✅ | [jpg](spots/customers-820.jpg) |
-| customers | 390 | 0.02% | 1319 / 1319 | ✅ | [jpg](spots/customers-390.jpg) |
+| plan | 1440 | 0.70% | 1296 / 1296 | ✅ | [jpg](spots/plan-1440.jpg) |
+| plan | 820 | 4.50% | 1958 / 2032 | ⚠️ | [jpg](spots/plan-820.jpg) |
+| plan | 390 | 5.22% | 1984 / 2056 | ❌ | [jpg](spots/plan-390.jpg) |
+| paid | 1440 | 0.02% | 1072 / 1072 | ✅ | [jpg](spots/paid-1440.jpg) |
+| paid | 820 | 0.03% | 1351 / 1351 | ✅ | [jpg](spots/paid-820.jpg) |
+| paid | 390 | 0.05% | 1428 / 1428 | ✅ | [jpg](spots/paid-390.jpg) |
+| customers | 1440 | 0.03% | 1048 / 1048 | ✅ | [jpg](spots/customers-1440.jpg) |
+| customers | 820 | 0.03% | 1539 / 1539 | ✅ | [jpg](spots/customers-820.jpg) |
+| customers | 390 | 0.09% | 1319 / 1319 | ✅ | [jpg](spots/customers-390.jpg) |
 | ways | 1440 | 0.01% | 1045 / 1045 | ✅ | [jpg](spots/ways-1440.jpg) |
 | ways | 820 | 0.01% | 1577 / 1577 | ✅ | [jpg](spots/ways-820.jpg) |
-| ways | 390 | 0.01% | 1480 / 1480 | ✅ | [jpg](spots/ways-390.jpg) |
+| ways | 390 | 0.02% | 1480 / 1480 | ✅ | [jpg](spots/ways-390.jpg) |
 | rules | 1440 | 0.00% | 838 / 838 | ✅ | [jpg](spots/rules-1440.jpg) |
 | rules | 820 | 0.01% | 1251 / 1251 | ✅ | [jpg](spots/rules-820.jpg) |
 | rules | 390 | 0.01% | 1370 / 1370 | ✅ | [jpg](spots/rules-390.jpg) |
@@ -70,10 +70,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### hero
 
-<details><summary>1440: 33/35 matched · 1 with differences · 2 ref-only · 2 built-only</summary>
+<details><summary>1440: 33/35 matched · 2 with differences · 2 ref-only · 2 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 | Bumper | em/span | x 759→650; y 665→559; w 43→74; h 13→23; size 11.5px→11px; weight 600→700; lh 12.65px→11px; ls 0px→1.32px; tt none→uppercase; bg rgba(0, 0, 0, 0)→rgba(10, 7, 20, 0.78) |
 
 **Only in reference:**
@@ -88,10 +89,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 33/35 matched · 1 with differences · 2 ref-only · 2 built-only</summary>
+<details><summary>820: 33/35 matched · 2 with differences · 2 ref-only · 2 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 | Bumper | em/span | x 157→47; y 1115→1009; w 43→74; h 13→23; size 11.5px→11px; weight 600→700; lh 12.65px→11px; ls 0px→1.32px; tt none→uppercase; bg rgba(0, 0, 0, 0)→rgba(10, 7, 20, 0.78) |
 
 **Only in reference:**
@@ -106,15 +108,19 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 24/29 matched · 0 with differences · 5 ref-only · 4 built-only</summary>
+<details><summary>390: 24/29 matched · 1 with differences · 5 ref-only · 4 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
 - Your spot, :15
 - 8:14:23
-- 34
+- 33
 - Counting the room
-- $0.27
+- $0.26
 
 **Only in built:**
 
@@ -141,7 +147,21 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### plan
 
-<details><summary>1440: 83/84 matched · 0 with differences · 1 ref-only · 3 built-only</summary>
+<details><summary>1440: 83/84 matched · 11 with differences · 1 ref-only · 3 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1) |
+| REEL | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
+| 13 mi | span | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1) |
+| 15 mi | span | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1) |
+| PREP | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
+| 22 mi | span | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
 
 **Only in reference:**
 
@@ -155,10 +175,18 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 74/75 matched · 1 with differences · 1 ref-only · 3 built-only</summary>
+<details><summary>820: 74/75 matched · 9 with differences · 1 ref-only · 3 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1) |
+| REEL | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1) |
+| PREP | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
 | Held to your most per day of $15. Raise it to air more often. | span | y 1865→1939 |
 
 **Only in reference:**
@@ -173,10 +201,18 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 73/74 matched · 1 with differences · 1 ref-only · 3 built-only</summary>
+<details><summary>390: 73/74 matched · 9 with differences · 1 ref-only · 3 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1) |
+| REEL | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1) |
+| PREP | b | color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66) |
 | Held to your most per day of $15. Raise it to air more often. | span | y 1895→1967 |
 
 **Only in reference:**
@@ -193,43 +229,85 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### paid
 
-<details><summary>1440: 42/42 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 42/42 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 268 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 44 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>820: 42/42 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 42/42 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 268 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 44 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>390: 40/40 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 40/40 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 268 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 44 (#2) | i | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
 ### customers
 
-<details><summary>1440: 39/39 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 39/39 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Show this code | small | color rgb(27, 11, 6)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>820: 39/39 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 39/39 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Show this code | small | color rgb(27, 11, 6)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>390: 38/38 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 38/38 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Show this code | small | color rgb(27, 11, 6)→rgb(0, 0, 0) |
 
 </details>
 
 ### ways
 
-<details><summary>1440: 35/35 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 35/35 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| :15 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>820: 35/35 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 35/35 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| :15 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
-<details><summary>390: 31/31 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 31/31 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| :15 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
@@ -299,3 +377,4 @@ Phase 2 STOP, 2026-10-17. Every section is at most 0.7% except the hero at 390 a
   - The planner's stats are a polite live region, not the whole list.
   - The control room sizes to its box at devicePixelRatio and draws one still under reduced motion (the reference kept redrawing at 45 ms).
 - **Money is computed** from $8 per 1,000: the receipts' $2.50 and $2.70, the room's $2.50 a spot, $147.36 spent and $3.59 a customer.
+- **Phase 4 (contrast, Q15; plan up to 5.2% at 390):** spots that won't air keep a solid row with a grey badge instead of the whole row at 42% opacity, and every badge, the playhead clock and the :15 bar have black text. That takes the planner at 390 from 4.6% to 5.2%, all in the out rows.

@@ -2,7 +2,7 @@
   "page": "spots",
   "slug": "spots",
   "route": "/spots",
-  "generated": "2026-10-18T06:14:06.789Z",
+  "generated": "2026-10-18T07:28:27.354Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -57,7 +57,7 @@
       "capture": "hero",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.25,
+      "mismatch": 0.55,
       "refSize": [
         1440,
         1001
@@ -101,7 +101,7 @@
       "capture": "plan",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.41,
+      "mismatch": 0.7,
       "refSize": [
         1440,
         1296
@@ -123,7 +123,7 @@
       "capture": "paid",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.02,
       "refSize": [
         1440,
         1072
@@ -145,7 +145,7 @@
       "capture": "customers",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.03,
       "refSize": [
         1440,
         1048
@@ -277,7 +277,7 @@
       "capture": "hero",
       "width": 820,
       "mode": "element",
-      "mismatch": 0.69,
+      "mismatch": 0.32,
       "refSize": [
         820,
         1398
@@ -321,7 +321,7 @@
       "capture": "plan",
       "width": 820,
       "mode": "element",
-      "mismatch": 4.21,
+      "mismatch": 4.5,
       "refSize": [
         820,
         1958
@@ -343,7 +343,7 @@
       "capture": "paid",
       "width": 820,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.03,
       "refSize": [
         820,
         1351
@@ -365,7 +365,7 @@
       "capture": "customers",
       "width": 820,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.03,
       "refSize": [
         820,
         1539
@@ -497,7 +497,7 @@
       "capture": "hero",
       "width": 390,
       "mode": "element",
-      "mismatch": 3.99,
+      "mismatch": 4.01,
       "refSize": [
         390,
         1211
@@ -541,7 +541,7 @@
       "capture": "plan",
       "width": 390,
       "mode": "element",
-      "mismatch": 4.63,
+      "mismatch": 5.22,
       "refSize": [
         390,
         1984
@@ -563,7 +563,7 @@
       "capture": "paid",
       "width": 390,
       "mode": "element",
-      "mismatch": 0,
+      "mismatch": 0.05,
       "refSize": [
         390,
         1428
@@ -585,7 +585,7 @@
       "capture": "customers",
       "width": 390,
       "mode": "element",
-      "mismatch": 0.02,
+      "mismatch": 0.09,
       "refSize": [
         390,
         1319
@@ -607,7 +607,7 @@
       "capture": "ways",
       "width": 390,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.02,
       "refSize": [
         390,
         1480
@@ -724,7 +724,16 @@
         "matched": 24,
         "refCount": 29,
         "builtCount": 28,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "Your spot, :15",
@@ -735,7 +744,7 @@
             "count": 1
           },
           {
-            "t": "34",
+            "t": "33",
             "count": 1
           },
           {
@@ -743,7 +752,7 @@
             "count": 1
           },
           {
-            "t": "$0.27",
+            "t": "$0.26",
             "count": 1
           }
         ],
@@ -771,6 +780,14 @@
         "refCount": 35,
         "builtCount": 35,
         "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
           {
             "text": "Bumper",
             "n": 0,
@@ -815,6 +832,14 @@
         "refCount": 35,
         "builtCount": 35,
         "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
           {
             "text": "Bumper",
             "n": 0,
@@ -888,6 +913,73 @@
         "builtCount": 76,
         "mismatches": [
           {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
             "text": "Held to your most per day of $15. Raise it to air more often.",
             "n": 0,
             "tag": "span",
@@ -923,6 +1015,73 @@
         "builtCount": 77,
         "mismatches": [
           {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
             "text": "Held to your most per day of $15. Raise it to air more often.",
             "n": 0,
             "tag": "span",
@@ -956,7 +1115,99 @@
         "matched": 83,
         "refCount": 84,
         "builtCount": 86,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(217, 138, 43)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "REEL",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
+            "text": "13 mi",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(154, 156, 171)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "15 mi",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(52, 120, 198)→rgba(243, 234, 217, 0.1)"
+            ]
+          },
+          {
+            "text": "PREP",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "color rgb(243, 234, 217)→rgba(243, 234, 217, 0.66)"
+            ]
+          },
+          {
+            "text": "22 mi",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -984,7 +1235,32 @@
         "matched": 40,
         "refCount": 40,
         "builtCount": 40,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "268",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "44",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -992,7 +1268,32 @@
         "matched": 42,
         "refCount": 42,
         "builtCount": 42,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "268",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "44",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1000,7 +1301,32 @@
         "matched": 42,
         "refCount": 42,
         "builtCount": 42,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "268",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "44",
+            "n": 1,
+            "tag": "i",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }
@@ -1010,7 +1336,16 @@
         "matched": 38,
         "refCount": 38,
         "builtCount": 38,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Show this code",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(27, 11, 6)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1018,7 +1353,16 @@
         "matched": 39,
         "refCount": 39,
         "builtCount": 39,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Show this code",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(27, 11, 6)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1026,7 +1370,16 @@
         "matched": 39,
         "refCount": 39,
         "builtCount": 39,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Show this code",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgb(27, 11, 6)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }
@@ -1036,7 +1389,16 @@
         "matched": 31,
         "refCount": 31,
         "builtCount": 31,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": ":15",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1044,7 +1406,16 @@
         "matched": 35,
         "refCount": 35,
         "builtCount": 35,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": ":15",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1052,7 +1423,16 @@
         "matched": 35,
         "refCount": 35,
         "builtCount": 35,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": ":15",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }

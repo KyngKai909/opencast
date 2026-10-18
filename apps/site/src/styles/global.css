@@ -1,5 +1,6 @@
 /* The global layers, in the reference's cascade order (SITE-SPEC §2). Page and component styles
    are scoped to their Astro components and load after these. */
+@import "./fonts.css";
 @import "./tokens.css";
 @import "./ref/head.css";
 @import "./ref/polish.css";
@@ -32,3 +33,58 @@ html.lenis,html.lenis body{height:auto}
    390px and below, the market buttons and the call-sign checker pushed the page sideways. Rows
    that are wider than the cell (#tnMk, #fdSeg) already scroll inside it. */
 .sheet > .cell{min-width:0}
+
+/* Reduced motion: nothing moves on its own. The crawl and the tickers stand still, blinks and
+   pulses stop, reveals land at once; scripts draw their still frames (src/lib/motion.ts). */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+  .crawl .track{animation:none!important;transform:none!important}
+}
+
+/* Skip to the page's content, for keyboards. */
+.skip{position:fixed;left:12px;top:-60px;z-index:95;padding:10px 16px;border-radius:999px;background:var(--glow);color:#140F24;font:700 14px var(--text);text-decoration:none;transition:top .2s}
+.skip:focus{top:12px}
+
+/* The rail's links showed focus only through the sliding indicator (nav.css set outline:none). */
+.nl2 a:focus-visible{outline:2px solid var(--glow);outline-offset:2px;border-radius:999px}
+
+/* Contrast (WCAG AA, 4.5:1; docs/site/open-questions.md Q5, Q15). The reference put white text on
+   the station colours, which only PREP passes; black passes on every one of them and on the tally
+   red, so text on a colour fill is black. Selectors start at html to outrank the page
+   stylesheets, which load after this one. */
+:root{--on-c:#000}
+html .badge,html .t-bar i:not(.sh),html .vw-bar i:not(.nb),html .sx-t .st.on,html .sgrid i.on b,html .sgrid i.on small,html .cmp thead .us,html .g-now span,html .mc-steps button.on,html .mc-steps button.on i,html .ec-mid small,html .cr-ph b,html .len i:first-child,html .st-mark.on span{color:var(--on-c)}
+html .ec-mid small{opacity:1}
+/* The lower third's number sits on BEAT's darker tint, where white passes and .85 white didn't. */
+html .lt-num,html .hui .lt-num{color:#fff}
+/* Text in a station colour on night or a station-tinted panel: BEAT and PREP (and NITE on its own
+   tint) were under 4.5:1. 13% cream lifts every colour past it and barely moves the ones that
+   already passed. */
+html .stn .mh .ch,html .knd .mf,html .tn-k,html .pl3 small,html .fl-n small{color:color-mix(in srgb,var(--c) 87%,#F3EAD9)}
+html .fl-n.dim2{opacity:1}
+/* Dim text raised to the 50% cream that passes on night and the panels. */
+html .mani .w{color:rgb(243 234 217 / .5)}
+html .tl-names span{color:rgb(167 159 191 / .82)}
+html .g-p.past{color:rgb(243 234 217 / .56)}
+html .g-p.past small{color:rgb(167 159 191 / .74)}
+html .eps li.d{color:rgb(243 234 217 / .56)}
+html .sgrid i b{color:rgb(243 234 217 / .62)}
+html .sgrid i small{color:rgb(243 234 217 / .56)}
+html .sgrid i.open b{color:rgb(243 234 217 / .54)}
+html .sgrid i.open small{color:rgb(243 234 217 / .52)}
+/* Spots that won't air were the whole row at 42% opacity; now the row stays solid and greys out
+   its badge, so its text can pass. */
+html .pr.out{opacity:1}
+html .pr.out .badge{background:rgb(243 234 217 / .1)!important;color:var(--muted)}
+html .pr.out .pr-id b{color:rgb(243 234 217 / .66)}
+html .pr.out .d,html .pr.out .v small{color:var(--muted)}
+
+/* Layout shift (Phase 4). Syndication's carriers are placed by CSS from positions in the markup
+   (the script used to place them after load, so they jumped). The power-on line grew from the
+   middle of a grid, which moved its box on every frame; it's anchored at the middle now and only
+   its height changes. */
+html .sx-t{left:var(--x);top:var(--y)}
+@media (max-width:699px){ html .sx-t{left:var(--px);top:var(--py)} }
+html .power i{position:absolute;left:0;top:50%;translate:0 -50%}
+/* The dial's station marks were 7px wide on phones (the label hides); 24px is the smallest target. */
+html .st-mark{min-width:24px;min-height:24px}

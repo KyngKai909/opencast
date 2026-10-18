@@ -2,7 +2,7 @@
   "page": "run",
   "slug": "run",
   "route": "/run",
-  "generated": "2026-10-18T06:11:52.820Z",
+  "generated": "2026-10-18T07:26:11.586Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -100,7 +100,7 @@
       "capture": "control",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.03,
       "refSize": [
         1440,
         1846
@@ -122,7 +122,7 @@
       "capture": "switch@0",
       "width": 1440,
       "mode": "tall",
-      "mismatch": 0.01,
+      "mismatch": 0.03,
       "refSize": [
         1440,
         900
@@ -144,7 +144,7 @@
       "capture": "switch@50",
       "width": 1440,
       "mode": "tall",
-      "mismatch": 0.02,
+      "mismatch": 0.03,
       "refSize": [
         1440,
         900
@@ -298,7 +298,7 @@
       "capture": "hero",
       "width": 820,
       "mode": "element",
-      "mismatch": 2.75,
+      "mismatch": 2.63,
       "refSize": [
         820,
         1616
@@ -342,7 +342,7 @@
       "capture": "control",
       "width": 820,
       "mode": "element",
-      "mismatch": 0.01,
+      "mismatch": 0.05,
       "refSize": [
         820,
         2153
@@ -364,7 +364,7 @@
       "capture": "switch@0",
       "width": 820,
       "mode": "tall",
-      "mismatch": 0.01,
+      "mismatch": 0.04,
       "refSize": [
         820,
         1180
@@ -386,7 +386,7 @@
       "capture": "switch@50",
       "width": 820,
       "mode": "tall",
-      "mismatch": 0.01,
+      "mismatch": 0.04,
       "refSize": [
         820,
         1180
@@ -584,7 +584,7 @@
       "capture": "control",
       "width": 390,
       "mode": "element",
-      "mismatch": 0.03,
+      "mismatch": 0.07,
       "refSize": [
         390,
         2950
@@ -606,7 +606,7 @@
       "capture": "switch@0",
       "width": 390,
       "mode": "tall",
-      "mismatch": 0.03,
+      "mismatch": 0.21,
       "refSize": [
         390,
         844
@@ -788,15 +788,23 @@
       "390": {
         "matched": 38,
         "refCount": 44,
-        "builtCount": 49,
+        "builtCount": 44,
         "mismatches": [
+          {
+            "text": "02 Prepare",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0)",
+              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
+            ]
+          },
           {
             "text": "03 Schedule",
             "n": 0,
             "tag": "button",
             "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
-              "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
             ]
           },
           {
@@ -837,43 +845,27 @@
         ],
         "builtOnly": [
           {
-            "t": "Fri",
+            "t": "Before",
             "count": 1
           },
           {
-            "t": "Crate Session",
+            "t": "After",
             "count": 1
           },
           {
-            "t": "● Beat Tape Live",
+            "t": "1080i → 1080p",
             "count": 1
           },
           {
-            "t": "Overnight Crates",
-            "count": 2
-          },
-          {
-            "t": "Sat",
+            "t": "Prepared once, on our side",
             "count": 1
           },
           {
-            "t": "Guest Mix",
+            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
             "count": 1
           },
           {
-            "t": "Late Crate",
-            "count": 1
-          },
-          {
-            "t": "A real schedule",
-            "count": 1
-          },
-          {
-            "t": "Your week, by the hour. Live shows get a slot and replays fill the gaps.",
-            "count": 1
-          },
-          {
-            "t": "7 days ahead",
+            "t": "Once per file",
             "count": 1
           }
         ]
@@ -881,23 +873,31 @@
       "820": {
         "matched": 44,
         "refCount": 50,
-        "builtCount": 55,
+        "builtCount": 50,
         "mismatches": [
+          {
+            "text": "02 Prepare",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0)",
+              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgb(91, 123, 224)→rgb(0, 0, 0)"
+            ]
+          },
           {
             "text": "03 Schedule",
             "n": 0,
             "tag": "button",
             "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
-              "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
-            ]
-          },
-          {
-            "text": "03",
-            "n": 0,
-            "tag": "i",
-            "diffs": [
-              "color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75)"
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
             ]
           },
           {
@@ -924,7 +924,7 @@
             "count": 1
           },
           {
-            "t": "Spot · Redlands Hardware",
+            "t": "Spot · Juniper Barber",
             "count": 1
           },
           {
@@ -946,43 +946,27 @@
         ],
         "builtOnly": [
           {
-            "t": "Fri",
+            "t": "Before",
             "count": 1
           },
           {
-            "t": "Crate Session",
+            "t": "After",
             "count": 1
           },
           {
-            "t": "● Beat Tape Live",
+            "t": "1080i → 1080p",
             "count": 1
           },
           {
-            "t": "Overnight Crates",
-            "count": 2
-          },
-          {
-            "t": "Sat",
+            "t": "Prepared once, on our side",
             "count": 1
           },
           {
-            "t": "Guest Mix",
+            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
             "count": 1
           },
           {
-            "t": "Late Crate",
-            "count": 1
-          },
-          {
-            "t": "A real schedule",
-            "count": 1
-          },
-          {
-            "t": "Your week, by the hour. Live shows get a slot and replays fill the gaps.",
-            "count": 1
-          },
-          {
-            "t": "7 days ahead",
+            "t": "Once per file",
             "count": 1
           }
         ]
@@ -997,7 +981,7 @@
             "n": 0,
             "tag": "button",
             "diffs": [
-              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0)",
               "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
             ]
           },
@@ -1006,7 +990,7 @@
             "n": 0,
             "tag": "i",
             "diffs": [
-              "color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75)"
+              "color rgb(47, 154, 114)→rgb(0, 0, 0)"
             ]
           },
           {
@@ -1033,7 +1017,7 @@
             "count": 1
           },
           {
-            "t": "Spot · Redlands Hardware",
+            "t": "Spot · Juniper Barber",
             "count": 1
           },
           {
@@ -1166,7 +1150,24 @@
         "matched": 117,
         "refCount": 117,
         "builtCount": 117,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "S2 E4",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "S2 E5",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1174,7 +1175,24 @@
         "matched": 118,
         "refCount": 118,
         "builtCount": 118,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "S2 E4",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "S2 E5",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1182,7 +1200,24 @@
         "matched": 118,
         "refCount": 118,
         "builtCount": 118,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "S2 E4",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "S2 E5",
+            "n": 0,
+            "tag": "li",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }
@@ -1202,6 +1237,7 @@
               "y 407→395",
               "w 26→135",
               "h 22→47",
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
             ]
           }
@@ -1223,6 +1259,7 @@
               "y 479→467",
               "w 26→165",
               "h 22→47",
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
             ]
           }
@@ -1244,6 +1281,7 @@
               "y 455→443",
               "w 26→290",
               "h 22→47",
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)",
               "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
             ]
           }

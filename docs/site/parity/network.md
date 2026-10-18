@@ -1,6 +1,6 @@
 # Visual parity: network (`/network`)
 
-Generated 2026-10-18T06:15:08.149Z by `node apps/site/scripts/parity.mjs network`.
+Generated 2026-10-18T07:29:31.483Z by `node apps/site/scripts/parity.mjs network`.
 
 | Setting | Value |
 |---|---|
@@ -70,7 +70,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### hero
 
-<details><summary>1440: 29/30 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>1440: 29/30 matched · 1 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Station | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 **Only in reference:**
 
@@ -82,7 +86,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 29/30 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>820: 29/30 matched · 1 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Station | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 **Only in reference:**
 
@@ -94,7 +102,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 29/30 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>390: 29/30 matched · 1 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Station | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 **Only in reference:**
 
@@ -227,7 +239,14 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### kinds
 
-<details><summary>1440: 25/26 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>1440: 25/26 matched · 4 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 BEAT, 24.1 REEL | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
+| Pomona Vinyl Club | span | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 18.1 SAZN | span | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 7.1 CIVC | span | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
 
 **Only in reference:**
 
@@ -239,7 +258,14 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 25/26 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>820: 25/26 matched · 4 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 BEAT, 24.1 REEL | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
+| Pomona Vinyl Club | span | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 18.1 SAZN | span | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 7.1 CIVC | span | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
 
 **Only in reference:**
 
@@ -257,15 +283,33 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### money
 
-<details><summary>1440: 43/43 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 43/43 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 02 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 03 | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
-<details><summary>820: 43/43 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 43/43 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 02 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 03 | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
-<details><summary>390: 42/42 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 42/42 matched · 3 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 02 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 03 | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
@@ -394,3 +438,4 @@ Phase 2 STOP, 2026-10-17. Every section is at most 0.2% at 1440 and 820 except d
 - **390, every section below dial (1.9–7.0%): the overflow fix.** The reference's page was 410px wide at 390, because the checker and the market buttons pushed it sideways. The build fits the 390px viewport (`.sheet > .cell{min-width:0}`, the checker's grid column). Everything below dial moves by a pixel, and the fixed background tint lands differently. The element diffs match on every text.
 - **faq (7.0% at 390): Q13.** High Desert reads "Later" (the reference said "Opening first", against the FAQ). The shorter label lets the line fit, and the list is 19px shorter.
 - **The tuner** reads its markets from the one station list (dial.ts). A change you make is announced; scanning isn't.
+- **Phase 4 (contrast, Q15):** the kinds' example lines, the tuner's kind tag and the pool's numbers are 13% lighter (BEAT's pink was under 4.5:1). No section moved.

@@ -1,0 +1,11 @@
+/* Fallback faces sized to the web fonts (measured in Chrome against Arial and Courier New), so text
+   takes the same room before and after the fonts load: no layout shift from fonts. */
+@font-face{font-family:"Big Shoulders Display Fallback";font-weight:900;src:local("Arial Bold");size-adjust:79.28%;ascent-override:123.61%;descent-override:26.49%;line-gap-override:0%}
+@font-face{font-family:"Big Shoulders Display Fallback";font-weight:800;src:local("Arial Bold");size-adjust:74.30%;ascent-override:131.90%;descent-override:28.26%;line-gap-override:0%}
+@font-face{font-family:"Big Shoulders Display Fallback";font-weight:700;src:local("Arial Bold");size-adjust:69.31%;ascent-override:141.39%;descent-override:30.30%;line-gap-override:0%}
+@font-face{font-family:"Big Shoulders Display Fallback";font-weight:500;src:local("Arial");size-adjust:64.95%;ascent-override:150.89%;descent-override:32.33%;line-gap-override:0%}
+@font-face{font-family:"Instrument Sans Fallback";font-weight:400;src:local("Arial");size-adjust:98.83%;ascent-override:98.15%;descent-override:25.30%;line-gap-override:0%}
+@font-face{font-family:"Instrument Sans Fallback";font-weight:500;src:local("Arial");size-adjust:99.75%;ascent-override:97.24%;descent-override:25.06%;line-gap-override:0%}
+@font-face{font-family:"Instrument Sans Fallback";font-weight:600;src:local("Arial Bold");size-adjust:95.90%;ascent-override:101.15%;descent-override:26.07%;line-gap-override:0%}
+@font-face{font-family:"Instrument Sans Fallback";font-weight:700;src:local("Arial Bold");size-adjust:96.78%;ascent-override:100.23%;descent-override:25.83%;line-gap-override:0%}
+@font-face{font-family:"VT323 Fallback";font-weight:400;src:local("Courier New");size-adjust:66.66%;ascent-override:120.01%;descent-override:30.00%;line-gap-override:0%}

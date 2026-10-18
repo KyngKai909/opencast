@@ -2,6 +2,7 @@
 // request D3 in docs/contract-requests.md. Declared here with the contracts' own helper so the
 // client and the mock read it the same way; until it lands the mock answers it, and with a real
 // API the site falls back to opening a mailto: to the desk.
+import "../lib/zod";
 import { z } from "zod";
 import { endpoint } from "@contracts/core";
 

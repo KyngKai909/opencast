@@ -21,6 +21,12 @@ export function trapFocus(el: HTMLElement, onEscape: () => void): Trap {
     if (!list.length) return;
     const first = list[0]!;
     const last = list[list.length - 1]!;
+    // Focus that slipped outside (or never got in) comes back.
+    if (!el.contains(document.activeElement)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+      return;
+    }
     if (e.shiftKey && (document.activeElement === first || !el.contains(document.activeElement))) {
       e.preventDefault();
       last.focus();
@@ -30,7 +36,10 @@ export function trapFocus(el: HTMLElement, onEscape: () => void): Trap {
     }
   };
   document.addEventListener("keydown", onKey);
-  requestAnimationFrame(() => items()[0]?.focus());
+  // Containers that fade in may not be focusable on the next frame; try again shortly after.
+  const into = () => !el.contains(document.activeElement) && items()[0]?.focus();
+  requestAnimationFrame(into);
+  setTimeout(into, 60);
   return {
     release() {
       document.removeEventListener("keydown", onKey);

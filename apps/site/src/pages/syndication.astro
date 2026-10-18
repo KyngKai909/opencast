@@ -3,6 +3,7 @@
 // offer, fits (the market), terms (with the earnings calculator), rights, escrow, outlets, faq.
 // Behaviour: src/scripts/syndication/index.ts.
 import Base from "../layouts/Base.astro";
+import { faqPage } from "../lib/ld";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/syndication.css";
 import Btn from "../components/Btn.astro";
@@ -23,6 +24,12 @@ const CV = `<svg class="cv" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8
 const est = carriage(D);
 const progs = filterPrograms(FILTER_START);
 const markets = new Set(CARRIERS.map((c) => c.place)).size;
+/** Where a carrier sits on the wire: on a ring around the source, or in two rows of four on a
+ * phone. In the markup, so the tiles don't jump into place when the script runs. */
+const tilePos = (a: number, i: number) => {
+  const r = (a * Math.PI) / 180, f = (n: number) => `${+n.toFixed(3)}%`;
+  return `--x:${f(50 + 40 * Math.cos(r))};--y:${f(50 + 39 * Math.sin(r))};--px:${f(12.5 + 25 * (i % 4))};--py:${i < 4 ? 62 : 85}%`;
+};
 const keys = Object.keys(FILTER_OPTIONS) as FilterKey[];
 const p = (v: number, min: number, max: number) => `--p:${((v - min) / (max - min)) * 100}%`;
 const offer = offerShow();
@@ -30,6 +37,7 @@ const lenLabel = (len: number) => (len >= 120 ? "2 h" : `${len} min`);
 const termsLabel = { cash: "Cash", share: "Revenue share", free: "Free" } as const;
 ---
 <Base page="syndication" st="#EBA03A">
+  <script slot="head" type="application/ld+json" set:html={faqPage(SYND_FAQ)} />
   <main id="top">
     <section class="blk rhero sx-hero" id="hero">
       <Sheet>
@@ -52,7 +60,7 @@ const termsLabel = { cash: "Cash", share: "Revenue share", free: "Free" } as con
               <div class="sx-hub-t"><small>From {SOURCE.n} {SOURCE.cs}, a family kitchen in Fontana</small><b>Tamales for forty</b><span>26 episodes of 30 min</span></div>
             </div>
             {CARRIERS.map((c, i) => (
-              <div class:list={["sx-t", { live: i % 3 === 0 }]} style={`--c:${c.c}`} data-i={i}>
+              <div class:list={["sx-t", { live: i % 3 === 0 }]} style={`--c:${c.c};${tilePos(c.a, i)}`} data-i={i}>
                 <div class="ts"><canvas aria-hidden="true"></canvas><span class="badge" style={`background:${c.c}`}>{c.n}</span><em class:list={["st", { on: i % 3 === 0 }]}>{i % 3 === 0 ? "On air" : `In ${15 + i * 17} min`}</em></div>
                 <div class="tm"><b>{c.cs}</b><small>{c.place}</small></div>
                 <div class="tt">{c.tv}</div>

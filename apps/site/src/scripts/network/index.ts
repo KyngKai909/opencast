@@ -3,7 +3,6 @@
 import { claim } from "../../data/links";
 import { IE_NUMBERS, takenBy } from "../../data/dial";
 import { DOLLAR, NET_MARKETS } from "../../data/network";
-import { checkCallSign, suggestNumber } from "../../lib/callsign";
 import { reducedMotion } from "../../lib/motion";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -103,9 +102,13 @@ function tuner(): void {
 function checker(): void {
   const inp = document.getElementById("csIn") as HTMLInputElement | null;
   if (!inp) return;
-  const check = () => {
+  // The rules (and zod) load on the first keystroke; the page arrives with TACO already checked.
+  let lib: typeof import("../../lib/callsign") | null = null;
+  const check = async () => {
     const v = inp.value.toUpperCase().replace(/\s/g, "");
     if (inp.value !== v) inp.value = v;
+    lib ??= await import("../../lib/callsign");
+    const { checkCallSign, suggestNumber } = lib;
     const c = checkCallSign(v, takenBy);
     $("csCk").innerHTML = c.rows.map((r) => `<li class="${r.ok ? "" : "no"}"><i aria-hidden="true">${r.ok ? "✓" : "×"}</i><span class="sr">${r.ok ? "Yes: " : "No: "}</span>${r.text}</li>`).join("");
     const o = $("csOut");
@@ -121,8 +124,7 @@ function checker(): void {
       a.querySelector(".live")!.innerHTML = `<i></i>${n}`;
     }
   };
-  inp.addEventListener("input", check);
-  check();
+  inp.addEventListener("input", () => void check());
 }
 
 /** Follow the dollar: where $100 goes, by kind of money. */

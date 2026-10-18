@@ -4,6 +4,7 @@
 // short FAQ and the footer. Built from the site's own parts; new copy is in docs/site/new-copy.md.
 // Behaviour: src/scripts/contact.ts.
 import Base from "../layouts/Base.astro";
+import { faqPage } from "../lib/ld";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/network.css";
 import Btn from "../components/Btn.astro";
@@ -20,6 +21,7 @@ const open = isOpen();
 const jackX = (i: number) => 40 + i * 80;
 ---
 <Base page="contact" st="#5B7BE0">
+  <script slot="head" type="application/ld+json" set:html={faqPage(CONTACT_FAQ)} />
   <main id="top" class="ct">
     <section class="blk rhero ct-hero" id="hero">
       <Sheet>

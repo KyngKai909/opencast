@@ -3,6 +3,7 @@
 // dial (the call-sign checker), kinds, money, locks, standards, faq. Behaviour:
 // src/scripts/network/index.ts.
 import Base from "../layouts/Base.astro";
+import { faqPage } from "../lib/ld";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/network.css";
 import Btn from "../components/Btn.astro";
@@ -35,6 +36,7 @@ const sug = check.ok ? suggestNumber(check.value, IE_NUMBERS) : "--.-";
 const d0 = DOLLAR[0]!;
 ---
 <Base page="network" st="#5B7BE0">
+  <script slot="head" type="application/ld+json" set:html={faqPage(NETWORK_FAQ)} />
   <main id="top">
     <section class="blk rhero nt-hero" id="hero">
       <Sheet>

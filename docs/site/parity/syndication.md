@@ -1,6 +1,6 @@
 # Visual parity: syndication (`/syndication`)
 
-Generated 2026-10-18T06:13:02.979Z by `node apps/site/scripts/parity.mjs syndication`.
+Generated 2026-10-18T07:27:21.967Z by `node apps/site/scripts/parity.mjs syndication`.
 
 | Setting | Value |
 |---|---|
@@ -24,22 +24,22 @@ Status: ✅ ≤ 1% · ⚠️ ≤ 5% · ❌ > 5%. Images: reference | built | dif
 | header | 390 | 0.00% | 60 / 60 | ✅ | [jpg](syndication/header-390.jpg) |
 | hero | 1440 | 0.01% | 1409 / 1409 | ✅ | [jpg](syndication/hero-1440.jpg) |
 | hero | 820 | 0.01% | 1316 / 1316 | ✅ | [jpg](syndication/hero-820.jpg) |
-| hero | 390 | 0.01% | 1283 / 1283 | ✅ | [jpg](syndication/hero-390.jpg) |
+| hero | 390 | 0.02% | 1283 / 1283 | ✅ | [jpg](syndication/hero-390.jpg) |
 | offer | 1440 | 0.00% | 996 / 996 | ✅ | [jpg](syndication/offer-1440.jpg) |
 | offer | 820 | 0.01% | 1380 / 1380 | ✅ | [jpg](syndication/offer-820.jpg) |
 | offer | 390 | 0.00% | 1417 / 1417 | ✅ | [jpg](syndication/offer-390.jpg) |
 | fits | 1440 | 0.00% | 1501 / 1501 | ✅ | [jpg](syndication/fits-1440.jpg) |
 | fits | 820 | 0.00% | 1464 / 1464 | ✅ | [jpg](syndication/fits-820.jpg) |
 | fits | 390 | 0.00% | 1440 / 1440 | ✅ | [jpg](syndication/fits-390.jpg) |
-| terms | 1440 | 1.19% | 1763 / 1763 | ⚠️ | [jpg](syndication/terms-1440.jpg) |
-| terms | 820 | 2.12% | 2208 / 2208 | ⚠️ | [jpg](syndication/terms-820.jpg) |
-| terms | 390 | 1.94% | 2770 / 2770 | ⚠️ | [jpg](syndication/terms-390.jpg) |
+| terms | 1440 | 1.35% | 1763 / 1763 | ⚠️ | [jpg](syndication/terms-1440.jpg) |
+| terms | 820 | 2.34% | 2208 / 2208 | ⚠️ | [jpg](syndication/terms-820.jpg) |
+| terms | 390 | 2.26% | 2770 / 2770 | ⚠️ | [jpg](syndication/terms-390.jpg) |
 | rights | 1440 | 0.01% | 838 / 838 | ✅ | [jpg](syndication/rights-1440.jpg) |
 | rights | 820 | 0.01% | 1251 / 1251 | ✅ | [jpg](syndication/rights-820.jpg) |
 | rights | 390 | 0.02% | 1325 / 1325 | ✅ | [jpg](syndication/rights-390.jpg) |
-| escrow | 1440 | 0.00% | 912 / 912 | ✅ | [jpg](syndication/escrow-1440.jpg) |
-| escrow | 820 | 0.00% | 1172 / 1172 | ✅ | [jpg](syndication/escrow-820.jpg) |
-| escrow | 390 | 0.00% | 1107 / 1107 | ✅ | [jpg](syndication/escrow-390.jpg) |
+| escrow | 1440 | 0.10% | 912 / 912 | ✅ | [jpg](syndication/escrow-1440.jpg) |
+| escrow | 820 | 0.13% | 1172 / 1172 | ✅ | [jpg](syndication/escrow-820.jpg) |
+| escrow | 390 | 0.29% | 1107 / 1107 | ✅ | [jpg](syndication/escrow-390.jpg) |
 | outlets | 1440 | 0.00% | 737 / 737 | ✅ | [jpg](syndication/outlets-1440.jpg) |
 | outlets | 820 | 0.00% | 830 / 830 | ✅ | [jpg](syndication/outlets-820.jpg) |
 | outlets | 390 | 0.02% | 802 / 802 | ✅ | [jpg](syndication/outlets-390.jpg) |
@@ -70,19 +70,26 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### hero
 
-<details><summary>1440: 65/67 matched · 9 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>1440: 65/67 matched · 16 with differences · 1 ref-only · 1 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 41.1 | span | x 1128→1125; y 632→630; bg rgb(224, 88, 58)→rgb(235, 160, 58) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| On air | em | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 (#2) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 33.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 41.1 | span | x 1128→1125; y 632→630; color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(224, 88, 58)→rgb(235, 160, 58) |
 | ORNG | b | x 1125→1122 |
 | Orange County | small | w 74→77 |
 | $1.00 + 15% | div | x 1123→1120; w 154→160 |
-| 31.1 | span | x 476→473; y 1023→1020; bg rgb(91, 123, 224)→rgb(52, 120, 198) |
+| 19.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 27.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 31.1 | span | x 476→473; y 1023→1020; color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(91, 123, 224)→rgb(52, 120, 198) |
 | PREP | b | x 473→470 |
 | Inland Empire (#3) | small | w 67→69 |
 | $2.00 an airing | div | x 471→468; w 154→160 |
-| 7.1 | span | bg rgb(154, 156, 171)→rgb(47, 154, 114) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(154, 156, 171)→rgb(47, 154, 114) |
 
 **Only in reference:**
 
@@ -94,17 +101,24 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 57/59 matched · 7 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>820: 57/59 matched · 14 with differences · 1 ref-only · 1 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 41.1 | span | bg rgb(224, 88, 58)→rgb(235, 160, 58) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| On air | em | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 (#2) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 33.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 41.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(224, 88, 58)→rgb(235, 160, 58) |
 | ORNG | b | x 632→630 |
 | Orange County | small | w 63→65 |
-| 31.1 | span | bg rgb(91, 123, 224)→rgb(52, 120, 198) |
+| 19.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 27.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(91, 123, 224)→rgb(52, 120, 198) |
 | PREP | b | x 259→257 |
 | Inland Empire (#3) | small | w 66→68 |
-| 7.1 | span | bg rgb(154, 156, 171)→rgb(47, 154, 114) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(154, 156, 171)→rgb(47, 154, 114) |
 
 **Only in reference:**
 
@@ -116,13 +130,20 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 46/48 matched · 3 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>390: 46/48 matched · 10 with differences · 1 ref-only · 1 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 41.1 | span | bg rgb(224, 88, 58)→rgb(235, 160, 58) |
-| 31.1 | span | bg rgb(91, 123, 224)→rgb(52, 120, 198) |
-| 7.1 | span | bg rgb(154, 156, 171)→rgb(47, 154, 114) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| On air | em | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 24.1 (#2) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 33.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 41.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(224, 88, 58)→rgb(235, 160, 58) |
+| 19.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 27.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(91, 123, 224)→rgb(52, 120, 198) |
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgb(154, 156, 171)→rgb(47, 154, 114) |
 
 **Only in reference:**
 
@@ -164,11 +185,51 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### terms
 
-<details><summary>1440: 135/154 matched · 1 with differences · 19 ref-only · 19 built-only</summary>
+<details><summary>1440: 135/154 matched · 79 with differences · 19 ref-only · 19 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 14.1 | b | x 1258→807; y 1253→1353; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42) |
+| 40% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| BEAT | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| REEL | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| MESA | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 41.1 | b | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| ORNG | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| LBCH | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VALE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 14.1 | b | x 1258→807; y 1253→1353; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62) |
+| PREP | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| CIVC | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| NITE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| FLDR | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VOZE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| ECHO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| CORT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| PASA | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SURF | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SKAT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| TIDE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| ROUT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| LOFI | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 64.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| DUNE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 11.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| PALM | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 24.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| MOJO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 37.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| FUZZ | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 50.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| VINE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 63.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| HALO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 10.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| GLOW | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 23.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| ROOT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 36.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| … 39 more (see json) | | |
 
 **Only in reference:**
 
@@ -216,11 +277,51 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 135/154 matched · 1 with differences · 19 ref-only · 19 built-only</summary>
+<details><summary>820: 135/154 matched · 79 with differences · 19 ref-only · 19 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 14.1 | b | x 634→66; y 1732→1832; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42) |
+| 40% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| BEAT | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| REEL | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| MESA | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 41.1 | b | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| ORNG | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| LBCH | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VALE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 14.1 | b | x 634→66; y 1732→1832; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62) |
+| PREP | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| CIVC | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| NITE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| FLDR | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VOZE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| ECHO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| CORT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| PASA | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SURF | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SKAT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| TIDE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| ROUT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| LOFI | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 64.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| DUNE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 11.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| PALM | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 24.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| MOJO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 37.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| FUZZ | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 50.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| VINE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 63.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| HALO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 10.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| GLOW | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 23.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| ROOT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 36.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| … 39 more (see json) | | |
 
 **Only in reference:**
 
@@ -268,11 +369,51 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 130/149 matched · 1 with differences · 19 ref-only · 19 built-only</summary>
+<details><summary>390: 130/149 matched · 79 with differences · 19 ref-only · 19 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 14.1 | b | x 34→274; y 2271→2315; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.42) |
+| 40% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60% | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| BEAT | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| REEL | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| MESA | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 41.1 | b | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| ORNG | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| LBCH | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VALE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| 14.1 | b | x 34→274; y 2271→2315; color rgb(255, 255, 255)→rgba(243, 234, 217, 0.62) |
+| PREP | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| CIVC | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| NITE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| FLDR | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| VOZE | small | color rgba(255, 255, 255, 0.82)→rgb(0, 0, 0) |
+| ECHO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| CORT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| PASA | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SURF | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| SKAT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| TIDE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| ROUT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| LOFI | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 64.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| DUNE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 11.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| PALM | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 24.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| MOJO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 37.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| FUZZ | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 50.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| VINE | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 63.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| HALO | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 10.3 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| GLOW | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 23.1 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| ROOT | small | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| 36.2 | b | color rgba(243, 234, 217, 0.42)→rgba(243, 234, 217, 0.62) |
+| … 39 more (see json) | | |
 
 **Only in reference:**
 
@@ -348,15 +489,36 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### escrow
 
-<details><summary>1440: 21/21 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 21/21 matched · 4 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 02 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 03a | small | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 03b | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
-<details><summary>820: 21/21 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 21/21 matched · 4 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 02 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 03a | small | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 03b | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
-<details><summary>390: 20/20 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 20/20 matched · 4 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 01 | small | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
+| 02 | small | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| 03a | small | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 03b | small | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
 
 </details>
 
@@ -410,3 +572,4 @@ Phase 2 STOP, 2026-10-17. Every section is at most 0.1% except terms.
 - **hero (0.0%):** the wire's tiles and pictures are canvases, masked here and matching by eye. The carriers use the stations' own colours (the reference had CIVC grey and PREP in NITE's blue). The tiles drawn "On air" stay on air for their first 9 seconds; the reference flipped them to "Aired" on the first frame.
 - **fits (0.0%):** the closed dropdowns and the sheet aren't in the capture. The option order was checked by the interaction test (Any first; an object-key ordering bug put "Any length" last and was fixed). Request / Add it open the waitlist with the program named (§6). Clear also clears the search. The sheet keeps focus and stops the page's smooth scroll.
 - **Under reduced motion** the wire draws once and never fires (the reference kept redrawing static).
+- **Phase 4 (contrast, Q15; terms 1.4–2.3%, escrow 0.1–0.3%):** the term bars' labels, the badges, the On air chips and the schedule's taken squares have black text; open and other stations' squares are lighter; the creator-fund node is no longer faded to 72%. The carriers are now placed by CSS from positions in the markup (they used to jump into place: CLS 0.36), with no visual change.

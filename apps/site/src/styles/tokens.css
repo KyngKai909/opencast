@@ -7,9 +7,9 @@
      the surface ink (buttons, chips): both kept as drawn (docs/site/open-questions.md Q4). */
   --night:#0E0A1C; --night-2:#171030; --glow:#F3EAD9; --muted:#A79FBF;
   --line:rgb(243 234 217 / .13); --tally:#FF4A3D; --st:#C04A9E;
-  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
-  --text:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
-  --osd:"VT323","Courier New",monospace;
+  --display:"Big Shoulders Display","Big Shoulders Display Fallback","Arial Narrow",Impact,sans-serif;
+  --text:"Instrument Sans","Instrument Sans Fallback","Helvetica Neue",Arial,sans-serif;
+  --osd:"VT323","VT323 Fallback","Courier New",monospace;
   --gut:clamp(16px,4vw,64px);
   --ease:cubic-bezier(.2,.7,.1,1);
   /* polish.css (its --r-key:14px is overridden by shape.css below) */

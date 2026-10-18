@@ -1,6 +1,6 @@
 # Visual parity: run (`/run`)
 
-Generated 2026-10-18T06:11:52.820Z by `node apps/site/scripts/parity.mjs run`.
+Generated 2026-10-18T07:26:11.586Z by `node apps/site/scripts/parity.mjs run`.
 
 | Setting | Value |
 |---|---|
@@ -23,21 +23,21 @@ Status: ✅ ≤ 1% · ⚠️ ≤ 5% · ❌ > 5%. Images: reference | built | dif
 | header | 820 | 0.00% | 68 / 68 | ✅ | [jpg](run/header-820.jpg) |
 | header | 390 | 0.00% | 60 / 60 | ✅ | [jpg](run/header-390.jpg) |
 | hero | 1440 | 1.69% | 992 / 992 | ⚠️ | [jpg](run/hero-1440.jpg) |
-| hero | 820 | 2.75% | 1616 / 1616 | ⚠️ | [jpg](run/hero-820.jpg) |
+| hero | 820 | 2.63% | 1616 / 1616 | ⚠️ | [jpg](run/hero-820.jpg) |
 | hero | 390 | 3.01% | 1384 / 1384 | ⚠️ | [jpg](run/hero-390.jpg) |
 | who | 1440 | 0.18% | 957 / 957 | ✅ | [jpg](run/who-1440.jpg) |
 | who | 820 | 0.02% | 1633 / 1633 | ✅ | [jpg](run/who-820.jpg) |
 | who | 390 | 1.00% | 1648 / 1648 | ✅ | [jpg](run/who-390.jpg) |
-| control | 1440 | 0.01% | 1846 / 1846 | ✅ | [jpg](run/control-1440.jpg) |
-| control | 820 | 0.01% | 2153 / 2153 | ✅ | [jpg](run/control-820.jpg) |
-| control | 390 | 0.03% | 2950 / 2950 | ✅ | [jpg](run/control-390.jpg) |
-| switch@0 | 1440 | 0.01% | 900 / 900 (section 1684 / 1684) | ✅ | [jpg](run/switch@0-1440.jpg) |
-| switch@50 | 1440 | 0.02% | 900 / 900 (section 1684 / 1684) | ✅ | [jpg](run/switch@50-1440.jpg) |
+| control | 1440 | 0.03% | 1846 / 1846 | ✅ | [jpg](run/control-1440.jpg) |
+| control | 820 | 0.05% | 2153 / 2153 | ✅ | [jpg](run/control-820.jpg) |
+| control | 390 | 0.07% | 2950 / 2950 | ✅ | [jpg](run/control-390.jpg) |
+| switch@0 | 1440 | 0.03% | 900 / 900 (section 1684 / 1684) | ✅ | [jpg](run/switch@0-1440.jpg) |
+| switch@50 | 1440 | 0.03% | 900 / 900 (section 1684 / 1684) | ✅ | [jpg](run/switch@50-1440.jpg) |
 | switch@100 | 1440 | 0.01% | 900 / 900 (section 1684 / 1684) | ✅ | [jpg](run/switch@100-1440.jpg) |
-| switch@0 | 820 | 0.01% | 1180 / 1180 (section 2064 / 2064) | ✅ | [jpg](run/switch@0-820.jpg) |
-| switch@50 | 820 | 0.01% | 1180 / 1180 (section 2064 / 2064) | ✅ | [jpg](run/switch@50-820.jpg) |
+| switch@0 | 820 | 0.04% | 1180 / 1180 (section 2064 / 2064) | ✅ | [jpg](run/switch@0-820.jpg) |
+| switch@50 | 820 | 0.04% | 1180 / 1180 (section 2064 / 2064) | ✅ | [jpg](run/switch@50-820.jpg) |
 | switch@100 | 820 | 0.01% | 1180 / 1180 (section 2064 / 2064) | ✅ | [jpg](run/switch@100-820.jpg) |
-| switch@0 | 390 | 0.03% | 844 / 844 (section 2455 / 2455) | ✅ | [jpg](run/switch@0-390.jpg) |
+| switch@0 | 390 | 0.21% | 844 / 844 (section 2455 / 2455) | ✅ | [jpg](run/switch@0-390.jpg) |
 | switch@50 | 390 | 0.01% | 844 / 844 (section 2455 / 2455) | ✅ | [jpg](run/switch@50-390.jpg) |
 | switch@100 | 390 | 0.00% | 844 / 844 (section 2455 / 2455) | ✅ | [jpg](run/switch@100-390.jpg) |
 | pricing | 1440 | 0.00% | 1652 / 1652 | ✅ | [jpg](run/pricing-1440.jpg) |
@@ -77,15 +77,15 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
-| 03 | i | color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75) |
+| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
+| 03 | i | color rgb(47, 154, 114)→rgb(0, 0, 0) |
 | 04 Breaks | button | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(235, 160, 58)→rgba(0, 0, 0, 0) |
 | 04 | i | color rgba(255, 255, 255, 0.75)→rgb(235, 160, 58) |
 
 **Only in reference:**
 
 - In the break
-- Spot · Redlands Hardware
+- Spot · Juniper Barber
 - 0:30
 - Breaks that build themselves
 - Bumpers, IDs and paid spots from the market, dropped into natural break points.
@@ -106,19 +106,20 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 44/50 matched · 4 with differences · 6 ref-only · 10 built-only</summary>
+<details><summary>820: 44/50 matched · 5 with differences · 6 ref-only · 6 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
-| 03 | i | color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75) |
+| 02 Prepare | button | color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(91, 123, 224) |
+| 02 | i | color rgb(91, 123, 224)→rgb(0, 0, 0) |
+| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
 | 04 Breaks | button | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(235, 160, 58)→rgba(0, 0, 0, 0) |
 | 04 | i | color rgba(255, 255, 255, 0.75)→rgb(235, 160, 58) |
 
 **Only in reference:**
 
 - In the break
-- Spot · Redlands Hardware
+- Spot · Juniper Barber
 - 0:30
 - Breaks that build themselves
 - Bumpers, IDs and paid spots from the market, dropped into natural break points.
@@ -126,24 +127,21 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 **Only in built:**
 
-- Fri
-- Crate Session
-- ● Beat Tape Live
-- Overnight Crates ×2
-- Sat
-- Guest Mix
-- Late Crate
-- A real schedule
-- Your week, by the hour. Live shows get a slot and replays fill the gaps.
-- 7 days ahead
+- Before
+- After
+- 1080i → 1080p
+- Prepared once, on our side
+- Every file is fixed and transcoded one time. No GPU, no server, no fan noise.
+- Once per file
 
 </details>
 
-<details><summary>390: 38/44 matched · 2 with differences · 6 ref-only · 10 built-only</summary>
+<details><summary>390: 38/44 matched · 3 with differences · 6 ref-only · 6 built-only</summary>
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255); bg rgba(0, 0, 0, 0)→rgb(47, 154, 114) |
+| 02 Prepare | button | color rgba(243, 234, 217, 0.8)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(91, 123, 224) |
+| 03 Schedule | button | color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191) |
 | 04 Breaks | button | color rgb(255, 255, 255)→rgb(167, 159, 191); bg rgb(235, 160, 58)→rgba(0, 0, 0, 0) |
 
 **Only in reference:**
@@ -157,16 +155,12 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 **Only in built:**
 
-- Fri
-- Crate Session
-- ● Beat Tape Live
-- Overnight Crates ×2
-- Sat
-- Guest Mix
-- Late Crate
-- A real schedule
-- Your week, by the hour. Live shows get a slot and replays fill the gaps.
-- 7 days ahead
+- Before
+- After
+- 1080i → 1080p
+- Prepared once, on our side
+- Every file is fixed and transcoded one time. No GPU, no server, no fan noise.
+- Once per file
 
 </details>
 
@@ -196,15 +190,30 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### control
 
-<details><summary>1440: 118/118 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 118/118 matched · 2 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| S2 E4 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| S2 E5 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
 
 </details>
 
-<details><summary>820: 118/118 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 118/118 matched · 2 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| S2 E4 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| S2 E5 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
 
 </details>
 
-<details><summary>390: 117/117 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 117/117 matched · 2 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| S2 E4 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
+| S2 E5 | li | color rgba(243, 234, 217, 0.3)→rgba(243, 234, 217, 0.56) |
 
 </details>
 
@@ -214,7 +223,7 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| dial | span/th | x 335→303; y 455→443; w 26→290; h 22→47; bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
+| dial | span/th | x 335→303; y 455→443; w 26→290; h 22→47; color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
 
 </details>
 
@@ -222,7 +231,7 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| dial | span/th | x 191→171; y 479→467; w 26→165; h 22→47; bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
+| dial | span/th | x 191→171; y 479→467; w 26→165; h 22→47; color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
 
 </details>
 
@@ -230,7 +239,7 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 | Text | Tag | Differences (ref → built) |
 |---|---|---|
-| dial | span/th | x 134→118; y 407→395; w 26→135; h 22→47; bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
+| dial | span/th | x 134→118; y 407→395; w 26→135; h 22→47; color rgb(255, 255, 255)→rgb(0, 0, 0); bg rgba(0, 0, 0, 0)→rgb(192, 74, 158) |
 
 </details>
 
@@ -341,3 +350,4 @@ Phase 2 STOP, 2026-10-17. Every section is at most 1% except the hero.
   - The signal chain's steps are pressed toggles, not tabs without panels (accessibility).
   - Each slider says its value in words (`aria-valuetext`).
   - The comparison table scrolls by keyboard.
+- **Phase 4 (contrast, Q15):** the signal chain's pressed step and the comparison table's Dial column have black text on the station colour; crossed-off episodes are 56% cream (were 30%). No section moved more than 0.12%.

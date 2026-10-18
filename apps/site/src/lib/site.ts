@@ -84,6 +84,17 @@ function scrolling(): void {
   });
 }
 
+/** "Skip to content" moves focus into the page, not just the scroll. */
+function skipLink(): void {
+  document.querySelector<HTMLAnchorElement>(".skip")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const main = document.querySelector<HTMLElement>("main");
+    if (!main) return;
+    main.tabIndex = -1;
+    main.focus();
+  });
+}
+
 function footerReveal(): void {
   const f = $("contact");
   if (!f) return;
@@ -157,6 +168,7 @@ export function initSite(): void {
   nowPlaying();
   scrolling();
   footerReveal();
+  skipLink();
   cursor();
   menu();
 }

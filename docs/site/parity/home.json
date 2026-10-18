@@ -2,7 +2,7 @@
   "page": "home",
   "slug": "home",
   "route": "/",
-  "generated": "2026-10-18T06:10:38.539Z",
+  "generated": "2026-10-18T07:24:56.139Z",
   "settings": {
     "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
     "widths": [
@@ -144,7 +144,7 @@
       "capture": "guide",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.04,
+      "mismatch": 0.11,
       "refSize": [
         1440,
         1326
@@ -276,7 +276,7 @@
       "capture": "public",
       "width": 1440,
       "mode": "element",
-      "mismatch": 0.1,
+      "mismatch": 0.42,
       "refSize": [
         1440,
         1000
@@ -430,7 +430,7 @@
       "capture": "guide",
       "width": 820,
       "mode": "element",
-      "mismatch": 0.07,
+      "mismatch": 0.21,
       "refSize": [
         820,
         1280
@@ -716,7 +716,7 @@
       "capture": "guide",
       "width": 390,
       "mode": "element",
-      "mismatch": 0.07,
+      "mismatch": 0.33,
       "refSize": [
         390,
         1202
@@ -921,7 +921,24 @@
         "matched": 16,
         "refCount": 16,
         "builtCount": 16,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -929,7 +946,24 @@
         "matched": 37,
         "refCount": 38,
         "builtCount": 38,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -947,7 +981,24 @@
         "matched": 47,
         "refCount": 48,
         "builtCount": 48,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "12.1",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255)"
+            ]
+          },
+          {
+            "text": "BEAT",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -1578,7 +1629,184 @@
         "matched": 101,
         "refCount": 102,
         "builtCount": 102,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Neighborhood Hour",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Overnight Crates",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Salsa School",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7:30 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Short Stack",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Joshua Tree, 4 am",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "La Hora Norteña",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "8:14 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -1596,7 +1824,184 @@
         "matched": 113,
         "refCount": 114,
         "builtCount": 114,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Neighborhood Hour",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Overnight Crates",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Salsa School",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7:30 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Short Stack",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Joshua Tree, 4 am",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "La Hora Norteña",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "8:14 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -1614,7 +2019,184 @@
         "matched": 114,
         "refCount": 115,
         "builtCount": 115,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Neighborhood Hour",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Overnight Crates",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Salsa School",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7:30 pm to 8 pm",
+            "n": 0,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Short Stack",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "6 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "Joshua Tree, 4 am",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 1,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          },
+          {
+            "text": "La Hora Norteña",
+            "n": 0,
+            "tag": "strong",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56)"
+            ]
+          },
+          {
+            "text": "7 pm to 8 pm",
+            "n": 2,
+            "tag": "small",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74)"
+            ]
+          },
+          {
+            "text": "8:14 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(0, 0, 0)"
+            ]
+          }
+        ],
         "refOnly": [
           {
             "t": "OCAT",
@@ -1634,7 +2216,80 @@
         "matched": 46,
         "refCount": 46,
         "builtCount": 46,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039)"
+            ]
+          },
+          {
+            "text": "FM 88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "FM 92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039)"
+            ]
+          },
+          {
+            "text": "FM 104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1642,7 +2297,80 @@
         "matched": 66,
         "refCount": 66,
         "builtCount": 66,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039)"
+            ]
+          },
+          {
+            "text": "FM 88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "FM 92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039)"
+            ]
+          },
+          {
+            "text": "FM 104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1650,7 +2378,80 @@
         "matched": 66,
         "refCount": 66,
         "builtCount": 66,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "7.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569)"
+            ]
+          },
+          {
+            "text": "12.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686)"
+            ]
+          },
+          {
+            "text": "18.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851)"
+            ]
+          },
+          {
+            "text": "24.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333)"
+            ]
+          },
+          {
+            "text": "31.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157)"
+            ]
+          },
+          {
+            "text": "60.1",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039)"
+            ]
+          },
+          {
+            "text": "FM 88.4",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863)"
+            ]
+          },
+          {
+            "text": "FM 92.0",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039)"
+            ]
+          },
+          {
+            "text": "FM 104.2",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }
@@ -1668,7 +2469,40 @@
         "matched": 14,
         "refCount": 14,
         "builtCount": 14,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Spot, 0:30",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Spot, 0:30",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Members",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Late Crate",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       },
@@ -1676,7 +2510,40 @@
         "matched": 14,
         "refCount": 14,
         "builtCount": 14,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "Spot, 0:30",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Spot, 0:30",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Members",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          },
+          {
+            "text": "Late Crate",
+            "n": 2,
+            "tag": "span",
+            "diffs": [
+              "color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }
@@ -1758,7 +2625,16 @@
         "matched": 35,
         "refCount": 35,
         "builtCount": 35,
-        "mismatches": [],
+        "mismatches": [
+          {
+            "text": "open.",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.14)→rgba(243, 234, 217, 0.5)"
+            ]
+          }
+        ],
         "refOnly": [],
         "builtOnly": []
       }

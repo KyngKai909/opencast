@@ -3,6 +3,7 @@
 // who, plan (the planner), paid (the receipt), customers, ways, rules, faq. Behaviour:
 // src/scripts/spots/index.ts.
 import Base from "../layouts/Base.astro";
+import { faqPage } from "../lib/ld";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/spots.css";
 import Btn from "../components/Btn.astro";
@@ -28,6 +29,7 @@ const a0 = AIRINGS[0]!;
 const r0 = receiptHtml(a0);
 ---
 <Base page="spots" st="#E0583A">
+  <script slot="head" type="application/ld+json" set:html={faqPage(SPOTS_FAQ)} />
   <main id="top">
     <section class="blk rhero sp-hero" id="hero">
       <Sheet>

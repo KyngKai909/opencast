@@ -2,6 +2,7 @@
 // /run, ported from docs/reference/site/pages/run.html. Sections: hero, who, control, switch,
 // pricing, earn, faq, then the footer with Claim a number. Behaviour: src/scripts/run/index.ts.
 import Base from "../layouts/Base.astro";
+import { faqPage } from "../lib/ld";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/run.css";
 import Btn from "../components/Btn.astro";
@@ -31,6 +32,7 @@ const STEPS = [["01", "Library", "#9A9CAB"], ["02", "Prepare", "#5B7BE0"], ["03"
 const STATS = [["Free", "to be on air, on the dial, all day"], ["0 GPUs", "needed on your side, ever"], ["Every platform", "from one stream, with your bug on it"], ["Paid breaks", "spots from businesses near and far, not a tip jar"]] as const;
 ---
 <Base page="run" st={np.c}>
+  <script slot="head" type="application/ld+json" set:html={faqPage(RUN_FAQ)} />
   <main id="top">
     <section class="blk rhero" id="hero">
       <Sheet>

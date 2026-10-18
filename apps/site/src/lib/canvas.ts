@@ -20,7 +20,9 @@ export interface Surface {
  * transform so drawing in `w`×`h` fills it. `w` is the logical width; the height follows the box.
  */
 export function fit(canvas: HTMLCanvasElement, w: number, box?: { width: number; height: number }): Surface {
-  const r = box ?? canvas.getBoundingClientRect();
+  // The layout size, not the drawn one: a scaled-up tile (Syndication's live carriers) would
+  // otherwise get a backing store past DPR 2.
+  const r = box ?? (canvas.clientWidth ? { width: canvas.clientWidth, height: canvas.clientHeight } : canvas.getBoundingClientRect());
   const bw = Math.max(1, r.width), bh = Math.max(1, r.height);
   const d = dpr();
   canvas.width = Math.round(bw * d);

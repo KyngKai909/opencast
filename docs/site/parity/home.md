@@ -1,6 +1,6 @@
 # Visual parity: home (`/`)
 
-Generated 2026-10-18T06:10:38.539Z by `node apps/site/scripts/parity.mjs home`.
+Generated 2026-10-18T07:24:56.139Z by `node apps/site/scripts/parity.mjs home`.
 
 | Setting | Value |
 |---|---|
@@ -34,9 +34,9 @@ Status: ✅ ≤ 1% · ⚠️ ≤ 5% · ❌ > 5%. Images: reference | built | dif
 | crawl | 1440 | 0.43% | 56 / 56 | ✅ | [jpg](home/crawl-1440.jpg) |
 | crawl | 820 | 0.21% | 56 / 56 | ✅ | [jpg](home/crawl-820.jpg) |
 | crawl | 390 | 0.03% | 57 / 57 | ✅ | [jpg](home/crawl-390.jpg) |
-| guide | 1440 | 0.04% | 1326 / 1326 | ✅ | [jpg](home/guide-1440.jpg) |
-| guide | 820 | 0.07% | 1280 / 1280 | ✅ | [jpg](home/guide-820.jpg) |
-| guide | 390 | 0.07% | 1202 / 1202 | ✅ | [jpg](home/guide-390.jpg) |
+| guide | 1440 | 0.11% | 1326 / 1326 | ✅ | [jpg](home/guide-1440.jpg) |
+| guide | 820 | 0.21% | 1280 / 1280 | ✅ | [jpg](home/guide-820.jpg) |
+| guide | 390 | 0.33% | 1202 / 1202 | ✅ | [jpg](home/guide-390.jpg) |
 | stations | 1440 | 0.01% | 1927 / 1927 | ✅ | [jpg](home/stations-1440.jpg) |
 | stations | 820 | 0.02% | 2346 / 2346 | ✅ | [jpg](home/stations-820.jpg) |
 | stations | 390 | 0.04% | 1632 / 1632 | ✅ | [jpg](home/stations-390.jpg) |
@@ -52,7 +52,7 @@ Status: ✅ ≤ 1% · ⚠️ ≤ 5% · ❌ > 5%. Images: reference | built | dif
 | doors | 1440 | 0.01% | 1179 / 1179 | ✅ | [jpg](home/doors-1440.jpg) |
 | doors | 820 | 0.02% | 1512 / 1512 | ✅ | [jpg](home/doors-820.jpg) |
 | doors | 390 | 0.03% | 1566 / 1566 | ✅ | [jpg](home/doors-390.jpg) |
-| public | 1440 | 0.10% | 1000 / 1000 | ✅ | [jpg](home/public-1440.jpg) |
+| public | 1440 | 0.42% | 1000 / 1000 | ✅ | [jpg](home/public-1440.jpg) |
 | public | 820 | 0.04% | 737 / 737 | ✅ | [jpg](home/public-820.jpg) |
 | public | 390 | 0.20% | 840 / 840 | ✅ | [jpg](home/public-390.jpg) |
 | footer | 1440 | 0.00% | 1303 / 1303 | ✅ | [jpg](home/footer-1440.jpg) |
@@ -79,7 +79,12 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### hero
 
-<details><summary>1440: 47/48 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>1440: 47/48 matched · 2 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 (#3) | span | color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255) |
+| BEAT (#3) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
@@ -91,7 +96,12 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 37/38 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>820: 37/38 matched · 2 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 (#3) | span | color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255) |
+| BEAT (#3) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
@@ -103,7 +113,12 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 16/16 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 16/16 matched · 2 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 12.1 (#3) | span | color rgba(255, 255, 255, 0.82)→rgb(255, 255, 255) |
+| BEAT (#3) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 </details>
 
@@ -228,7 +243,32 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### guide
 
-<details><summary>1440: 114/115 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>1440: 114/115 matched · 22 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Neighborhood Hour | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Overnight Crates | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Salsa School | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7:30 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Short Stack | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 92.0 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Joshua Tree, 4 am | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 104.2 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| La Hora Norteña | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#3) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 8:14 pm (#2) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
@@ -240,7 +280,32 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>820: 113/114 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>820: 113/114 matched · 22 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Neighborhood Hour | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Overnight Crates | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Salsa School | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7:30 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Short Stack | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 92.0 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Joshua Tree, 4 am | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 104.2 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| La Hora Norteña | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#3) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 8:14 pm (#2) | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
@@ -252,7 +317,32 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 </details>
 
-<details><summary>390: 101/102 matched · 0 with differences · 1 ref-only · 1 built-only</summary>
+<details><summary>390: 101/102 matched · 22 with differences · 1 ref-only · 1 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Neighborhood Hour | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 12.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Overnight Crates | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 18.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Salsa School | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7:30 pm to 8 pm | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 24.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Short Stack | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 6 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 31.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 60.1 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 88.4 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| 92.0 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| Joshua Tree, 4 am | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#2) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 104.2 | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
+| La Hora Norteña | strong | color rgba(243, 234, 217, 0.4)→rgba(243, 234, 217, 0.56) |
+| 7 pm to 8 pm (#3) | small | color rgba(167, 159, 191, 0.45)→rgba(167, 159, 191, 0.74) |
+| 8:14 pm | span | color rgb(255, 255, 255)→rgb(0, 0, 0) |
 
 **Only in reference:**
 
@@ -266,25 +356,75 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### stations
 
-<details><summary>1440: 66/66 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 66/66 matched · 9 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 12.1 | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
+| 18.1 | span | color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851) |
+| 24.1 | span | color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333) |
+| 31.1 | span | color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157) |
+| 60.1 | span | color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039) |
+| FM 88.4 | span | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| FM 92.0 | span | color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039) |
+| FM 104.2 | span | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
 
 </details>
 
-<details><summary>820: 66/66 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 66/66 matched · 9 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 12.1 | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
+| 18.1 | span | color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851) |
+| 24.1 | span | color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333) |
+| 31.1 | span | color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157) |
+| 60.1 | span | color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039) |
+| FM 88.4 | span | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| FM 92.0 | span | color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039) |
+| FM 104.2 | span | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
 
 </details>
 
-<details><summary>390: 46/46 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>390: 46/46 matched · 9 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| 7.1 | span | color rgb(47, 154, 114)→color(srgb 0.284235 0.644706 0.499569) |
+| 12.1 | span | color rgb(192, 74, 158)→color(srgb 0.778941 0.371765 0.649686) |
+| 18.1 | span | color rgb(224, 88, 58)→color(srgb 0.888118 0.419529 0.30851) |
+| 24.1 | span | color rgb(217, 138, 43)→color(srgb 0.864235 0.590118 0.257333) |
+| 31.1 | span | color rgb(52, 120, 198)→color(srgb 0.301294 0.528706 0.786157) |
+| 60.1 | span | color rgb(154, 156, 171)→color(srgb 0.649294 0.651529 0.694039) |
+| FM 88.4 | span | color rgb(91, 123, 224)→color(srgb 0.434353 0.538941 0.874863) |
+| FM 92.0 | span | color rgb(201, 112, 154)→color(srgb 0.809647 0.501412 0.636039) |
+| FM 104.2 | span | color rgb(235, 160, 58)→color(srgb 0.925647 0.665177 0.30851) |
 
 </details>
 
 ### breaks
 
-<details><summary>1440: 14/14 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 14/14 matched · 4 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Spot, 0:30 | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Spot, 0:30 (#2) | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Members | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Late Crate (#3) | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
 
 </details>
 
-<details><summary>820: 14/14 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>820: 14/14 matched · 4 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| Spot, 0:30 | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Spot, 0:30 (#2) | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Members | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
+| Late Crate (#3) | span | color rgba(167, 159, 191, 0.6)→rgba(167, 159, 191, 0.82) |
 
 </details>
 
@@ -332,7 +472,11 @@ Matched by normalized text + occurrence index. Rects are relative to the section
 
 ### public
 
-<details><summary>1440: 35/35 matched · 0 with differences · 0 ref-only · 0 built-only</summary>
+<details><summary>1440: 35/35 matched · 1 with differences · 0 ref-only · 0 built-only</summary>
+
+| Text | Tag | Differences (ref → built) |
+|---|---|---|
+| open. | span | color rgba(243, 234, 217, 0.14)→rgba(243, 234, 217, 0.5) |
 
 </details>
 
@@ -373,3 +517,4 @@ Phase 2 STOP, 2026-10-17. Every section is at most 0.4% at every width.
   - The crawl's second copy and the manifesto's word spans are hidden from screen readers (the sentence is read once).
   - Without JavaScript the page shows (no black power-on overlay, the headline visible).
   - Links back to this page (the logo, Watch, Open the dial) scroll to the top as the reference's `#top` links did. The stations' "Room on the dial" goes to /run (the reference's JS-built link jumped to the door on Home).
+- **Phase 4 (contrast, Q15):** the manifesto's unlit words are 50% cream (were 14%), the guide's past programs and the break timeline's names are lighter, and the station badges and the dial's tuned mark have black text. The worst section is still 0.43%: the changed text is a small share of each section's pixels.

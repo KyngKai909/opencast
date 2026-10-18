@@ -2,6 +2,7 @@
 // / (Home), ported from docs/reference/site/pages/home.html. Sections: hero, crawl, guide,
 // stations, breaks, doors, public, then the footer. Behaviour starts in src/scripts/home/index.ts.
 import Base from "../layouts/Base.astro";
+import { organization } from "../lib/ld";
 import Footer from "../components/Footer.astro";
 import FooterHome from "../components/footers/FooterHome.astro";
 import Hero from "../components/home/Hero.astro";
@@ -15,6 +16,7 @@ import { NOW_PLAYING } from "../data/stations";
 ---
 <Base page="home" st={NOW_PLAYING.c}>
   <Fragment slot="head">
+    <script type="application/ld+json" set:html={organization()} />
     <noscript><style>.power{display:none!important}.hero-copy h1 .ln span{transform:none!important}</style></noscript>
   </Fragment>
   <div class="power" id="power" aria-hidden="true"><i></i></div>

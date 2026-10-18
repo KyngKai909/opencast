@@ -28,8 +28,8 @@ const AR = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5
       <a href={p.href} class:list={{ "is-cur": p.key === current }} aria-current={p.key === current ? "page" : undefined}><i>{p.ix}</i>{p.label}</a>
     ))}
   </nav>
-  <a class="np" href={watchCta.href} data-watch aria-label="Watch what's on now">
-    <span class="tnb"><span class="tnb-lcd" aria-hidden="true"><i class="tnb-dot"></i><span class="tnb-roll"><span class="tnb-a"><span class="js-ch">{np.n}</span><span id="npCs">{np.cs}</span></span><span class="tnb-p"><small>Now</small><em id="npProg">{prog}</em></span></span></span><span class="tnb-go">Watch<b aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 5.5v9l7.5-4.5z" fill="currentColor"/></svg></b></span></span>
+  <a class="np" href={watchCta.href} data-watch>
+    <span class="tnb"><span class="tnb-lcd"><i class="tnb-dot"></i><span class="tnb-roll"><span class="tnb-a"><span class="js-ch">{np.n}</span><span id="npCs">{np.cs}</span></span><span class="tnb-p"><small>Now</small><em id="npProg">{prog}</em></span></span></span><span class="tnb-go">Watch<b aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 5.5v9l7.5-4.5z" fill="currentColor"/></svg></b></span></span>
   </a>
   <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="mob" aria-label="Menu"><span class="hb" aria-hidden="true"><i></i><i></i></span><span class="ml">Menu</span></button>
 </header>

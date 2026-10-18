@@ -1,6 +1,7 @@
 // The waitlist sheet's rules, apart from the sheet: what each field accepts, what's sent to
 // `waitlist.join`, and what the confirmation says. New words are in docs/site/new-copy.md.
 
+import "./zod";
 import { z } from "zod";
 import type { Market } from "@contracts/common";
 import type { WaitlistRole } from "@contracts/waitlist";
