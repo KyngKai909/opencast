@@ -110,6 +110,6 @@ for (const route of ["/", "/run", "/syndication", "/spots", "/network", "/contac
     await open(page, route);
     await page.mouse.wheel(0, 3000);
     await page.waitForTimeout(800);
-    expect(errs.filter((e) => !/404 \(Not Found\)/.test(e) || route !== "/no-such-page")).toEqual([]);
+    expect(errs.filter((e) => !/status of 404\b/.test(e) || route !== "/no-such-page")).toEqual([]);
   });
 }
