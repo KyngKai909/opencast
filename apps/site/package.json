@@ -9,7 +9,8 @@
     "preview": "astro preview --port 5183",
     "typecheck": "astro check",
     "test": "vitest run --passWithNoTests",
-    "lint": "echo \"No lint configured for site\""
+    "lint": "echo \"No lint configured for site\"",
+    "parity": "node scripts/parity.mjs"
   },
   "dependencies": {
     "@fontsource/big-shoulders-display": "5.3.0",
@@ -22,9 +23,10 @@
     "@astrojs/check": "0.9.10",
     "@resvg/resvg-js": "2.6.2",
     "astro": "7.3.5",
+    "cookie": "2.0.1",
+    "jsdom": "^26.1.0",
     "satori": "0.33.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "cookie": "2.0.1"
+    "vitest": "^3.2.4"
   }
 }

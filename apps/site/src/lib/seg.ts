@@ -20,8 +20,8 @@ export function initSegs(root: ParentNode = document): void {
   for (const group of root.querySelectorAll<HTMLElement>("[data-seg]:not([data-seg-ready])")) {
     group.dataset.segReady = "";
     group.addEventListener("click", (e) => {
-      const b = (e.target as Element).closest<HTMLButtonElement>(":scope > button");
-      if (b && group.contains(b) && !b.classList.contains("on")) choose(group, b);
+      const b = (e.target as Element).closest<HTMLButtonElement>("button");
+      if (b && b.parentElement === group && !b.classList.contains("on")) choose(group, b);
     });
   }
 }

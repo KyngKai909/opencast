@@ -1,17 +1,36 @@
 ---
-// /: the shell until Phase 2 ports Home from docs/reference/site/pages/home.html. The anchors
-// the footers link to (#guide, #stations, #breaks, #public) are held here until then.
+// / (Home), ported from docs/reference/site/pages/home.html. Sections: hero, crawl, guide,
+// stations, breaks, doors, public, then the footer. Behaviour starts in src/scripts/home/index.ts.
 import Base from "../layouts/Base.astro";
-// After Base, so the page's CSS follows the global layers (the reference's cascade).
-import "../styles/pages/run.css";
 import Footer from "../components/Footer.astro";
-import FooterNetwork from "../components/footers/FooterNetwork.astro";
+import FooterHome from "../components/footers/FooterHome.astro";
+import Hero from "../components/home/Hero.astro";
+import Crawl from "../components/home/Crawl.astro";
+import Guide from "../components/home/Guide.astro";
+import Stations from "../components/home/Stations.astro";
+import Break from "../components/home/Break.astro";
+import Doors from "../components/home/Doors.astro";
+import Public from "../components/home/Public.astro";
+import { NOW_PLAYING } from "../data/stations";
 ---
-<Base page="home">
-  <main id="top" class="shell">
-    <h1 class="sr">Anyone can run a channel.</h1>
-    <span id="guide"></span><span id="stations"></span><span id="breaks"></span><span id="public"></span>
+<Base page="home" st={NOW_PLAYING.c}>
+  <Fragment slot="head">
+    <noscript><style>.power{display:none!important}.hero-copy h1 .ln span{transform:none!important}</style></noscript>
+  </Fragment>
+  <div class="power" id="power" aria-hidden="true"><i></i></div>
+  <div class="peek" id="peek" aria-hidden="true"><div class="scr"><canvas></canvas><span class="ch"></span><span class="lb"></span></div></div>
+  <main id="top">
+    <Hero />
+    <Crawl />
+    <Guide />
+    <Stations />
+    <Break />
+    <Doors />
+    <Public />
   </main>
-  <Footer slot="footer" home><FooterNetwork slot="first" /></Footer>
+  <Footer slot="footer" home><FooterHome slot="first" /></Footer>
 </Base>
-<style>.shell{min-height:60svh}</style>
+<script>
+  import { initHome } from "../scripts/home/index";
+  initHome();
+</script>

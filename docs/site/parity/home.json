@@ -1,0 +1,1794 @@
+{
+  "page": "home",
+  "slug": "home",
+  "route": "/",
+  "generated": "2026-10-18T05:26:54.605Z",
+  "settings": {
+    "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
+    "widths": [
+      "1440x900",
+      "820x1180",
+      "390x844"
+    ],
+    "seed": 1814,
+    "reduced": false,
+    "reference": "docs/reference/site/pages/home.html",
+    "built": "apps/site/dist/",
+    "pixelThreshold": 40,
+    "rectTolerance": 2
+  },
+  "order": [
+    "header",
+    "hero",
+    "crawl",
+    "guide",
+    "stations",
+    "breaks",
+    "doors",
+    "public",
+    "footer"
+  ],
+  "captures": [
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 1440,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        68
+      ],
+      "builtSize": [
+        1440,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/header-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@0",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1755,
+        1755
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@0-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@50",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1755,
+        1755
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@50-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@100",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1755,
+        1755
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@100-1440.jpg"
+    },
+    {
+      "section": "crawl",
+      "capture": "crawl",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.43,
+      "refSize": [
+        1440,
+        56
+      ],
+      "builtSize": [
+        1440,
+        56
+      ],
+      "sectionHeight": [
+        56,
+        56
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/crawl-1440.jpg"
+    },
+    {
+      "section": "guide",
+      "capture": "guide",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.04,
+      "refSize": [
+        1440,
+        1326
+      ],
+      "builtSize": [
+        1440,
+        1326
+      ],
+      "sectionHeight": [
+        1325,
+        1325
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/guide-1440.jpg"
+    },
+    {
+      "section": "stations",
+      "capture": "stations",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1927
+      ],
+      "builtSize": [
+        1440,
+        1927
+      ],
+      "sectionHeight": [
+        1926,
+        1926
+      ],
+      "maskedCanvases": 18,
+      "cropped": false,
+      "image": "home/stations-1440.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@0",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        3420,
+        3420
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@0-1440.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@50",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        3420,
+        3420
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@50-1440.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@100",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        3420,
+        3420
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@100-1440.jpg"
+    },
+    {
+      "section": "doors",
+      "capture": "doors",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1179
+      ],
+      "builtSize": [
+        1440,
+        1179
+      ],
+      "sectionHeight": [
+        1179,
+        1179
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/doors-1440.jpg"
+    },
+    {
+      "section": "public",
+      "capture": "public",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.1,
+      "refSize": [
+        1440,
+        1000
+      ],
+      "builtSize": [
+        1440,
+        1000
+      ],
+      "sectionHeight": [
+        998,
+        998
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/public-1440.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1303
+      ],
+      "builtSize": [
+        1440,
+        1303
+      ],
+      "sectionHeight": [
+        1303,
+        1303
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/footer-1440.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 820,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        68
+      ],
+      "builtSize": [
+        820,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/header-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@0",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2301,
+        2301
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@0-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@50",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2301,
+        2301
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@50-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@100",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2301,
+        2301
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@100-820.jpg"
+    },
+    {
+      "section": "crawl",
+      "capture": "crawl",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.21,
+      "refSize": [
+        820,
+        56
+      ],
+      "builtSize": [
+        820,
+        56
+      ],
+      "sectionHeight": [
+        56,
+        56
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/crawl-820.jpg"
+    },
+    {
+      "section": "guide",
+      "capture": "guide",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.07,
+      "refSize": [
+        820,
+        1280
+      ],
+      "builtSize": [
+        820,
+        1280
+      ],
+      "sectionHeight": [
+        1280,
+        1280
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/guide-820.jpg"
+    },
+    {
+      "section": "stations",
+      "capture": "stations",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        820,
+        2346
+      ],
+      "builtSize": [
+        820,
+        2346
+      ],
+      "sectionHeight": [
+        2345,
+        2345
+      ],
+      "maskedCanvases": 18,
+      "cropped": false,
+      "image": "home/stations-820.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@0",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        4484,
+        4484
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@0-820.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@50",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        4484,
+        4484
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@50-820.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@100",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        4484,
+        4484
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@100-820.jpg"
+    },
+    {
+      "section": "doors",
+      "capture": "doors",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        820,
+        1512
+      ],
+      "builtSize": [
+        820,
+        1512
+      ],
+      "sectionHeight": [
+        1511,
+        1511
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/doors-820.jpg"
+    },
+    {
+      "section": "public",
+      "capture": "public",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.04,
+      "refSize": [
+        820,
+        737
+      ],
+      "builtSize": [
+        820,
+        737
+      ],
+      "sectionHeight": [
+        736,
+        736
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/public-820.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        1793
+      ],
+      "builtSize": [
+        820,
+        1793
+      ],
+      "sectionHeight": [
+        1792,
+        1792
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/footer-820.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 390,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        60
+      ],
+      "builtSize": [
+        390,
+        60
+      ],
+      "sectionHeight": [
+        60,
+        60
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/header-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@0",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        1646,
+        1646
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@0-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@50",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        1646,
+        1646
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@50-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero@100",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        1646,
+        1646
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/hero@100-390.jpg"
+    },
+    {
+      "section": "crawl",
+      "capture": "crawl",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.03,
+      "refSize": [
+        390,
+        57
+      ],
+      "builtSize": [
+        390,
+        57
+      ],
+      "sectionHeight": [
+        56,
+        56
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/crawl-390.jpg"
+    },
+    {
+      "section": "guide",
+      "capture": "guide",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.07,
+      "refSize": [
+        390,
+        1202
+      ],
+      "builtSize": [
+        390,
+        1202
+      ],
+      "sectionHeight": [
+        1201,
+        1201
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/guide-390.jpg"
+    },
+    {
+      "section": "stations",
+      "capture": "stations",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.04,
+      "refSize": [
+        390,
+        1632
+      ],
+      "builtSize": [
+        390,
+        1632
+      ],
+      "sectionHeight": [
+        1631,
+        1631
+      ],
+      "maskedCanvases": 18,
+      "cropped": false,
+      "image": "home/stations-390.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@0",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        3207,
+        3207
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@0-390.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@50",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        3207,
+        3207
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@50-390.jpg"
+    },
+    {
+      "section": "breaks",
+      "capture": "breaks@100",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        3207,
+        3207
+      ],
+      "maskedCanvases": 42,
+      "cropped": false,
+      "image": "home/breaks@100-390.jpg"
+    },
+    {
+      "section": "doors",
+      "capture": "doors",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.03,
+      "refSize": [
+        390,
+        1566
+      ],
+      "builtSize": [
+        390,
+        1566
+      ],
+      "sectionHeight": [
+        1565,
+        1565
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/doors-390.jpg"
+    },
+    {
+      "section": "public",
+      "capture": "public",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.2,
+      "refSize": [
+        390,
+        840
+      ],
+      "builtSize": [
+        390,
+        840
+      ],
+      "sectionHeight": [
+        839,
+        839
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/public-390.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        1363
+      ],
+      "builtSize": [
+        390,
+        1363
+      ],
+      "sectionHeight": [
+        1362,
+        1362
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "home/footer-390.jpg"
+    }
+  ],
+  "missing": [],
+  "elements": {
+    "header": {
+      "390": {
+        "matched": 2,
+        "refCount": 2,
+        "builtCount": 2,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 4,
+        "refCount": 4,
+        "builtCount": 4,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 13,
+        "refCount": 13,
+        "builtCount": 13,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "hero": {
+      "390": {
+        "matched": 16,
+        "refCount": 16,
+        "builtCount": 16,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 37,
+        "refCount": 38,
+        "builtCount": 38,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 47,
+        "refCount": 48,
+        "builtCount": 48,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "crawl": {
+      "390": {
+        "matched": 33,
+        "refCount": 37,
+        "builtCount": 37,
+        "mismatches": [
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2155→2160"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2174→2179"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2457→2462"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2476→2481"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2773→2778"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2792→2797"
+            ]
+          },
+          {
+            "text": "7.1 CIVC Library Talks, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3112→3117"
+            ]
+          },
+          {
+            "text": "7.1 CIVC",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3131→3136"
+            ]
+          },
+          {
+            "text": "12.1 BEAT Late Crate, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3420→3425"
+            ]
+          },
+          {
+            "text": "12.1 BEAT",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3439→3444"
+            ]
+          },
+          {
+            "text": "18.1 SAZN Tamales for forty, until 8:30 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3713→3718"
+            ]
+          },
+          {
+            "text": "18.1 SAZN",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3732→3737"
+            ]
+          },
+          {
+            "text": "24.1 REEL The Late Show, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4074→4080"
+            ]
+          },
+          {
+            "text": "24.1 REEL",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4093→4099"
+            ]
+          },
+          {
+            "text": "31.1 PREP Prep Football Live, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4407→4412"
+            ]
+          },
+          {
+            "text": "31.1 PREP",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4426→4431"
+            ]
+          },
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5056→5067"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5075→5086"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5359→5369"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5378→5388"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5675→5685"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5694→5704"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "60.1 OCAT Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 OCAT",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "60.1 MATN Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 MATN",
+            "count": 2
+          }
+        ]
+      },
+      "820": {
+        "matched": 33,
+        "refCount": 37,
+        "builtCount": 37,
+        "mismatches": [
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2155→2160"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2174→2179"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2457→2462"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2476→2481"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2773→2778"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2792→2797"
+            ]
+          },
+          {
+            "text": "7.1 CIVC Library Talks, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3112→3117"
+            ]
+          },
+          {
+            "text": "7.1 CIVC",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3131→3136"
+            ]
+          },
+          {
+            "text": "12.1 BEAT Late Crate, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3420→3425"
+            ]
+          },
+          {
+            "text": "12.1 BEAT",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3439→3444"
+            ]
+          },
+          {
+            "text": "18.1 SAZN Tamales for forty, until 8:30 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3713→3718"
+            ]
+          },
+          {
+            "text": "18.1 SAZN",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3732→3737"
+            ]
+          },
+          {
+            "text": "24.1 REEL The Late Show, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4074→4080"
+            ]
+          },
+          {
+            "text": "24.1 REEL",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4093→4099"
+            ]
+          },
+          {
+            "text": "31.1 PREP Prep Football Live, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4407→4412"
+            ]
+          },
+          {
+            "text": "31.1 PREP",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4426→4431"
+            ]
+          },
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5056→5067"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5075→5086"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5359→5369"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5378→5388"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5675→5685"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5694→5704"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "60.1 OCAT Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 OCAT",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "60.1 MATN Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 MATN",
+            "count": 2
+          }
+        ]
+      },
+      "1440": {
+        "matched": 33,
+        "refCount": 37,
+        "builtCount": 37,
+        "mismatches": [
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2155→2160"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2174→2179"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2457→2462"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2476→2481"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 2773→2778"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "x 2792→2797"
+            ]
+          },
+          {
+            "text": "7.1 CIVC Library Talks, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3112→3117"
+            ]
+          },
+          {
+            "text": "7.1 CIVC",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3131→3136"
+            ]
+          },
+          {
+            "text": "12.1 BEAT Late Crate, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3420→3425"
+            ]
+          },
+          {
+            "text": "12.1 BEAT",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3439→3444"
+            ]
+          },
+          {
+            "text": "18.1 SAZN Tamales for forty, until 8:30 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 3713→3718"
+            ]
+          },
+          {
+            "text": "18.1 SAZN",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 3732→3737"
+            ]
+          },
+          {
+            "text": "24.1 REEL The Late Show, until 10 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4074→4080"
+            ]
+          },
+          {
+            "text": "24.1 REEL",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4093→4099"
+            ]
+          },
+          {
+            "text": "31.1 PREP Prep Football Live, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 4407→4412"
+            ]
+          },
+          {
+            "text": "31.1 PREP",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 4426→4431"
+            ]
+          },
+          {
+            "text": "88.4 NITE Night Shift, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5056→5067"
+            ]
+          },
+          {
+            "text": "88.4 NITE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5075→5086"
+            ]
+          },
+          {
+            "text": "92.0 FLDR Kelso Dunes, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5359→5369"
+            ]
+          },
+          {
+            "text": "92.0 FLDR",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5378→5388"
+            ]
+          },
+          {
+            "text": "104.2 VOZE Voces del Valle, until 9 pm",
+            "n": 1,
+            "tag": "span",
+            "diffs": [
+              "x 5675→5685"
+            ]
+          },
+          {
+            "text": "104.2 VOZE",
+            "n": 1,
+            "tag": "b",
+            "diffs": [
+              "x 5694→5704"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "60.1 OCAT Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 OCAT",
+            "count": 2
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "60.1 MATN Silent Hour, until 9 pm",
+            "count": 2
+          },
+          {
+            "t": "60.1 MATN",
+            "count": 2
+          }
+        ]
+      }
+    },
+    "guide": {
+      "390": {
+        "matched": 101,
+        "refCount": 102,
+        "builtCount": 102,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 113,
+        "refCount": 114,
+        "builtCount": 114,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 114,
+        "refCount": 115,
+        "builtCount": 115,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "stations": {
+      "390": {
+        "matched": 46,
+        "refCount": 46,
+        "builtCount": 46,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 66,
+        "refCount": 66,
+        "builtCount": 66,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 66,
+        "refCount": 66,
+        "builtCount": 66,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "breaks": {
+      "390": {
+        "matched": 6,
+        "refCount": 6,
+        "builtCount": 6,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 14,
+        "refCount": 14,
+        "builtCount": 14,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 14,
+        "refCount": 14,
+        "builtCount": 14,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "doors": {
+      "390": {
+        "matched": 27,
+        "refCount": 28,
+        "builtCount": 28,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 33,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 33,
+        "refCount": 34,
+        "builtCount": 34,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "OCAT",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "MATN",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "public": {
+      "390": {
+        "matched": 30,
+        "refCount": 30,
+        "builtCount": 30,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 35,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 35,
+        "refCount": 35,
+        "builtCount": 35,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "footer": {
+      "390": {
+        "matched": 29,
+        "refCount": 29,
+        "builtCount": 29,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 29,
+        "refCount": 29,
+        "builtCount": 29,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 29,
+        "refCount": 29,
+        "builtCount": 29,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    }
+  },
+  "notes": []
+}

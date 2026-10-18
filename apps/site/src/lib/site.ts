@@ -69,10 +69,11 @@ function scrolling(): void {
   }
   addEventListener("scroll", onScroll, { passive: true });
   onScroll();
-  // In-page anchors land 70px under the fixed nav. The waitlist's own links are the sheet's.
+  // In-page anchors land 70px under the fixed nav. Links that scroll themselves (data-scroll-own)
+  // and the waitlist's links (the sheet's) are left alone.
   document.addEventListener("click", (e) => {
     const a = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
-    if (!a || a.hasAttribute("data-waitlist")) return;
+    if (!a || e.defaultPrevented || a.hasAttribute("data-waitlist") || a.hasAttribute("data-scroll-own")) return;
     const id = a.getAttribute("href")!.slice(1);
     const target = id === "top" ? document.body : id ? document.getElementById(id) : null;
     if (!target) return;

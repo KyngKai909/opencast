@@ -1,10 +1,13 @@
 // Calls the API from the contracts: each endpoint's method, path and schemas come from
-// @opencast/contracts, so a call can't drift from what the API mounts. Responses are parsed with
-// the endpoint's response schema. The site only calls public endpoints, so there's no token.
-
-import { API_PREFIX, buildPath, ErrorResponse, type EndpointDef } from "@opencast/contracts";
+// packages/contracts (one file at a time, `@contracts/<file>`), so a call can't drift from what
+// the API mounts. Responses are parsed with the endpoint's schema. With no PUBLIC_API_URL, calls
+// are answered by the in-page mocks (src/mocks), so the site runs with no API.
+import { buildPath, ErrorResponse, type EndpointDef } from "@contracts/core";
 import type { z } from "zod";
 import { API_URL } from "../data/links";
+
+/** The contracts' `API_PREFIX` (index.ts), which can't be imported without the whole package. */
+const API_PREFIX = "/v1";
 
 export class ApiError extends Error {
   constructor(
@@ -26,24 +29,40 @@ export interface CallArgs {
   signal?: AbortSignal;
 }
 
+/** What a mock answers: the status and the JSON. */
+export interface MockReply {
+  status: number;
+  json: unknown;
+}
+
+export const mocked = () => !API_URL;
+
 export async function call<E extends EndpointDef>(endpoint: E, args: CallArgs = {}): Promise<z.infer<E["response"]>> {
-  const url = `${API_URL}${API_PREFIX}${buildPath(endpoint.path, args.params ?? {})}`;
-  const init: RequestInit = { method: endpoint.method, signal: args.signal };
-  if (args.body !== undefined) {
-    init.headers = { "content-type": "application/json" };
-    init.body = JSON.stringify(args.body);
+  const path = buildPath(endpoint.path, args.params ?? {});
+  let status: number, json: unknown;
+  if (mocked()) {
+    const { answer } = await import("../mocks/index");
+    ({ status, json } = await answer(endpoint, path, args.body));
+  } else {
+    const init: RequestInit = { method: endpoint.method };
+    if (args.signal) init.signal = args.signal;
+    if (args.body !== undefined) {
+      init.headers = { "content-type": "application/json" };
+      init.body = JSON.stringify(args.body);
+    }
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${API_PREFIX}${path}`, init);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
+      throw new NetworkError("offline");
+    }
+    status = res.status;
+    json = await res.json().catch(() => null);
   }
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch (e) {
-    if (e instanceof DOMException && e.name === "AbortError") throw e;
-    throw new NetworkError("offline");
-  }
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
+  if (status >= 400) {
     const e = ErrorResponse.safeParse(json);
-    throw e.success ? new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields) : new ApiError(res.status, "error", "Something went wrong. Try again.");
+    throw e.success ? new ApiError(status, e.data.error.code, e.data.error.message, e.data.error.fields) : new ApiError(status, "error", "Something went wrong. Try again.");
   }
   const parsed = (endpoint.response as z.ZodType).safeParse(json);
   if (!parsed.success) {

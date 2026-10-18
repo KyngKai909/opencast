@@ -1,0 +1,79 @@
+---
+// Home's hero (home/body.html, section#hero): the screen with the current station's picture, the
+// copy, the lower third, the dial band, and the wall of every station the screen pulls back into.
+// Behaviour: src/pages/home/hero.ts and wall.ts.
+import { NOW_PLAYING, STATIONS, slot } from "../../data/stations";
+import { COUNTS, numberWord } from "../../data/home";
+import { watch, ROUTES } from "../../data/links";
+import { clock, nowMinutes } from "../../lib/clock";
+
+const s = NOW_PLAYING;
+const sl = slot(s, nowMinutes());
+const pos = (n: string, b: string) => (b === "fm" ? (parseFloat(n) - 88) / 20 : (parseFloat(n) - 2) / 67);
+const tv: string[] = [];
+for (let n = 2; n <= 69; n++) {
+  const l = ((n - 2) / 67) * 100;
+  tv.push(`<span class="tick${n % 10 === 0 ? " big" : ""}" style="left:${l}%"></span>`);
+  if (n === 2 || n % 10 === 0) tv.push(`<span class="tick tl" style="left:${l}%">${n}</span>`);
+}
+const fm: string[] = [];
+for (let f = 88; f <= 108; f++) {
+  const l = ((f - 88) / 20) * 100;
+  fm.push(`<span class="tick${f % 4 === 0 ? " big" : ""}" style="left:${l}%"></span>`);
+  if (f % 4 === 0) fm.push(`<span class="tick tl" style="left:${l}%">${f}</span>`);
+}
+const watchCta = watch(s.n);
+---
+<section class="hero" id="hero">
+  <div class="pin" id="pin">
+    <div class="halo" id="halo" aria-hidden="true"></div>
+    <div class="screen" id="screen" role="group" aria-roledescription="tuner" tabindex="0" aria-label={`Now on ${s.n} ${s.cs}: ${sl.prog}. Use the left and right arrow keys or type a channel number to change stations.`} data-cur="Flip">
+      <canvas id="pic" aria-hidden="true"></canvas>
+      <canvas id="noise" aria-hidden="true"></canvas>
+      <div class="scan"></div><div class="vig"></div>
+      <div class="osd" aria-hidden="true"><span id="osdNum">{s.n}</span><small id="osdCs">{s.cs}</small><span class="tun">TUNING IN</span></div>
+      <div class="kbuf" id="kbuf" aria-hidden="true"></div>
+    </div>
+
+    <div class="hui">
+      <div class="hrow">
+        <div class="hero-copy fade" id="copy">
+          <h1><span class="ln"><span>Anyone</span></span><span class="ln"><span>can run</span></span><span class="ln"><span>a channel.</span></span></h1>
+          <p>A dial of 24/7 stations made by people near you: crate diggers, film clubs, family kitchens, city hall. Flip through what's on right now.</p>
+          <div class="acts"><a class="btn" href={watchCta.href} data-watch data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">{s.n}</span></span>Open the dial</a><a class="btn ghost" href={ROUTES.run}>Run a station</a></div>
+        </div>
+
+        <div class="lower fade" id="lower">
+          <div class="lt-tag"><span class="lt-num" id="lNum">{s.n}</span><span class="lt-cs" id="lCs">{s.cs}</span><span class="lt-air"><i></i>On air</span></div>
+          <div class="lt-body">
+            <div class="lt-r lt-now"><span class="lt-k">Now</span><div class="lt-v"><div class="lt-prog" id="lProg">{sl.prog}</div><div class="lt-who" id="lWho">{s.who}</div></div><span class="lt-left" id="lLeft">{sl.left} min left</span></div>
+            <div class="lt-row"><span id="lStart">{clock(sl.start)}</span><div class="lt-bar"><i id="lBar" style={`width:${(sl.pct * 100).toFixed(1)}%`}></i></div><span id="lEnd">{clock(sl.end)}</span></div>
+            <div class="lt-r lt-nx"><span class="lt-k">Next</span><div class="lt-v"><b id="lNext">{sl.next}</b></div><span class="lt-t" id="lNextT">{clock(sl.end)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint fade" id="hint"><span><kbd>←</kbd> <kbd>→</kbd> flip</span><span><kbd>0–9</kbd> type a number</span><button class="snd" id="snd" type="button" aria-pressed="false"><i><b></b><b></b><b></b></i><span>Sound off</span></button></div>
+
+      <div class="dial fade" id="dial">
+        <div class="row">
+          <button class="arrow" id="prev" type="button" aria-label="Previous station"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="band" id="band" data-cur="Drag">
+            <div class="seg tv-s" id="segTv"><span class="lab">TV 2–69</span><Fragment set:html={tv.join("")} />{STATIONS.map((x, i) => x.b === "tv" && <button type="button" class:list={["st-mark", { on: x === s }]} style={`left:${pos(x.n, x.b) * 100}%;--c:${x.c}`} data-i={i} aria-label={`Tune to ${x.n} ${x.cs}`}><span>{x.cs}</span></button>)}</div>
+            <div class="seg fm-s" id="segFm"><span class="lab">FM 88–108</span><Fragment set:html={fm.join("")} />{STATIONS.map((x, i) => x.b === "fm" && <button type="button" class="st-mark" style={`left:${pos(x.n, x.b) * 100}%;--c:${x.c}`} data-i={i} aria-label={`Tune to ${x.n} ${x.cs}`}><span>{x.cs}</span></button>)}</div>
+            <div class="needle" id="needle"></div>
+          </div>
+          <button class="arrow" id="next" type="button" aria-label="Next station"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div class="wall" id="wall" role="group" aria-label="Every station, live" inert>
+      {Array.from({ length: 9 }, (_, k) => k === 4 ? (
+        <div class="tile me"><span class="tb"><b></b><em></em></span><span class="tp"><small></small><strong></strong></span><span class="tw">Watching</span></div>
+      ) : (
+        <button type="button" class="tile" data-cur="Tune"><canvas aria-hidden="true"></canvas><span class="tb"><b></b><em></em></span><span class="tp"><small></small><strong></strong></span></button>
+      ))}
+    </div>
+    <div class="after" id="after"><div class="af-l"><div class="dots" id="afterDots">{STATIONS.map((x) => <i style={`--c:${x.c}`}></i>)}</div><p class="af-k">The wall, live</p><b id="afterB">{numberWord(COUNTS.all)} stations on tonight</b></div><a class="af-r" href="#guide" id="afterGo" data-scroll-own><span>See the full guide</span><i><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></i></a></div>
+  </div>
+  <p class="sr" id="tuneSay" aria-live="polite"></p>
+</section>

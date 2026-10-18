@@ -1,0 +1,49 @@
+---
+// 04 Get on the dial (home/body.html section#doors): the four ways in. Hovering one peeks at a
+// station (src/scripts/home/peek.ts).
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import { ROUTES } from "../../data/links";
+import { STATIONS } from "../../data/stations";
+const KEY = `<span class="key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+const tvs = STATIONS.filter((s) => s.b === "tv");
+const at = (n: number) => (((n - 2) / 67) * 100).toFixed(2);
+---
+<section class="blk" id="doors">
+  <div class="wrap">
+    <div class="sheet">
+      <Cell class="hd" d={7}>
+        <Mh ix="04" label="Get on the dial" meta="Four ways in" />
+        <div class="cb"><h2>Make it. Carry it.<br />Sponsor it.</h2></div>
+      </Cell>
+      <Cell class="hd" d={5}>
+        <Mh label="Who it's for" />
+        <div class="cb end"><p class="lede">Everything on the dial is made, carried or paid for by someone nearby. Here's where each of them starts.</p></div>
+      </Cell>
+      <Cell as="a" class="dr big" id="run" href={ROUTES.run} d={6} style="--c:#F3EAD9" data-peek="1" data-cur="Open">
+        <Mh ix="A" label="For creators and groups" meta="Free to start" />
+        <div class="cb">
+          <div class="claim" aria-hidden="true"><span class="cn">__.1</span><span class="cc">YOURS</span></div>
+          <div class="rul" id="rul" aria-hidden="true">{tvs.map((s) => <span class="mk" style={`left:${at(parseFloat(s.n))}%;--c:${s.c}`}><b>{s.cs}</b></span>)}<span class="mk you" style={`left:${at(44)}%`}><b>You?</b></span><span class="lo">2</span><span class="hi">69</span></div>
+          <h3>Run a station</h3><p>Get a call sign and a number, build a schedule, and air it around the clock.</p>
+        </div>
+        <div class="mf"><span>Claim a number</span><Fragment set:html={KEY} /></div>
+      </Cell>
+      <Cell as="a" class="dr" id="syndication" href={ROUTES.syndication} d={6} style="--c:#EBA03A" data-peek="3" data-cur="Open">
+        <Mh ix="B" label="For stations and makers" meta="Paid when it airs" />
+        <div class="cb"><h3>Syndication</h3><p>Carry shows from other stations, or offer yours to the whole network and get paid when it airs.</p></div>
+        <div class="mf"><span>Browse the market</span><Fragment set:html={KEY} /></div>
+      </Cell>
+      <Cell as="a" class="dr" id="spots" href={ROUTES.spots} d={3} t={3} m={2} style="--c:#E0583A" data-peek="2" data-cur="Open">
+        <Mh ix="C" label="For advertisers" />
+        <div class="cb"><h3>Spot market</h3><p>Buy short spots on the stations your customers already watch, down the street or online.</p></div>
+        <div class="mf"><span>Buy a spot</span><Fragment set:html={KEY} /></div>
+      </Cell>
+      <Cell as="a" class="dr" id="network" href={ROUTES.network} d={3} t={3} m={2} style="--c:#5B7BE0" data-peek="0" data-cur="Open">
+        <Mh ix="D" label="For everyone" />
+        <div class="cb"><h3>The network</h3><p>Who runs this, how the money moves, and the rules every station follows.</p></div>
+        <div class="mf"><span>How it's run</span><Fragment set:html={KEY} /></div>
+      </Cell>
+    </div>
+  </div>
+</section>

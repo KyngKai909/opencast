@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { waitlistApi } from "@opencast/contracts";
+import { waitlistApi } from "@contracts/waitlist";
 import { COPY, cleanCallSign, cleanZip, confirmation, fieldErrorsFrom, toBody, validate, type Joined, type WaitlistDraft } from "./waitlist";
 
 const IE = { id: "00000000-0000-4000-8000-000000090001", slug: "inland-empire", name: "Inland Empire", timezone: "America/Los_Angeles", open: false };

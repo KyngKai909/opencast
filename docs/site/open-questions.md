@@ -22,4 +22,4 @@ Anything not decided yet. Each is built so it's easy to change, and noted where 
 - **Q9. Pay calculator unit.** It prices each 15-second spot at $8 per 1,000, ported exactly. The copy "about $8 per 1,000 tuned in" is left as written.
 - **Q10. Hosting.** The site moves from Vercel (`opencast-site`) to Railway in Phase 5. Staging's API `WEB_ORIGIN` will need the new origin; that is asked for at the Phase 5 STOP.
 - **Q11. OCAT.** Renamed to MATN (Classic Matinee, 60.1) everywhere in the site's demo data.
-- **Q12. Whose clock.** "Now" on the site is Pacific time wherever the visitor is, because the stations are in Southern California. The reference used the browser's own zone. `apps/site/src/lib/clock.ts`.
+- **Q12. Whose clock.** "Now" is the visitor's own time, as in the reference, so the guide's "Times in your time zone" stays true. Pacific was tried first and dropped for that reason. `apps/site/src/lib/clock.ts`.

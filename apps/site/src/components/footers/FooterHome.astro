@@ -1,0 +1,20 @@
+---
+// Home's footer first row (home/body.html footer): the sign-off, and the TV switching off.
+import Btn from "../Btn.astro";
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import { contact, watch } from "../../data/links";
+import { NOW_PLAYING } from "../../data/stations";
+---
+<Cell d={8}>
+  <Mh ix="06" label="Sign-off" meta="A person answers" />
+  <div class="cb">
+    <h2>Turn it off whenever. We'll keep it on.</h2>
+    <p class="lede">Questions, a station you'd like to see on the dial, or a business that wants to be in the breaks: write to us and a person answers.</p>
+    <div class="acts"><a class="btn" href={watch(NOW_PLAYING.n).href} data-watch data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">{NOW_PLAYING.n}</span></span>Open the dial</a><Btn cta={contact()} ghost>Contact us</Btn></div>
+  </div>
+</Cell>
+<Cell class="offc" d={4}>
+  <Mh label="Off air" meta="Good night" tab />
+  <div class="cb"><div class="offtv" aria-hidden="true"><div class="img"><canvas id="offC" width="320" height="240"></canvas></div><span class="dot"></span></div></div>
+</Cell>

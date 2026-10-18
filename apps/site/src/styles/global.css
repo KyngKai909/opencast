@@ -20,3 +20,10 @@ html.lenis,html.lenis body{height:auto}
 
 /* A button that can't be pressed yet (a form still sending). The reference has no disabled state. */
 .btn:disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed;transform:none;filter:none}
+
+/* Cell header strips that run out of room wrap instead of clipping: the reference clipped the label
+   and the meta mid-word on phones (Run's audience labels at every phone width, "Earnings and
+   ownership" up to 414px). The meta drops to a second line and a long label wraps; a strip that
+   fits (every desktop strip) is unchanged. */
+.mh{flex-wrap:wrap;row-gap:2px}
+.mh>span{white-space:normal}

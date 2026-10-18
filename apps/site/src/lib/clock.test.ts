@@ -12,9 +12,8 @@ describe("clock", () => {
     expect(clock(-60)).toBe("11 pm");
     expect(clock(59.6)).toBe("1 am");
   });
-  it("tells the time in Pacific wherever it runs", () => {
-    // 2026-10-18T03:14:00Z is 8:14 pm on the 17th in Los Angeles (PDT).
-    expect(nowMinutes(new Date("2026-10-18T03:14:00Z"))).toBe(20 * 60 + 14);
+  it("tells the visitor's local time", () => {
+    expect(nowMinutes(new Date(2026, 9, 17, 20, 14, 30))).toBe(20 * 60 + 14.5);
   });
 });
 

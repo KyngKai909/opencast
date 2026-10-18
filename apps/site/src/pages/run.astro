@@ -1,13 +1,260 @@
 ---
-// /run: the shell until Phase 2 ports the page from docs/reference/site/pages/run.html.
+// /run, ported from docs/reference/site/pages/run.html. Sections: hero, who, control, switch,
+// pricing, earn, faq, then the footer with Claim a number. Behaviour: src/scripts/run/index.ts.
 import Base from "../layouts/Base.astro";
 // After Base, so the page's CSS follows the global layers (the reference's cascade).
 import "../styles/pages/run.css";
+import Btn from "../components/Btn.astro";
+import Cell from "../components/Cell.astro";
+import Faq from "../components/Faq.astro";
 import Footer from "../components/Footer.astro";
+import Mf from "../components/Mf.astro";
+import Mh from "../components/Mh.astro";
+import Sheet from "../components/Sheet.astro";
 import FooterRun from "../components/footers/FooterRun.astro";
+import { claim } from "../data/links";
+import { NOW_PLAYING } from "../data/stations";
+import { compare, coverage, estimate, LIBRARY_STOPS, minutesLabel, money, pct, PRICE, RUN_DEFAULTS as D, SHARES, size } from "../data/pricing";
+import { AUDIENCES, BILLING, COMPARISON, EARNERS, OWNERSHIP, RATE_CARD, RUN_FAQ, SHARE_NOTE, SHARE_ROWS, SPOT_HINT, SWITCH_STEPS } from "../data/run";
+import { clock, nowMinutes } from "../lib/clock";
+
+const np = NOW_PLAYING;
+const KEY = `<span class="key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+// The calculators' first frame, prerendered from the same functions the page runs.
+const lib = LIBRARY_STOPS[D.libraryStop]!;
+const est = estimate({ gb: D.gb, live: D.live, relays: D.relays, library: lib });
+const cov = coverage({ tuned: D.tuned, minutes: D.minutes, pledges: D.pledges, bill: est.total });
+const vs = compare(lib, est.total);
+const p = (v: number, min: number, max: number) => `--p:${((v - min) / (max - min)) * 100}%`;
+const bar = Math.max(cov.earned, est.total) || 1;
+const STEPS = [["01", "Library", "#9A9CAB"], ["02", "Prepare", "#5B7BE0"], ["03", "Schedule", "#2F9A72"], ["04", "Breaks", "#EBA03A"], ["05", "On air", "#C04A9E"]] as const;
+const STATS = [["Free", "to be on air, on the dial, all day"], ["0 GPUs", "needed on your side, ever"], ["Every platform", "from one stream, with your bug on it"], ["Paid breaks", "spots from businesses near and far, not a tip jar"]] as const;
 ---
-<Base page="run">
-  <main id="top" class="shell"><h1 class="sr">Run it like a station. Not a loop.</h1></main>
+<Base page="run" st={np.c}>
+  <main id="top">
+    <section class="blk rhero" id="hero">
+      <Sheet>
+        <Cell class="hd rh" d={7}>
+          <Mh label="Run a station" meta="For operators" />
+          <div class="cb">
+            <h1>Run it like a station.<br /><span class="dim">Not a loop.</span></h1>
+            <p class="lede">Bring your library. Build a real schedule with bumpers, station IDs and breaks, go live inside it, and send one continuous signal to the dial and every platform you stream to.</p>
+            <div class="acts"><Btn cta={claim()} live="__.1" cur="Claim" data-claim="">Claim a number</Btn><Btn href="#pricing" ghost>See pricing</Btn></div>
+          </div>
+          <Mf><span>Being on air is free. You pay for storage, relays and live hours.</span></Mf>
+        </Cell>
+        <Cell class="chainc" d={5}>
+          <Mh label="Signal chain" meta={`${np.n} ${np.cs}, live`} live />
+          <div class="cb">
+            <div class="mc" id="mc" style="--s:#9A9CAB">
+              <div class="mc-steps" role="group" aria-label="Signal chain">
+                {STEPS.map(([i, l, c], k) => (
+                  <button type="button" data-i={k} aria-pressed={k === 0 ? "true" : "false"} style={`--c:${c}`}><i>{i}</i>{l}<u></u></button>
+                ))}
+              </div>
+              <div class="pgm" id="pgm" data-s="0">
+                <canvas id="pgmC" width="480" height="270" aria-hidden="true"></canvas>
+                <div class="ov ov-lib" aria-hidden="true">
+                  <div class="ol-h"><span>NAS · /media/beat-tape-tv</span><span class="tab">2.4 TB</span></div>
+                  <div class="ol-l" id="olL"></div>
+                </div>
+                <div class="ov ov-prep" aria-hidden="true"><div class="op-b" id="opB"><span>Before</span></div><i class="op-d" id="opD"></i><span class="op-a">After</span><span class="op-t" id="opT">HDR10 → SDR</span></div>
+                <div class="ov ov-sch" aria-hidden="true">
+                  <div class="os-g">
+                    <div class="os-r"><span>Fri</span><div><b style="flex:2;--k:#C04A9E">Crate Session</b><b style="flex:2;--k:#FF4A3D" class="lv">● Beat Tape Live</b><b style="flex:3;--k:#7a3b8f">Overnight Crates</b></div></div>
+                    <div class="os-r"><span>Sat</span><div><b style="flex:2;--k:#EBA03A">Guest Mix</b><b style="flex:2;--k:#C04A9E">Late Crate</b><b style="flex:3;--k:#7a3b8f">Overnight Crates</b></div></div>
+                    <i class="os-n" id="osN"></i>
+                  </div>
+                </div>
+                <div class="ov ov-brk" aria-hidden="true">
+                  <div class="ob-now"><small>In the break</small><b id="obN">Bumper</b><span class="tab" id="obT">0:05</span></div>
+                  <div class="ob-s" id="obS"><i style="flex:1;--k:#C04A9E"></i><i style="flex:6;--k:#E0583A"></i><i style="flex:6;--k:#E8402F"></i><i style="flex:3;--k:#5B7BE0"></i><i style="flex:1;--k:#fff"></i></div>
+                </div>
+                <div class="ov ov-air" aria-hidden="true"><span class="pgm-tl"><i></i>On air</span><span class="pgm-lt"><b>LATE CRATE</b><small>with Marisol, live from Pomona</small></span></div>
+                <span class="pgm-bug" aria-hidden="true"><span class="js-ch">{np.n}</span> <b>{np.cs}</b></span>
+                <span class="pgm-tc tab" id="pgmTc" aria-hidden="true">00:00:00:00</span>
+              </div>
+              <div class="mc-cap"><div><b id="mcT">Your library stays home</b><p id="mcP">A small agent on your NAS sends only what's about to air.</p></div><em class="tab" id="mcS">2.4 TB home · 38 GB sent</em></div>
+              <svg class="sc-fan" id="scFan" aria-hidden="true"></svg>
+              <div class="sc-outs" id="outs">
+                <div class="so" style="--k:#FF4A3D"><b>The dial</b><small>{np.n}</small></div>
+                <div class="so" style="--k:#FF3B30"><b>YouTube</b><small class="tab" data-up="171230">47:33:50</small></div>
+                <div class="so" style="--k:#9146FF"><b>Twitch</b><small class="tab" data-restart="2892">0:48</small></div>
+                <div class="so" style="--k:#53FC18"><b>Kick</b><small class="tab" data-up="91210">25:20:10</small></div>
+                <div class="so" style="--k:#9A9CAB"><b>RTMP</b><small>Your server</small></div>
+              </div>
+            </div>
+          </div>
+          <Mf><span>Five destinations. One signal.</span><span class="tab" id="chClock">{clock(Math.floor(nowMinutes()))}</span></Mf>
+        </Cell>
+        {STATS.map(([b, s]) => (
+          <Cell class="st4" d={3} t={3} m={1}><div class="cb"><b>{b}</b><span>{s}</span></div></Cell>
+        ))}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="who">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="01" label="Who it's for" meta="Three kinds of operator" /><div class="cb"><h2>Built for the people<br />already doing it.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="Why they switch" /><div class="cb end"><p class="lede">Most of our operators don't stand in front of a camera. They have a library, a taste, and a channel they keep running with tools that weren't made for it.</p></div></Cell>
+        {AUDIENCES.map((a) => (
+          <Cell as="a" class="aud" href={a.href} d={4} t={6} style={`--c:${a.c}`} data-cur="Open">
+            <Mh ix={a.L} label={a.sub} />
+            <div class="cb"><p class="tag">{a.tag}</p><h3>{a.t}</h3><ul>{a.pts.map((x) => <li>{x}</li>)}</ul></div>
+            <div class="mf"><span>{a.cta}</span><Fragment set:html={KEY} /></div>
+          </Cell>
+        ))}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="control">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="02" label="Master control" meta="Eight parts" /><div class="cb"><h2>Master control.<br />The whole station, one screen.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="What you run" /><div class="cb end"><p class="lede">Schedule, breaks, live, relays and the library, run the way a TV station runs them. The parts operators told us were hardest, scheduling and choosing what airs, do most of their own work.</p></div></Cell>
+        <Cell class="ft big" d={8} t={6}>
+          <Mh ix="A" label="Schedule" meta={`This week on ${np.n}`} />
+          <div class="cb"><div class="sch" id="sch" aria-hidden="true"></div>
+            <div class="ftx"><h3>A real schedule, not a playlist.</h3><p>Lay out a week by the hour. Blocks repeat by day, live shows get a slot, and the station can sign off at 2 am and come back at 6. Drag a show and everything after it moves.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={4} t={3}>
+          <Mh ix="B" label="Breaks" meta="Auto-filled" />
+          <div class="cb"><div class="bks" aria-hidden="true">
+            <div class="bk-row"><i style="flex:10;--c:#C04A9E"></i><i style="flex:3;--c:#fff"></i><i style="flex:12;--c:#E0583A"></i><i style="flex:12;--c:#E8402F"></i><i style="flex:6;--c:#5B7BE0"></i><i style="flex:3;--c:#fff"></i><i style="flex:10;--c:#C04A9E"></i></div>
+            <div class="bk-l"><span>Show</span><span>Bumper</span><span>Spot</span><span>Spot</span><span>Credit</span><span>ID</span></div></div>
+            <div class="ftx"><h3>Breaks that build themselves.</h3><p>We find natural break points from chapters, black frames and silence, then fill them with your bumpers, IDs and spots you've accepted from the market.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={4} t={3}>
+          <Mh ix="C" label="Library at home" meta="Agent" />
+          <div class="cb"><div class="lib" aria-hidden="true"><div class="lib-a"><b class="tab">2.4 TB</b><span>On your NAS</span></div><div class="lib-f"><i></i><i></i><i></i></div><div class="lib-b"><b class="tab">38 GB</b><span>Next 7 days</span></div></div>
+            <div class="ftx"><h3>Your library stays at home.</h3><p>A small agent on your NAS or computer sends only what's about to air. You pay storage for 38 GB, not 2.4 TB.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={4} t={3}>
+          <Mh ix="D" label="Prepare" meta="Automatic" />
+          <div class="cb"><ul class="prep" aria-hidden="true"><li><span>HDR10</span><i>→</i><span>SDR</span></li><li><span>1080i</span><i>→</i><span>1080p</span></li><li><span>−9 LUFS</span><i>→</i><span>−16 LUFS</span></li><li><span>Sideways phone clip</span><i>→</i><span>Upright</span></li></ul>
+            <div class="ftx"><h3>Prepared once, on our side.</h3><p>Every file is fixed and transcoded one time, then aired from the prepared copy forever. No GPU, no server, no fan noise.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={4} t={3}>
+          <Mh ix="E" label="Relays" meta="Built in" />
+          <div class="cb"><ul class="rly" aria-hidden="true"><li><i></i>YouTube<span class="tab">47:33:50</span></li><li><i></i>Twitch<span class="tab warn">restarts at next break</span></li><li><i></i>Kick<span class="tab">25:20:10</span></li><li><i class="off"></i>Facebook<span>live shows only</span></li></ul>
+            <div class="ftx"><h3>One signal to every platform.</h3><p>Connect YouTube and Twitch, or add any RTMP address. We restart ahead of each platform's limit, at a break, so viewers never see it drop.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={4} t={3}>
+          <Mh ix="F" label="Live" meta="From a phone or OBS" />
+          <div class="cb"><div class="lv-t" aria-hidden="true"><span class="seg r">Replay</span><span class="seg l"><i></i>Live, 9 to 11 pm</span><span class="seg r">Replay</span></div>
+            <div class="ftx"><h3>Go live inside the schedule.</h3><p>Live shows get a slot like anything else. Start late and a replay covers it; end early and the next block slides in. The stream never breaks.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={6} t={3}>
+          <Mh ix="G" label="Series slots" meta="Next episode" />
+          <div class="cb"><ol class="eps" aria-hidden="true"><li class="d">S2 E4</li><li class="d">S2 E5</li><li class="n">S2 E6<small>Tonight</small></li><li>S2 E7</li><li>S2 E8</li></ol>
+            <div class="ftx"><h3>Slots that remember where you were.</h3><p>Point a slot at a series and it airs the next episode every time, in order, shuffled, or by season. Seasons and playback orders are built in.</p></div></div>
+        </Cell>
+        <Cell class="ft" d={6} t={6}>
+          <Mh ix="H" label="Feeds" meta="M3U and XMLTV" />
+          <div class="cb"><div class="feeds">{["channel.m3u", "guide.xml"].map((f) => <div class="fd"><code>usedial.com/{np.n}/{f}</code><button class="cp" type="button" data-copy={`usedial.com/${np.n}/${f}`} aria-label={`Copy usedial.com/${np.n}/${f}`}>Copy</button></div>)}</div>
+            <div class="ftx"><h3>In Plex and IPTV apps, too.</h3><p>Every station publishes an M3U playlist and an XMLTV guide, so it shows up in Plex, Channels and any IPTV player with its schedule attached.</p></div></div>
+        </Cell>
+      </Sheet>
+    </section>
+
+    <section class="blk" id="switch">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="03" label="Switching" meta="From loop tools" /><div class="cb"><h2>Already running<br />a 24/7 stream?</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="The short version" /><div class="cb end"><p class="lede">Loop tools make you upload your whole library and cap it at 100 or 150 GB. We leave it on your NAS, keep you on air around the clock for free, and fill your breaks with paid spots.</p></div></Cell>
+        <Cell d={12}>
+          <div class="mh"><span>One channel, side by side</span><span><span class="swp">Swipe to compare →</span><span class="mo">Monthly</span></span></div>
+          <div class="cmpw" tabindex="0" role="region" aria-label="One channel, side by side"><table class="cmp"><thead><tr><th scope="col"><span class="sr">Feature</span></th><th scope="col" class="us">dial</th><th scope="col">Livepush</th><th scope="col">Upstream</th><th scope="col">Gyre</th></tr></thead><tbody>
+            {COMPARISON.map(([f, us, a, b, c]) => <tr><th scope="row">{f}</th><td class="us" set:html={us} /><td set:html={a} /><td set:html={b} /><td set:html={c} /></tr>)}
+          </tbody></table></div>
+          <Mf><span>Competitor prices and limits from their public pricing pages, October 2026. Check them before you decide.</span></Mf>
+        </Cell>
+        {SWITCH_STEPS.map((s, i) => (
+          <Cell class="stp" d={s.d} t={s.t} m={2}><div class="mh"><span><b class="ix">{String(i + 1).padStart(2, "0")}</b>Step</span></div><div class="cb"><h3>{s.h}</h3><p>{s.p}</p></div></Cell>
+        ))}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="pricing">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="04" label="Pricing" meta="Pay as you go" /><div class="cb"><h2>On air is free.<br /><span class="dim">You pay for what it costs.</span></h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="How it works" /><div class="cb end"><p class="lede">One channel per station, pay as you go. Every month starts with a free allowance, and a cap never takes your channel off the dial. What your station earns pays this bill first; that's the next section.</p></div></Cell>
+        <Cell d={5} t={6}>
+          <Mh label="Rate card" meta="USD" />
+          <div class="cb rc"><div class="rate">{RATE_CARD.map((r) => <div class="rt"><div><b>{r.n}</b><small>{r.d}</small></div><div class="rp"><b class="tab">{r.p}</b>{r.f && <small>{r.f}</small>}</div></div>)}</div></div>
+          <Mf><span>Launch prices. They live in one table and will change with notice.</span></Mf>
+        </Cell>
+        <Cell class="calc" d={7} t={6}>
+          <Mh label="Estimate your month" meta="Drag to try" />
+          <div class="cb">
+            <div class="cr"><label for="cLib">Your library<b class="tab" id="vLib">{size(lib)}</b></label><input id="cLib" type="range" min="0" max={LIBRARY_STOPS.length - 1} step="1" value={D.libraryStop} aria-valuetext={size(lib)} style={p(D.libraryStop, 0, LIBRARY_STOPS.length - 1)} /><small class="crh">Stays on your NAS or computer. Loop tools have to hold all of it.</small></div>
+            <div class="cr"><label for="cGb">On air in the next 7 days<b class="tab" id="vGb">{est.gb} GB</b></label><input id="cGb" type="range" min="0" max="300" step="5" value={D.gb} aria-valuetext={`${est.gb} GB`} style={p(D.gb, 0, 300)} /><small class="crh">The only part we store, and the only part you pay storage for.</small></div>
+            <div class="cr"><span class="lb" id="rmL">Relays</span><div class="seg2 rm" role="group" aria-labelledby="rmL">{["Off", "Live only", "Everything"].map((l, r) => <button type="button" data-r={r} class:list={{ on: r === D.relays }} aria-pressed={r === D.relays ? "true" : "false"}>{l}</button>)}</div></div>
+            <div class="cr"><label for="cLive">Live hours a month<b class="tab" id="vLive">{D.live} h</b></label><input id="cLive" type="range" min="0" max="200" step="1" value={D.live} aria-valuetext={`${D.live} hours`} style={p(D.live, 0, 200)} /></div>
+            <div class="out" aria-live="polite">
+              <div class="ol"><span>Storage</span><b class="tab" id="oSt">{money(est.storage)}</b></div>
+              <div class="ol"><span>Relays</span><b class="tab" id="oRl">{money(est.relays)}</b></div>
+              <div class="ol"><span>Live hours</span><b class="tab" id="oLv">{money(est.live)}</b></div>
+              <div class="ot"><span>Your usage this month</span><b class="tab" id="oTot">{money(est.total)}</b></div>
+            </div>
+            <div class="vs" id="vs"><div class="vs-h"><span>The same channel elsewhere</span><small id="vsNote">Their plans have to hold your whole {size(lib)} library, at 1080p.</small></div><div class="vs-r" id="vsR">{vs.map((c) => (
+              <div class="vc"><span>{c.n}</span>{c.fits ? <b class="tab">${c.price}</b> : <b class="tab no">Won't fit</b>}<small>{c.plan}</small>{c.fits ? (c.diff > 0 ? <em class="dn">${c.diff.toFixed(2)} more than here</em> : <em class="up">${(-c.diff).toFixed(2)} less than here</em>) : <em class="no">{size(c.over)} over</em>}</div>
+            ))}</div></div>
+          </div>
+          <Mf><span>Estimate for a {PRICE.hours / 24}-day month. Other tools: their published plans, October 2026; extra streams, 60 fps and 4K cost more there.</span></Mf>
+        </Cell>
+        {BILLING.map((b) => <Cell class="bl" d={3} t={3} m={1}><div class="cb"><b>{b.h}</b><p>{b.p}</p></div></Cell>)}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="earn">
+      <Sheet>
+        <Cell class="hd" d={7}><Mh ix="05" label="Earnings and ownership" meta="Where the money goes" /><div class="cb"><h2>A station can<br />pay for itself.</h2></div></Cell>
+        <Cell class="hd" d={5}><Mh label="The short version" /><div class="cb end"><p class="lede">Your breaks earn. Your shows earn when other stations air them. Viewers can pledge. That money pays your bill first, most of it stays with you, and part of what we keep comes back to every station.</p></div></Cell>
+        {EARNERS.map((e) => (
+          <Cell as="a" class="ern" href={e.href} d={3} t={3} m={2} style={`--c:${e.c}`} data-cur="Open"><div class="mh"><span><i class="sq"></i>{e.h}</span></div><div class="cb"><h3>{e.h}</h3><p>{e.p}</p></div><div class="mf"><span>{e.l}</span><Fragment set:html={KEY} /></div></Cell>
+        ))}
+        <Cell class="pay" d={12} id="pay">
+          <Mh label="Does it cover your costs?" meta="Drag to try" />
+          <div class="pay-g">
+            <div class="pay-in">
+              <div class="cr"><label for="pTun">People tuned in, on average<b class="tab" id="vTun">{D.tuned}</b></label><input id="pTun" type="range" min="1" max="500" step="1" value={D.tuned} aria-valuetext={`${D.tuned} people`} style={p(D.tuned, 1, 500)} /><small class="crh">Across the whole day, on the dial and your relays.</small></div>
+              <div class="cr"><label for="pMin">Spot time sold each hour<b class="tab" id="vMin">{minutesLabel(D.minutes)}</b></label><input id="pMin" type="range" min="0" max="3" step=".25" value={D.minutes} aria-valuetext={minutesLabel(D.minutes)} style={p(D.minutes, 0, 3)} /><small class="crh">{SPOT_HINT}</small></div>
+              <div class="cr"><label for="pPl">Pledges a month<b class="tab" id="vPl">${D.pledges}</b></label><input id="pPl" type="range" min="0" max="1000" step="10" value={D.pledges} aria-valuetext={`$${D.pledges}`} style={p(D.pledges, 0, 1000)} /></div>
+              <p class="pay-n">Your bill is the estimate from Pricing: <b class="tab" id="pCostN">{money(est.total)}</b>. Change it there and this follows.</p>
+            </div>
+            <div class="pay-out" aria-live="polite">
+              <div class="ol"><span>Spots, after our {pct(SHARES.spotsBooked)}</span><b class="tab" id="pSp">{money(cov.spots)}</b></div>
+              <div class="ol"><span>Pledges, after our {pct(SHARES.pledges)}</span><b class="tab" id="pPlO">{money(cov.pledges)}</b></div>
+              <div class="ol"><span>Your usage bill, paid from that first</span><b class="tab" id="pCost">−{money(cov.paid)}</b></div>
+              <div class="ot"><span>Left for you this month<small id="pVerdict">{cov.verdict}</small></span><b class="tab" id="pLeft">{money(cov.left)}</b></div>
+              <div class="pay-bar" aria-hidden="true" style={`--gap:${Math.max(0, est.total - cov.earned) / bar}`}><i id="pbC" style={`flex-grow:${cov.paid / bar}`}></i><i id="pbL" style={`flex-grow:${cov.left / bar}`}></i></div>
+              <div class="t-lg2"><span><i style="--k:#E0583A"></i>Pays the bill</span><span><i style="--k:#3ddc84"></i>Stays with you</span></div>
+            </div>
+          </div>
+          <Mf><span>An example, not a promise. Real earnings depend on your audience and which spots you approve.</span></Mf>
+        </Cell>
+        <Cell d={12}>
+          <Mh label="Who gets what" meta="Per dollar earned, by source" />
+          <div class="cb"><div class="shr" role="table" aria-label="Who gets what, per dollar earned"><div class="sh-h" role="row"><span role="columnheader">Source</span><span role="columnheader">Elsewhere, they keep</span><span role="columnheader">Station keeps</span><span role="columnheader">We keep</span></div>
+            {SHARE_ROWS.map((r) => (
+              <div class="sh-r" role="row"><b role="rowheader">{r.n}</b><span class="el" role="cell">{r.el.length ? r.el.map(([n, v]) => <i><span>{n}</span><b class="tab">{pct(v)}</b></i>) : <i class="na"><span>No equivalent</span></i>}</span><span class="sk tab" role="cell">{pct(1 - r.ours)}</span><span class="nk tab" role="cell">{pct(r.ours)}</span></div>
+            ))}
+          </div></div>
+          <Mf><span>{SHARE_NOTE}</span></Mf>
+        </Cell>
+        {OWNERSHIP.map((o) => <Cell class="own" d={3} t={3} m={2} style={`--c:${o.c}`}><div class="mh"><span><i class="sq"></i>{o.k}</span></div><div class="cb"><h3>{o.h}</h3><p>{o.p}</p></div></Cell>)}
+      </Sheet>
+    </section>
+
+    <section class="blk" id="faq">
+      <Sheet>
+        <Cell class="hd" d={5} t={6}><Mh ix="06" label="Questions" /><div class="cb"><h2>Questions<br />operators ask.</h2></div></Cell>
+        <Cell class="faq" d={7} t={6}><Mh label="Before you switch" meta={`${RUN_FAQ.length} answers`} /><Faq items={RUN_FAQ} /></Cell>
+      </Sheet>
+    </section>
+  </main>
   <Footer slot="footer"><FooterRun slot="first" /></Footer>
 </Base>
-<style>.shell{min-height:60svh}</style>
+<script>
+  import { initRun } from "../scripts/run/index";
+  initRun();
+</script>

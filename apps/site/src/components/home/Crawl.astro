@@ -1,0 +1,11 @@
+---
+// The crawl under the hero: every station's program, looping (home/body.html .crawl).
+import { crawlHtml } from "../../scripts/home/markup";
+import { nowMinutes } from "../../lib/clock";
+const h = crawlHtml(nowMinutes());
+---
+<div class="crawl" role="region" aria-label="On now across the network"><span class="tag"><i></i>On now</span><div class="track" id="crawl"><span class="cr-a" set:html={h} /><span class="cr-b" aria-hidden="true" set:html={h} /></div></div>
+<style is:global>
+  /* The two passes are wrappers now (for the hidden copy); they lay out as the reference's flat list did. */
+  .crawl .track > .cr-a, .crawl .track > .cr-b { display: contents; }
+</style>

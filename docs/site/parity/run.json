@@ -1,0 +1,1427 @@
+{
+  "page": "run",
+  "slug": "run",
+  "route": "/run",
+  "generated": "2026-10-18T05:28:53.567Z",
+  "settings": {
+    "time": "2026-10-17T20:14:00-07:00 (America/Los_Angeles)",
+    "widths": [
+      "1440x900",
+      "820x1180",
+      "390x844"
+    ],
+    "seed": 1814,
+    "reduced": false,
+    "reference": "docs/reference/site/pages/run.html",
+    "built": "apps/site/dist/run",
+    "pixelThreshold": 40,
+    "rectTolerance": 2
+  },
+  "order": [
+    "header",
+    "hero",
+    "who",
+    "control",
+    "switch",
+    "pricing",
+    "earn",
+    "faq",
+    "footer"
+  ],
+  "captures": [
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 1440,
+      "mode": "header",
+      "mismatch": 0.06,
+      "refSize": [
+        1440,
+        68
+      ],
+      "builtSize": [
+        1440,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/header-1440.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 1.69,
+      "refSize": [
+        1440,
+        992
+      ],
+      "builtSize": [
+        1440,
+        992
+      ],
+      "sectionHeight": [
+        992,
+        992
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/hero-1440.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.18,
+      "refSize": [
+        1440,
+        957
+      ],
+      "builtSize": [
+        1440,
+        957
+      ],
+      "sectionHeight": [
+        955,
+        955
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/who-1440.jpg"
+    },
+    {
+      "section": "control",
+      "capture": "control",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        1846
+      ],
+      "builtSize": [
+        1440,
+        1846
+      ],
+      "sectionHeight": [
+        1845,
+        1845
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/control-1440.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@0",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1684,
+        1684
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@0-1440.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@50",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0.02,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1684,
+        1684
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@50-1440.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@100",
+      "width": 1440,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        900
+      ],
+      "builtSize": [
+        1440,
+        900
+      ],
+      "sectionHeight": [
+        1684,
+        1684
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@100-1440.jpg"
+    },
+    {
+      "section": "pricing",
+      "capture": "pricing",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0,
+      "refSize": [
+        1440,
+        1652
+      ],
+      "builtSize": [
+        1440,
+        1652
+      ],
+      "sectionHeight": [
+        1652,
+        1652
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/pricing-1440.jpg"
+    },
+    {
+      "section": "earn",
+      "capture": "earn",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        1440,
+        2145
+      ],
+      "builtSize": [
+        1440,
+        2145
+      ],
+      "sectionHeight": [
+        2143,
+        2143
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/earn-1440.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.04,
+      "refSize": [
+        1440,
+        718
+      ],
+      "builtSize": [
+        1440,
+        718
+      ],
+      "sectionHeight": [
+        718,
+        718
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/faq-1440.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 1440,
+      "mode": "element",
+      "mismatch": 0.3,
+      "refSize": [
+        1440,
+        1220
+      ],
+      "builtSize": [
+        1440,
+        1220
+      ],
+      "sectionHeight": [
+        1219,
+        1219
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/footer-1440.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 820,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        820,
+        68
+      ],
+      "builtSize": [
+        820,
+        68
+      ],
+      "sectionHeight": [
+        68,
+        68
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/header-820.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 2.75,
+      "refSize": [
+        820,
+        1616
+      ],
+      "builtSize": [
+        820,
+        1616
+      ],
+      "sectionHeight": [
+        1615,
+        1615
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/hero-820.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        820,
+        1633
+      ],
+      "builtSize": [
+        820,
+        1633
+      ],
+      "sectionHeight": [
+        1632,
+        1632
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/who-820.jpg"
+    },
+    {
+      "section": "control",
+      "capture": "control",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        2153
+      ],
+      "builtSize": [
+        820,
+        2153
+      ],
+      "sectionHeight": [
+        2152,
+        2152
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/control-820.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@0",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2064,
+        2064
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@0-820.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@50",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2064,
+        2064
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@50-820.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@100",
+      "width": 820,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        1180
+      ],
+      "builtSize": [
+        820,
+        1180
+      ],
+      "sectionHeight": [
+        2064,
+        2064
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@100-820.jpg"
+    },
+    {
+      "section": "pricing",
+      "capture": "pricing",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.01,
+      "refSize": [
+        820,
+        2369
+      ],
+      "builtSize": [
+        820,
+        2369
+      ],
+      "sectionHeight": [
+        2368,
+        2368
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/pricing-820.jpg"
+    },
+    {
+      "section": "earn",
+      "capture": "earn",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        820,
+        3049
+      ],
+      "builtSize": [
+        820,
+        3049
+      ],
+      "sectionHeight": [
+        3048,
+        3048
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/earn-820.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.05,
+      "refSize": [
+        820,
+        823
+      ],
+      "builtSize": [
+        820,
+        823
+      ],
+      "sectionHeight": [
+        821,
+        821
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/faq-820.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 820,
+      "mode": "element",
+      "mismatch": 0.37,
+      "refSize": [
+        820,
+        1429
+      ],
+      "builtSize": [
+        820,
+        1429
+      ],
+      "sectionHeight": [
+        1428,
+        1428
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/footer-820.jpg"
+    },
+    {
+      "section": "header",
+      "capture": "header",
+      "width": 390,
+      "mode": "header",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        60
+      ],
+      "builtSize": [
+        390,
+        60
+      ],
+      "sectionHeight": [
+        60,
+        60
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/header-390.jpg"
+    },
+    {
+      "section": "hero",
+      "capture": "hero",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 3.01,
+      "refSize": [
+        390,
+        1384
+      ],
+      "builtSize": [
+        390,
+        1384
+      ],
+      "sectionHeight": [
+        1384,
+        1384
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/hero-390.jpg"
+    },
+    {
+      "section": "who",
+      "capture": "who",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 1,
+      "refSize": [
+        390,
+        1648
+      ],
+      "builtSize": [
+        390,
+        1648
+      ],
+      "sectionHeight": [
+        1646,
+        1646
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/who-390.jpg"
+    },
+    {
+      "section": "control",
+      "capture": "control",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.03,
+      "refSize": [
+        390,
+        2950
+      ],
+      "builtSize": [
+        390,
+        2950
+      ],
+      "sectionHeight": [
+        2950,
+        2950
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/control-390.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@0",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0.03,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        2455,
+        2455
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@0-390.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@50",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0.01,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        2455,
+        2455
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@50-390.jpg"
+    },
+    {
+      "section": "switch",
+      "capture": "switch@100",
+      "width": 390,
+      "mode": "tall",
+      "mismatch": 0,
+      "refSize": [
+        390,
+        844
+      ],
+      "builtSize": [
+        390,
+        844
+      ],
+      "sectionHeight": [
+        2455,
+        2455
+      ],
+      "maskedCanvases": 2,
+      "cropped": false,
+      "image": "run/switch@100-390.jpg"
+    },
+    {
+      "section": "pricing",
+      "capture": "pricing",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.02,
+      "refSize": [
+        390,
+        2585
+      ],
+      "builtSize": [
+        390,
+        2585
+      ],
+      "sectionHeight": [
+        2584,
+        2584
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/pricing-390.jpg"
+    },
+    {
+      "section": "earn",
+      "capture": "earn",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.2,
+      "refSize": [
+        390,
+        3754
+      ],
+      "builtSize": [
+        390,
+        3754
+      ],
+      "sectionHeight": [
+        3753,
+        3753
+      ],
+      "maskedCanvases": 0,
+      "cropped": true,
+      "image": "run/earn-390.jpg"
+    },
+    {
+      "section": "faq",
+      "capture": "faq",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.12,
+      "refSize": [
+        390,
+        790
+      ],
+      "builtSize": [
+        390,
+        790
+      ],
+      "sectionHeight": [
+        789,
+        789
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/faq-390.jpg"
+    },
+    {
+      "section": "footer",
+      "capture": "footer",
+      "width": 390,
+      "mode": "element",
+      "mismatch": 0.83,
+      "refSize": [
+        390,
+        1406
+      ],
+      "builtSize": [
+        390,
+        1406
+      ],
+      "sectionHeight": [
+        1405,
+        1405
+      ],
+      "maskedCanvases": 0,
+      "cropped": false,
+      "image": "run/footer-390.jpg"
+    }
+  ],
+  "missing": [],
+  "elements": {
+    "header": {
+      "390": {
+        "matched": 2,
+        "refCount": 2,
+        "builtCount": 2,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 4,
+        "refCount": 4,
+        "builtCount": 4,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 13,
+        "refCount": 13,
+        "builtCount": 13,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "hero": {
+      "390": {
+        "matched": 38,
+        "refCount": 44,
+        "builtCount": 44,
+        "mismatches": [
+          {
+            "text": "02 Prepare",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
+            ]
+          },
+          {
+            "text": "03 Schedule",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+            ]
+          },
+          {
+            "text": "04 Breaks",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(235, 160, 58)→rgba(0, 0, 0, 0)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "In the break",
+            "count": 1
+          },
+          {
+            "t": "Members",
+            "count": 1
+          },
+          {
+            "t": "0:15",
+            "count": 1
+          },
+          {
+            "t": "Breaks that build themselves",
+            "count": 1
+          },
+          {
+            "t": "Bumpers, IDs and paid spots from the market, dropped into natural break points.",
+            "count": 1
+          },
+          {
+            "t": "1:45 a break",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Before",
+            "count": 1
+          },
+          {
+            "t": "After",
+            "count": 1
+          },
+          {
+            "t": "1080i → 1080p",
+            "count": 1
+          },
+          {
+            "t": "Prepared once, on our side",
+            "count": 1
+          },
+          {
+            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
+            "count": 1
+          },
+          {
+            "t": "Once per file",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 44,
+        "refCount": 50,
+        "builtCount": 50,
+        "mismatches": [
+          {
+            "text": "02 Prepare",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "bg rgba(0, 0, 0, 0)→rgb(91, 123, 224)"
+            ]
+          },
+          {
+            "text": "02",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgb(91, 123, 224)→rgba(255, 255, 255, 0.75)"
+            ]
+          },
+          {
+            "text": "03 Schedule",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(167, 159, 191)"
+            ]
+          },
+          {
+            "text": "04 Breaks",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(235, 160, 58)→rgba(0, 0, 0, 0)"
+            ]
+          },
+          {
+            "text": "04",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.75)→rgb(235, 160, 58)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "In the break",
+            "count": 1
+          },
+          {
+            "t": "Spot · Juniper Barber",
+            "count": 1
+          },
+          {
+            "t": "0:30",
+            "count": 1
+          },
+          {
+            "t": "Breaks that build themselves",
+            "count": 1
+          },
+          {
+            "t": "Bumpers, IDs and paid spots from the market, dropped into natural break points.",
+            "count": 1
+          },
+          {
+            "t": "1:45 a break",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Before",
+            "count": 1
+          },
+          {
+            "t": "After",
+            "count": 1
+          },
+          {
+            "t": "1080i → 1080p",
+            "count": 1
+          },
+          {
+            "t": "Prepared once, on our side",
+            "count": 1
+          },
+          {
+            "t": "Every file is fixed and transcoded one time. No GPU, no server, no fan noise.",
+            "count": 1
+          },
+          {
+            "t": "Once per file",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 44,
+        "refCount": 50,
+        "builtCount": 55,
+        "mismatches": [
+          {
+            "text": "03 Schedule",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgba(243, 234, 217, 0.8)→rgb(255, 255, 255)",
+              "bg rgba(0, 0, 0, 0)→rgb(47, 154, 114)"
+            ]
+          },
+          {
+            "text": "03",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgb(47, 154, 114)→rgba(255, 255, 255, 0.75)"
+            ]
+          },
+          {
+            "text": "04 Breaks",
+            "n": 0,
+            "tag": "button",
+            "diffs": [
+              "color rgb(255, 255, 255)→rgb(167, 159, 191)",
+              "bg rgb(235, 160, 58)→rgba(0, 0, 0, 0)"
+            ]
+          },
+          {
+            "text": "04",
+            "n": 0,
+            "tag": "i",
+            "diffs": [
+              "color rgba(255, 255, 255, 0.75)→rgb(235, 160, 58)"
+            ]
+          }
+        ],
+        "refOnly": [
+          {
+            "t": "In the break",
+            "count": 1
+          },
+          {
+            "t": "Spot · Juniper Barber",
+            "count": 1
+          },
+          {
+            "t": "0:30",
+            "count": 1
+          },
+          {
+            "t": "Breaks that build themselves",
+            "count": 1
+          },
+          {
+            "t": "Bumpers, IDs and paid spots from the market, dropped into natural break points.",
+            "count": 1
+          },
+          {
+            "t": "1:45 a break",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Fri",
+            "count": 1
+          },
+          {
+            "t": "Crate Session",
+            "count": 1
+          },
+          {
+            "t": "● Beat Tape Live",
+            "count": 1
+          },
+          {
+            "t": "Overnight Crates",
+            "count": 2
+          },
+          {
+            "t": "Sat",
+            "count": 1
+          },
+          {
+            "t": "Guest Mix",
+            "count": 1
+          },
+          {
+            "t": "Late Crate",
+            "count": 1
+          },
+          {
+            "t": "A real schedule",
+            "count": 1
+          },
+          {
+            "t": "Your week, by the hour. Live shows get a slot and replays fill the gaps.",
+            "count": 1
+          },
+          {
+            "t": "7 days ahead",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "who": {
+      "390": {
+        "matched": 26,
+        "refCount": 26,
+        "builtCount": 26,
+        "mismatches": [
+          {
+            "text": "A Lofi, mixes, long-stream archives, podcast reruns",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 410→406",
+              "h 19→26"
+            ]
+          },
+          {
+            "text": "B ErsatzTV, Tunarr and Plex channels with bumpers",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 832→828",
+              "h 19→26"
+            ]
+          },
+          {
+            "text": "C City hall, a school, a church, a radio collective",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 1201→1197",
+              "h 19→26"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 27,
+        "refCount": 27,
+        "builtCount": 27,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 27,
+        "refCount": 27,
+        "builtCount": 27,
+        "mismatches": [
+          {
+            "text": "A Lofi, mixes, long-stream archives, podcast reruns",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 410→407",
+              "h 19→26"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "control": {
+      "390": {
+        "matched": 117,
+        "refCount": 117,
+        "builtCount": 117,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 118,
+        "refCount": 118,
+        "builtCount": 118,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 118,
+        "refCount": 118,
+        "builtCount": 118,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "switch": {
+      "390": {
+        "matched": 86,
+        "refCount": 86,
+        "builtCount": 86,
+        "mismatches": [
+          {
+            "text": "dial",
+            "n": 0,
+            "tag": "span/th",
+            "diffs": [
+              "x 134→118",
+              "y 407→395",
+              "w 26→135",
+              "h 22→47",
+              "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 87,
+        "refCount": 87,
+        "builtCount": 87,
+        "mismatches": [
+          {
+            "text": "dial",
+            "n": 0,
+            "tag": "span/th",
+            "diffs": [
+              "x 191→171",
+              "y 479→467",
+              "w 26→165",
+              "h 22→47",
+              "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 87,
+        "refCount": 87,
+        "builtCount": 87,
+        "mismatches": [
+          {
+            "text": "dial",
+            "n": 0,
+            "tag": "span/th",
+            "diffs": [
+              "x 335→303",
+              "y 455→443",
+              "w 26→290",
+              "h 22→47",
+              "bg rgba(0, 0, 0, 0)→rgb(192, 74, 158)"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "pricing": {
+      "390": {
+        "matched": 79,
+        "refCount": 79,
+        "builtCount": 79,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 80,
+        "refCount": 80,
+        "builtCount": 80,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 80,
+        "refCount": 80,
+        "builtCount": 80,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "earn": {
+      "390": {
+        "matched": 93,
+        "refCount": 93,
+        "builtCount": 93,
+        "mismatches": [
+          {
+            "text": "05 Earnings and ownership",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "y 68→59",
+              "w 190→209"
+            ]
+          },
+          {
+            "text": "05",
+            "n": 0,
+            "tag": "b",
+            "diffs": [
+              "y 68→59"
+            ]
+          },
+          {
+            "text": "Where the money goes",
+            "n": 0,
+            "tag": "span",
+            "diffs": [
+              "x 218→16",
+              "y 71→83",
+              "w 155→170"
+            ]
+          }
+        ],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 94,
+        "refCount": 94,
+        "builtCount": 94,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 95,
+        "refCount": 95,
+        "builtCount": 95,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "faq": {
+      "390": {
+        "matched": 12,
+        "refCount": 12,
+        "builtCount": 12,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "820": {
+        "matched": 12,
+        "refCount": 12,
+        "builtCount": 12,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      },
+      "1440": {
+        "matched": 12,
+        "refCount": 12,
+        "builtCount": 12,
+        "mismatches": [],
+        "refOnly": [],
+        "builtOnly": []
+      }
+    },
+    "footer": {
+      "390": {
+        "matched": 42,
+        "refCount": 44,
+        "builtCount": 44,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Choose a free number and a four-letter call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Four letters. 4 to go.",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Choose a free number and a call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Three to five letters.",
+            "count": 1
+          }
+        ]
+      },
+      "820": {
+        "matched": 42,
+        "refCount": 44,
+        "builtCount": 44,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Choose a free number and a four-letter call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Four letters. 4 to go.",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Choose a free number and a call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Three to five letters.",
+            "count": 1
+          }
+        ]
+      },
+      "1440": {
+        "matched": 42,
+        "refCount": 44,
+        "builtCount": 44,
+        "mismatches": [],
+        "refOnly": [
+          {
+            "t": "Choose a free number and a four-letter call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Four letters. 4 to go.",
+            "count": 1
+          }
+        ],
+        "builtOnly": [
+          {
+            "t": "Choose a free number and a call sign, point us at your library, and your first schedule can be on the dial in an evening.",
+            "count": 1
+          },
+          {
+            "t": "Three to five letters.",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "notes": []
+}

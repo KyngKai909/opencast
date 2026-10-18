@@ -1,0 +1,42 @@
+---
+// 02 Stations (home/body.html section#stations): one cell per station, its call sign drawn as a
+// window onto its picture (src/scripts/home/signs.ts), then the open number.
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import { STATIONS, slot } from "../../data/stations";
+import { COUNTS } from "../../data/home";
+import { ROUTES, watch } from "../../data/links";
+import { clock, nowMinutes } from "../../lib/clock";
+const m = nowMinutes();
+const KEY = `<span class="key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+---
+<section class="blk" id="stations">
+  <div class="wrap">
+    <div class="sheet" id="signs">
+      <Cell class="hd" d={7}>
+        <Mh ix="02" label="Stations" meta={`${COUNTS.all} on the dial`} />
+        <div class="cb"><h2>Every number<br />is somebody.</h2></div>
+      </Cell>
+      <Cell class="hd" d={5}>
+        <Mh label="Who's on" meta={`${COUNTS.tv} TV · ${COUNTS.fm} radio`} />
+        <div class="cb end"><p class="lede">A station is a person or a group with a call sign, a number in their market and a schedule they built. Some are one person and a crate of records. One is a whole city council.</p></div>
+      </Cell>
+      {STATIONS.map((s, i) => {
+        const sl = slot(s, m);
+        return (
+          <Cell as="a" class="stn" d={4} t={3} m={1} href={watch(s.n).href} data-i={i} data-watch data-cur="Tune" style={`--c:${s.c}`}>
+            <div class="mh"><span class="ch">{s.b === "fm" ? "FM " : ""}{s.n}</span><span class="air"><i></i>On now</span></div>
+            <div class="cv"><canvas aria-hidden="true"></canvas><span class="sr">Tune to {s.n} {s.cs}.</span></div>
+            <div class="mf col"><div class="nm"><b>{s.name}</b><span>{s.who}</span></div><div class="onn"><strong data-prog>{sl.prog}</strong><small data-until>until {clock(sl.end)}</small><span class="pb"><i data-pct style={`width:${(sl.pct * 100).toFixed(0)}%`}></i></span></div></div>
+            <Fragment set:html={KEY} />
+          </Cell>
+        );
+      })}
+      <Cell as="a" class="stn-cta" d={12} t={3} m={1} href={ROUTES.run} data-cur="Open" style="--c:#F3EAD9">
+        <div class="mh"><span class="ch">__.1</span><span>Open</span></div>
+        <div class="cb"><h3>Room on the dial.</h3><p>Pick a number and a call sign. Free to start.</p></div>
+        <div class="mf"><span>Run a station</span><Fragment set:html={KEY} /></div>
+      </Cell>
+    </div>
+  </div>
+</section>

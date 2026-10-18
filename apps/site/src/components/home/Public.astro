@@ -1,0 +1,21 @@
+---
+// 05 Public by design (home/body.html section#public): the manifesto, lit word by word as it
+// scrolls in, and the five promises.
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import { MANIFESTO, PROMISES } from "../../data/home";
+const words = MANIFESTO.split(" ").map((w) => ({ hot: /^\*.*\*[.,]?$/.test(w), w: w.replace(/\*/g, "") }));
+---
+<section class="blk" id="public">
+  <div class="wrap">
+    <div class="sheet">
+      <Cell d={12}>
+        <Mh ix="05" label="Public by design" meta="Five promises" />
+        <div class="cb"><p class="mani" id="mani"><span class="sr">{MANIFESTO.replace(/\*/g, "")}</span><span aria-hidden="true">{words.map((x, i) => <>{i > 0 && " "}<span class:list={["w", { hot: x.hot }]}>{x.w}</span></>)}</span></p></div>
+      </Cell>
+      {PROMISES.map((p, i) => (
+        <Cell class="pf" d={p.d} t={p.t} m={p.m} style={`--c:${p.c}`}><div class="mh"><span><i class="sq"></i>{p.title}</span><span class="ix">{String(i + 1).padStart(2, "0")}</span></div><div class="cb"><p>{p.body}</p></div></Cell>
+      ))}
+    </div>
+  </div>
+</section>

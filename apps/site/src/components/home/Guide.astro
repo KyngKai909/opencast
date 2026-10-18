@@ -1,0 +1,35 @@
+---
+// 01 The guide (home/body.html section#guide). Rows tune the hero; the filter shows TV or radio.
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import Mf from "../Mf.astro";
+import Seg from "../Seg.astro";
+import Sheet from "../Sheet.astro";
+import { COUNTS } from "../../data/home";
+import { guideHtml } from "../../scripts/home/markup";
+import { clock, nowMinutes } from "../../lib/clock";
+const m = nowMinutes();
+---
+<section class="blk" id="guide">
+  <Sheet>
+    <Cell class="hd" d={7}>
+      <Mh ix="01" label="The guide" meta="Live" live />
+      <div class="cb"><h2>No feed.<br />Just what's on.</h2></div>
+    </Cell>
+    <Cell class="hd" d={5}>
+      <Mh label="How it works" tab><span slot="meta" id="gClock">{clock(Math.floor(m))}</span></Mh>
+      <div class="cb end"><p class="lede">Every station keeps a schedule, so there's always something playing and you can see what's next. Nothing is picked for you.</p></div>
+    </Cell>
+    <Cell d={12}>
+      <div class="g-bar">
+        <Seg label="Show stations" key="f" id="gFilter" options={[{ value: "all", label: "All", count: COUNTS.all }, { value: "tv", label: "TV", count: COUNTS.tv }, { value: "fm", label: "Radio", count: COUNTS.fm }]} />
+        <span class="g-help">Hover a station to peek. Select it to tune in.</span>
+      </div>
+      <div class="guide"><div class="g-in" id="gIn" set:html={guideHtml(m)} /></div>
+      <Mf>
+        <div class="lgd"><span><i class="k-now"></i>On now</span><span><i class="k-up"></i>Coming up</span><span><i class="k-past"></i>Ended</span></div>
+        <span class="tab">Times in your time zone</span>
+      </Mf>
+    </Cell>
+  </Sheet>
+</section>

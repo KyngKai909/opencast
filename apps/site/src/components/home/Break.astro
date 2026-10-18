@@ -1,0 +1,29 @@
+---
+// 03 The break (home/body.html section#breaks): a break on BEAT, played by scrolling through the
+// pinned section. Drawn by src/scripts/home/break.ts.
+import Cell from "../Cell.astro";
+import { BREAK_PARTS, BREAK_STATION, BREAK_TOTAL, mmss } from "../../data/home";
+import { byCallSign } from "../../data/stations";
+const b = byCallSign(BREAK_STATION)!;
+---
+<section class="brkw" id="breaks" aria-label="How a break works, played as you scroll">
+  <div class="brk-pin" id="brkPin" style={`--pc:${b.c}`}>
+    <div class="wrap">
+      <div class="sheet">
+        <Cell class="bcap" d={5}>
+          <div class="mh"><span><b class="ix">03</b>The break</span><span class="pre"><i></i><span id="capPre">A break on {b.n} {b.cs}</span></span></div>
+          <div class="cb"><h2 id="capH"><span>The breaks are part of the show.</span></h2><p id="capP">Scroll to play one. Every station builds its own: short, local, and paying the people who make the channel.</p></div>
+          <div class="mf"><span>Scroll to play</span><span class="tab" id="tlT">0:00 of {mmss(BREAK_TOTAL)}</span></div>
+        </Cell>
+        <Cell class="btv" d={7}>
+          <div class="mh"><span id="tlNow"><b>{BREAK_PARTS[0]!.name}</b></span><span>{b.n} {b.cs}</span></div>
+          <div class="cb"><div class="brk-tv"><canvas id="brkC" width="800" height="500" aria-hidden="true"></canvas></div></div>
+          <div class="mf col">
+            <div class="tl" id="tl" aria-hidden="true">{BREAK_PARTS.map((p) => <div style={`flex:${p.secs}`}><i></i></div>)}</div>
+            <div class="tl-names" id="tlNames" aria-hidden="true">{BREAK_PARTS.map((p, i) => <span class:list={{ on: i === 0 }} style={`flex:${p.secs}`}>{p.label ?? ""}</span>)}</div>
+          </div>
+        </Cell>
+      </div>
+    </div>
+  </div>
+</section>

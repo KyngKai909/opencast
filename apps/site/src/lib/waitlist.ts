@@ -1,9 +1,10 @@
-// The waitlist form's rules, apart from the form: what each field accepts, what's sent to
-// `waitlist.join`, and what the confirmation says. Words the reference doesn't draw are in
-// docs/apps/new-copy.md (Site).
+// The waitlist sheet's rules, apart from the sheet: what each field accepts, what's sent to
+// `waitlist.join`, and what the confirmation says. New words are in docs/site/new-copy.md.
 
 import { z } from "zod";
-import type { Market, WaitlistRole } from "@opencast/contracts";
+import type { Market } from "@contracts/common";
+import type { WaitlistRole } from "@contracts/waitlist";
+import { cleanCallSign } from "./callsign";
 
 export type Role = WaitlistRole;
 
@@ -21,15 +22,20 @@ export interface WaitlistDraft {
   zip: string;
   /** Kept while another role is chosen, so switching back doesn't lose it; only a station sends it. */
   callSign: string;
+  /** The number a station holds with it ("44.1"); request D1, ignored by the API until it lands. */
+  channel?: string;
+  /** What it's for ("Order a spot", a program's title), as `about`. */
+  about?: string;
+  /** The planner's picks or a market row's program (request D2, ignored until it lands). */
+  details?: Record<string, string>;
+  /** The number was suggested by the sheet, not picked: it follows the call sign. */
+  suggested?: boolean;
 }
 
 export type FieldName = "email" | "zip" | "callSign";
 export type FieldErrors = Partial<Record<FieldName, string>>;
 
-/** A call sign as it's typed: letters only, in capitals, five at most ("be-at1" → "BEAT"). */
-export function cleanCallSign(value: string): string {
-  return value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 5);
-}
+export { cleanCallSign };
 
 /** A ZIP as it's typed: digits only, five at most (a ZIP+4 keeps its first five). */
 export function cleanZip(value: string): string {
@@ -46,8 +52,8 @@ export const COPY = {
   callSignFree: (cs: string) => `${cs} is free.`,
   callSignTaken: (cs: string) => `${cs} is taken. Try another.`,
   callSignRefused: (reason: string, ideas: string[]) => `${reason}${ideas.length ? ` Try ${ideas.slice(0, 2).join(" or ")}.` : " Try another."}`,
-  callSignAlsoAsked: (cs: string) => `Someone else asked for ${cs} too. You can still ask: Opencast decides who keeps it.`,
-  offline: "We couldn’t reach Opencast. Check your connection and try again."
+  callSignAlsoAsked: (cs: string) => `Someone else asked for ${cs} too. You can still ask: Dial decides who keeps it.`,
+  offline: "We couldn’t reach Dial. Check your connection and try again."
 } as const;
 
 /** What's wrong before anything is sent. Empty when the form can go. */
@@ -60,10 +66,24 @@ export function validate(draft: WaitlistDraft): FieldErrors {
   return errors;
 }
 
-/** The body for `waitlist.join`. The call sign goes only with a station, and only when there is one. */
-export function toBody(draft: WaitlistDraft): { role: Role; email: string; zip: string; callSign?: string } {
-  const body: { role: Role; email: string; zip: string; callSign?: string } = { role: draft.role, email: draft.email.trim(), zip: draft.zip };
+export interface JoinBody {
+  role: Role;
+  email: string;
+  zip: string;
+  callSign?: string;
+  about?: string;
+  channel?: string;
+  details?: Record<string, string>;
+}
+
+/** The body for `waitlist.join`. The call sign and number go only with a station, and only when there are some. */
+export function toBody(draft: WaitlistDraft): JoinBody {
+  const body: JoinBody = { role: draft.role, email: draft.email.trim(), zip: draft.zip };
   if (draft.role === "station" && draft.callSign) body.callSign = draft.callSign;
+  if (draft.role === "station" && draft.channel) body.channel = draft.channel;
+  const about = draft.about?.trim().slice(0, 140);
+  if (about) body.about = about;
+  if (draft.details && Object.keys(draft.details).length) body.details = draft.details;
   return body;
 }
 

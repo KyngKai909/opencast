@@ -1,0 +1,140 @@
+---
+// The waitlist sheet (SITE-SPEC §6): one on every page, opened by any link built with
+// data/links.ts `waitlist()` (or claim(), offerShow(), startSpot()… in waitlist mode). A right-side
+// panel on desktop, a bottom sheet on phones; square surface, pill buttons, `.seg2` for the role.
+// It posts to `waitlist.join` (mocked when there's no PUBLIC_API_URL). Logic: src/scripts/waitlist.ts,
+// loaded on first open. New copy: docs/site/new-copy.md. Without JavaScript, `#waitlist` shows it
+// with a note pointing to the Contact page.
+import { ROUTES } from "../data/links";
+---
+<div class="wl" id="waitlist" role="dialog" aria-modal="true" aria-labelledby="wlH" hidden>
+  <div class="wl-scrim" data-wl-close></div>
+  <div class="wl-panel">
+    <div class="mh"><span><b class="ix">00</b>The waitlist</span><button type="button" class="wl-x" data-wl-close aria-label="Close the waitlist"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+    <div class="wl-body">
+      <form class="wl-form" id="wlForm" novalidate>
+        <h2 id="wlH">Get on the dial<br /><span class="dim">before it opens.</span></h2>
+        <p class="wl-lede" id="wlLede">Dial opens one market at a time. Say who you are and where, and we'll write when yours is on.</p>
+        <noscript><p class="wl-err">The waitlist needs JavaScript. Or tell us on the <a href={ROUTES.contact}>contact page</a>.</p></noscript>
+
+        <fieldset class="wl-f">
+          <legend class="wl-l">I'm joining as</legend>
+          <div class="seg2 wl-roles" id="wlRole" role="group" aria-label="I'm joining as" data-seg>
+            <button type="button" class="on" aria-pressed="true" data-v="viewer">A viewer</button>
+            <button type="button" aria-pressed="false" data-v="station">A station</button>
+            <button type="button" aria-pressed="false" data-v="producer">A producer</button>
+            <button type="button" aria-pressed="false" data-v="business">A business</button>
+          </div>
+        </fieldset>
+
+        <div class="wl-f" data-for="station" hidden>
+          <label class="wl-l" for="wlCs">Call sign you'd like<span class="tab" id="wlNum" aria-live="polite"></span></label>
+          <div class="wl-cs"><input id="wlCs" name="callSign" maxlength="5" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="YOUR" aria-describedby="wlCsMsg" /><span class="wl-ch tab" id="wlCh" aria-hidden="true">__.1</span></div>
+          <small class="wl-hint" id="wlCsMsg">Three to five letters. We'll hold it for 120 days.</small>
+        </div>
+
+        <div class="wl-f" data-for="producer business" hidden>
+          <label class="wl-l" for="wlAbout" id="wlAboutL">What it's for</label>
+          <input class="wl-in" id="wlAbout" name="about" maxlength="140" autocomplete="off" />
+          <dl class="wl-dl" id="wlDetails" hidden></dl>
+        </div>
+
+        <div class="wl-row">
+          <div class="wl-f">
+            <label class="wl-l" for="wlEmail">Email</label>
+            <input class="wl-in" id="wlEmail" name="email" type="email" autocomplete="email" inputmode="email" required aria-describedby="wlEmailE" />
+            <small class="wl-e" id="wlEmailE"></small>
+          </div>
+          <div class="wl-f wl-zip">
+            <label class="wl-l" for="wlZip">ZIP code</label>
+            <input class="wl-in tab" id="wlZip" name="zip" autocomplete="postal-code" inputmode="numeric" maxlength="5" required aria-describedby="wlZipE" />
+            <small class="wl-e" id="wlZipE"></small>
+          </div>
+        </div>
+
+        <p class="wl-err" id="wlErr" role="alert"></p>
+        <div class="acts"><button class="btn" type="submit" id="wlGo"><span class="live" aria-hidden="true"><i></i><span id="wlChip">+1</span></span><span id="wlGoL">Join the waitlist</span></button></div>
+      </form>
+
+      <div class="wl-done" id="wlDone" hidden tabindex="-1">
+        <div class="wl-held" id="wlHeld" hidden><span class="tab" id="wlHeldN"></span><b id="wlHeldCs"></b><small>Held for 120 days</small></div>
+        <h2 id="wlDoneH"></h2>
+        <p class="wl-lede" id="wlDoneP"></p>
+        <div class="acts"><button class="btn ghost" type="button" data-wl-close>Back to the page</button></div>
+      </div>
+    </div>
+    <div class="mf"><span>Your ZIP decides your market. We don't share your email.</span></div>
+  </div>
+</div>
+<script>
+  // Open on any waitlist link; the sheet's logic loads the first time.
+  document.addEventListener("click", async (e) => {
+    const a = (e.target as Element).closest<HTMLElement>("[data-waitlist]");
+    if (!a || (e as MouseEvent).metaKey || (e as MouseEvent).ctrlKey) return;
+    e.preventDefault();
+    const { openWaitlist } = await import("../scripts/waitlist");
+    openWaitlist(JSON.parse(a.dataset.waitlist ?? "{}"));
+  });
+</script>
+<style is:global>
+  .wl{position:fixed;inset:0;z-index:85}
+  .wl:target{display:block !important}
+  .wl-scrim{position:absolute;inset:0;background:rgb(8 5 18 / .62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:wlfade .3s var(--ease)}
+  .wl-panel{position:absolute;top:0;right:0;bottom:0;width:min(520px,100%);display:flex;flex-direction:column;background:var(--night);box-shadow:-1px 0 0 var(--rule);animation:wlin .45s var(--ease)}
+  .wl-panel > .mh{flex:none;display:flex;align-items:center;justify-content:space-between;height:calc(var(--mh) + 12px);padding:0 var(--pad);border-bottom:1px solid var(--rule)}
+  .wl-x{width:40px;height:40px;border-radius:50%;border:0;background:rgb(243 234 217 / .06);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;cursor:pointer;color:var(--glow)}
+  .wl-x:hover{background:rgb(243 234 217 / .12)}
+  .wl-x svg{width:16px;height:16px}
+  .wl-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:clamp(24px,3vw,40px) var(--pad)}
+  .wl-panel > .mf{flex:none;padding:14px var(--pad);border-top:1px solid var(--rule);font-size:12.5px;color:var(--muted)}
+  .wl h2{font-size:clamp(40px,4.4vw,60px);line-height:.94;text-transform:uppercase}
+  .wl h2 .dim{color:rgb(243 234 217 / .38)}
+  .wl-lede{margin-top:16px;color:rgb(243 234 217 / .78);font-size:15.5px;line-height:1.55;max-width:44ch}
+  .wl-form{display:flex;flex-direction:column;gap:22px}
+  .wl-form > h2{margin-bottom:-6px}
+  .wl-f{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .wl-l{display:flex;justify-content:space-between;align-items:baseline;padding:0;font:600 11px/1 var(--text);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .wl-l .tab{font:400 18px/1 var(--osd);letter-spacing:.02em;color:#E9FFE8;text-transform:none}
+  .wl-roles{display:grid;grid-template-columns:repeat(4,1fr);width:100%}
+  .wl-roles button{justify-content:center;padding:0 6px}
+  .wl-in{height:50px;width:100%;padding:0 14px;border:0;border-radius:2px;background:rgb(243 234 217 / .05);box-shadow:inset 0 0 0 1px rgb(243 234 217 / .16);color:var(--glow);font:500 16px var(--text)}
+  .wl-in:hover{box-shadow:inset 0 0 0 1px rgb(243 234 217 / .28)}
+  .wl-in:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--glow)}
+  .wl-in[aria-invalid="true"]{box-shadow:inset 0 0 0 1.5px var(--tally)}
+  .wl-row{display:grid;grid-template-columns:1fr 140px;gap:14px}
+  .wl-cs{display:flex;align-items:center;height:72px;border-radius:2px;background:var(--np,var(--st));padding:0 18px;gap:12px}
+  .wl-cs input{flex:1;min-width:0;height:100%;border:0;background:none;color:#fff;font:900 46px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+  .wl-cs input::placeholder{color:rgb(255 255 255 / .35)}
+  .wl-cs input:focus{outline:none}
+  .wl-cs:focus-within{box-shadow:0 0 0 2px var(--night),0 0 0 4px var(--glow)}
+  .wl-ch{font:400 28px/1 var(--osd);color:#E9FFE8}
+  .wl-hint{font-size:12.5px;color:var(--muted)}
+  .wl-hint.ok{color:#3ddc84}
+  .wl-hint.no{color:#ff8a80}
+  .wl-e{font-size:12.5px;color:#ff8a80;min-height:0}
+  .wl-e:empty{display:none}
+  .wl-err{font-size:14px;color:#ff8a80}
+  .wl-err:empty{display:none}
+  .wl-err a{color:inherit}
+  .wl-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:4px 0 0;font-size:13.5px}
+  .wl-dl dt{color:var(--muted)}
+  .wl-dl dd{margin:0;color:var(--glow)}
+  .wl .acts{display:flex;gap:12px;flex-wrap:wrap}
+  .wl .btn[aria-busy="true"]{opacity:.6;cursor:progress}
+  .wl-done{display:flex;flex-direction:column;gap:6px;outline:none}
+  .wl-done .acts{margin-top:22px}
+  .wl-held{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding:14px 18px;border-radius:2px;background:var(--np,var(--st));color:#fff}
+  .wl-held .tab{font:400 30px/1 var(--osd);color:#E9FFE8}
+  .wl-held b{font:900 40px/1 var(--display);letter-spacing:.02em}
+  .wl-held small{margin-left:auto;font:600 11px/1 var(--text);letter-spacing:.13em;text-transform:uppercase;color:rgb(255 255 255 / .8)}
+  @keyframes wlin{from{transform:translateX(40px);opacity:0}}
+  @keyframes wlfade{from{opacity:0}}
+  @media (max-width:699px){
+    .wl-panel{top:auto;left:0;width:100%;max-height:92svh;box-shadow:0 -1px 0 var(--rule);animation-name:wlup}
+    .wl-row{grid-template-columns:1fr 110px}
+    .wl-roles{grid-template-columns:repeat(2,1fr);border-radius:18px}
+    .wl-roles button{height:40px}
+    @keyframes wlup{from{transform:translateY(40px);opacity:0}}
+  }
+  @media (prefers-reduced-motion:reduce){ .wl-panel,.wl-scrim{animation:none} }
+</style>

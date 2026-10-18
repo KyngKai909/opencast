@@ -1,13 +1,9 @@
-// The site's clock. The stations are in Southern California, so "now" is Pacific time wherever
-// the visitor is (the reference used the browser's zone). Tests freeze it with Playwright's clock.
+// The site's clock: the visitor's own time, as the reference has it (the guide says "Times in
+// your time zone"). Tests freeze it with a fixed Date and a time zone.
 
-const ZONE = "America/Los_Angeles";
-const parts = new Intl.DateTimeFormat("en-US", { timeZone: ZONE, hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23" });
-
-/** Minutes after midnight, Pacific, with seconds as a fraction. */
+/** Minutes after midnight, local time, with seconds as a fraction. */
 export function nowMinutes(at: Date = new Date()): number {
-  const p = Object.fromEntries(parts.formatToParts(at).map((x) => [x.type, x.value]));
-  return Number(p.hour) * 60 + Number(p.minute) + Number(p.second) / 60;
+  return at.getHours() * 60 + at.getMinutes() + at.getSeconds() / 60;
 }
 
 /** A 12-hour clock: 0 → "12 am", 494 → "8:14 am", 1214 → "8:14 pm" (`clock()` in the reference). */

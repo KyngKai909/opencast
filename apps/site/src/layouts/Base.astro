@@ -15,6 +15,7 @@ import "../styles/global.css";
 import display800 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-800-normal.woff2?url";
 import display900 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-900-normal.woff2?url";
 import Header from "../components/Header.astro";
+import WaitlistSheet from "../components/WaitlistSheet.astro";
 import type { PageKey } from "../data/links";
 import { PAGES, pageUrl } from "../data/pages";
 
@@ -71,6 +72,7 @@ const og = page ? `https://usedial.com/og/${page}.png` : "https://usedial.com/og
     <Header current={page} />
     <slot />
     <slot name="footer" />
+    <WaitlistSheet />
     <script>
       import { initSite } from "../lib/site";
       import { initNav } from "../lib/nav";
