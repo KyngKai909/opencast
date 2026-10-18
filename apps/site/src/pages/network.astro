@@ -1,0 +1,13 @@
+---
+// /network: the shell until Phase 2 ports the page from docs/reference/site/pages/network.html.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/network.css";
+import Footer from "../components/Footer.astro";
+import FooterNetwork from "../components/footers/FooterNetwork.astro";
+---
+<Base page="network">
+  <main id="top" class="shell"><h1 class="sr">A network, not a feed.</h1></main>
+  <Footer slot="footer"><FooterNetwork slot="first" /></Footer>
+</Base>
+<style>.shell{min-height:60svh}</style>

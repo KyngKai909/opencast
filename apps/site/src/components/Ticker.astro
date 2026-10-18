@@ -1,0 +1,30 @@
+---
+// A one-line ticker (synd.css `.deals`): a label, then one item at a time, each swapped in with a
+// short slide every `interval` ms. The first item is in the HTML. It's `aria-live="off"` and
+// pauses while hovered or focused; with reduced motion it doesn't rotate (src/lib/ticker.ts).
+export interface TickerItem {
+  /** A square badge before the line: a channel number in its station colour. */
+  badge?: string;
+  color?: string;
+  /** The line itself; <b> and <em> as in the reference. */
+  html: string;
+}
+interface Props {
+  label: string;
+  items: TickerItem[];
+  interval?: number;
+  id?: string;
+  class?: string;
+}
+const { label, items, interval = 3400, id, class: cls } = Astro.props;
+const item = (it: TickerItem) => (it.badge ? `<span class="badge" style="background:${it.color ?? "var(--st)"}">${it.badge}</span>` : "") + `<span>${it.html}</span>`;
+const first = items[0];
+---
+<div class:list={["deals", cls]} aria-live="off" data-ticker data-interval={interval} data-items={JSON.stringify(items.map(item))} id={id} tabindex="0" aria-label={label}>
+  <span class="dl-k">{label}</span>
+  <div class="dl-v">{first && <div set:html={item(first)} />}</div>
+</div>
+<script>
+  import { initTickers } from "../lib/ticker";
+  initTickers();
+</script>

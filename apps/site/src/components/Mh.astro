@@ -1,0 +1,19 @@
+---
+// A cell's header strip (grid.css `.mh`): small-caps label on the left, meta on the right.
+// `ix` is the VT323 section index ("07"). `live` puts the pulsing tally dot before the meta.
+interface Props {
+  label?: string;
+  meta?: string;
+  ix?: string;
+  live?: boolean;
+  /** `.tab` figures for the meta (counts, amounts). */
+  tab?: boolean;
+  class?: string;
+}
+const { label, meta, ix, live, tab, class: cls } = Astro.props;
+const hasMeta = meta !== undefined || Astro.slots.has("meta");
+---
+<div class:list={["mh", cls]}>
+  <span>{ix && <b class="ix">{ix}</b>}{label}<slot /></span>
+  {hasMeta && <span class:list={[{ lv: live, tab }]}>{live && <i />}{meta}<slot name="meta" /></span>}
+</div>

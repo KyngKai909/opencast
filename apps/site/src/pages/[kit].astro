@@ -1,0 +1,187 @@
+---
+// /_kit: every shared component in every state (not linked, noindex). Astro skips files that
+// start with "_", so the route comes from getStaticPaths. /_kit?widths shows it at 1440, 820 and
+// 390 side by side.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/network.css";
+import Btn from "../components/Btn.astro";
+import Cell from "../components/Cell.astro";
+import Faq from "../components/Faq.astro";
+import Footer from "../components/Footer.astro";
+import Mf from "../components/Mf.astro";
+import Mh from "../components/Mh.astro";
+import Seg from "../components/Seg.astro";
+import Sheet from "../components/Sheet.astro";
+import Slider from "../components/Slider.astro";
+import Steps from "../components/Steps.astro";
+import Ticker from "../components/Ticker.astro";
+import FooterNetwork from "../components/footers/FooterNetwork.astro";
+import FooterRun from "../components/footers/FooterRun.astro";
+import FooterSpots from "../components/footers/FooterSpots.astro";
+import FooterSyndication from "../components/footers/FooterSyndication.astro";
+import { claim, contact, LAUNCH_MODE, offerShow, startSpot, watch } from "../data/links";
+import { STATIONS } from "../data/stations";
+
+export function getStaticPaths() {
+  return [{ params: { kit: "_kit" } }];
+}
+
+const brand = import.meta.glob("../assets/brand/*.svg", { query: "?url", import: "default", eager: true }) as Record<string, string>;
+const colors: [string, string, string][] = [
+  ["Night (ground)", "--night", "#0E0A1C"],
+  ["Night 2", "--night-2", "#171030"],
+  ["Surface ink", "", "#140F24"],
+  ["Cream", "--glow", "#F3EAD9"],
+  ["Muted", "--muted", "#A79FBF"],
+  ["Rule", "--rule", "#2A2342"],
+  ["Tally", "--tally", "#FF4A3D"],
+  ["Phosphor", "", "#E9FFE8"],
+  ["Pays the bill", "", "#E0583A"],
+  ["Stays with you", "", "#3ddc84"]
+];
+const faq = [
+  { q: "A closed question", a: "Its answer, which shows when it's opened." },
+  { q: "An open question", a: 'Answers can hold a <a href="/contact">link</a> and <b>bold</b>.' },
+  { q: "A question long enough to wrap onto a second line on a phone, to check the plus key stays put", a: "It does." }
+];
+const ticker = [
+  { badge: "24.1", color: "#D98A2B", html: "<b>REEL</b> picked up <b>Tamales for forty</b> <em>· 30% share · 2 min ago</em>" },
+  { badge: "88.4", color: "#5B7BE0", html: "<b>NITE</b> is carrying <b>Crate Talk</b> <em>· $3.00 an airing · 9 min ago</em>" },
+  { badge: "7.1", color: "#2F9A72", html: "<b>CIVC</b> added <b>Silent Hour</b> <em>· free · 14 min ago</em>" }
+];
+const footers = [FooterRun, FooterSyndication, FooterSpots, FooterNetwork];
+---
+<Base title="Kit | Dial" description="Every shared component in every state." noindex>
+  <main id="top" class="kit">
+    <section class="blk"><Sheet>
+      <Cell class="hd" d={12}>
+        <Mh ix="00" label="Kit" meta={`Launch mode: ${LAUNCH_MODE}`} />
+        <div class="cb"><h1>The kit.<br /><span class="dim">Every part, every state.</span></h1><p class="lede">Not linked and not indexed. The header above is the real one: under 1100px it becomes the menu. <a href="?widths">See the kit at 1440, 820 and 390</a>.</p></div>
+      </Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-color"><Sheet>
+      <Cell d={12}><Mh ix="01" label="Colour" meta="tokens.css" /><div class="cb"><h2 id="k-color" class="sr">Colour</h2>
+        <div class="sw">{colors.map(([n, v, hex]) => <figure><i style={`background:${hex}`} /><figcaption><b>{n}</b><span class="tab">{hex}</span>{v && <span>{v}</span>}</figcaption></figure>)}</div>
+      </div></Cell>
+      <Cell d={12}><Mh label="Stations" meta="colour · text on night (ink)" /><div class="cb">
+        <div class="sw">{STATIONS.map((s) => <figure><i style={`background:${s.c}`} /><figcaption><b style={`color:${s.ink}`}>{s.n} {s.cs}</b><span class="tab">{s.c}{s.ink !== s.c ? ` · ink ${s.ink}` : ""}</span><span>{s.name}</span></figcaption></figure>)}</div>
+      </div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-type"><Sheet>
+      <Cell d={6} t={6}><Mh ix="02" label="Type" meta="Big Shoulders Display" /><div class="cb ty"><h2 id="k-type" class="sr">Type</h2>
+        {[900, 800, 700, 500].map((w) => <p class="d" style={`font-weight:${w}`}>Tune in {w}</p>)}
+      </div></Cell>
+      <Cell d={3} t={3}><Mh label="Text" meta="Instrument Sans" /><div class="cb ty">
+        {[400, 500, 600, 700].map((w) => <p style={`font-weight:${w}`}>Carry the show, {w}</p>)}
+        <p class="tab">Tabular $1,234.50 · 0123456789</p>
+      </div></Cell>
+      <Cell d={3} t={3}><Mh label="On screen" meta="VT323" /><div class="cb ty"><p class="o">12.1 BEAT</p><p class="o">8:14 pm</p></div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-grid"><Sheet>
+      <Cell d={12}><Mh ix="03" label="Sheet and Cell" meta="--d 12 · --t 6 · --m 2" /><div class="cb"><h2 id="k-grid" class="sr">Grid</h2><p class="lede">Cells split by hairlines, no gaps, no cards. A <code>t</code> over 6 fails the build.</p></div></Cell>
+      <Cell d={6} t={6} m={2}><Mh label="d 6 · t 6 · m 2" meta="Meta" /><div class="cb"><p>Half on desktop, full on tablet and phone.</p></div><Mf><span>A footer strip</span><span class="tab">$0.00</span></Mf></Cell>
+      <Cell d={3} t={3} m={1}><Mh label="d 3 · t 3 · m 1" /><div class="cb"><p>Quarter, half, half.</p></div></Cell>
+      <Cell d={3} t={3} m={1}><Mh label="Live" meta="12.1 BEAT, live" live /><div class="cb"><p>Header with the tally dot.</p></div></Cell>
+      <Cell d={4} t={2} m={2}><Mh ix="04" label="With index" meta="9" tab /><div class="cb"><p>d 4 · t 2 · m 2</p></div></Cell>
+      <Cell d={4} t={2} m={1}><Mh label="Label only" /><div class="cb"><p>d 4 · t 2 · m 1</p></div></Cell>
+      <Cell d={4} t={2} m={1}><Mh label="Two items" meta="Right" /><div class="cb"><p>d 4 · t 2 · m 1</p></div><Mf><span>Left</span><span>Right</span></Mf></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-btn"><Sheet>
+      <Cell d={6} t={6}><Mh ix="04" label="Buttons" meta="only things you press are round" /><div class="cb stack"><h2 id="k-btn" class="sr">Buttons</h2>
+        <div class="acts"><Btn cta={claim()} live="__.1" cur="Claim">Claim a number</Btn><Btn cta={contact()} ghost>Talk to a person</Btn></div>
+        <div class="acts"><Btn cta={startSpot()} live=":15">Start a spot</Btn><Btn cta={offerShow()} live="NEW">Offer a show</Btn><Btn href="#k-btn" live="+1">Live chip +1</Btn></div>
+        <div class="acts"><Btn href="#k-btn" ghost>Ghost</Btn><Btn button live="__.1" disabled>Disabled</Btn><Btn button ghost disabled>Ghost, disabled</Btn></div>
+        <div class="acts"><Btn cta={watch("12.1")} live="12.1">Watch</Btn><Btn cta={watch("12.1", "live")} ghost>Watch, live mode</Btn></div>
+        <p class="small">Hover lifts a button and tints its glow with the station colour; focus shows the cream ring. A primary always has its chip: the build fails without one.</p>
+      </div></Cell>
+      <Cell d={6} t={6}><Mh label="Where they go" meta={LAUNCH_MODE} /><div class="cb"><dl class="dl">
+        <dt>Claim a number</dt><dd><code>{claim({ number: "44.1", callSign: "TACO" }).href}</code> {JSON.stringify(claim({ number: "44.1", callSign: "TACO" }).attrs)}</dd>
+        <dt>Claim, live mode</dt><dd><code>{claim({ number: "44.1", callSign: "TACO" }, "live").href}</code></dd>
+        <dt>Start a spot, live</dt><dd><code>{startSpot({ where: "shop", kind: "cafe", times: "evening", budget: "300", cap: "15" }, "live").href}</code></dd>
+        <dt>Talk to a person</dt><dd><code>{contact("stations").href}</code></dd>
+      </dl></div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-seg"><Sheet>
+      <Cell d={6} t={6}><Mh ix="05" label="Segmented" meta=".seg2" /><div class="cb stack"><h2 id="k-seg" class="sr">Segmented controls</h2>
+        <Seg label="Where you sell" options={[{ value: "shop", label: "In a shop" }, { value: "online", label: "Online" }]} />
+        <Seg label="Show stations" key="f" options={[{ value: "all", label: "All", count: 9 }, { value: "tv", label: "TV", count: 6 }, { value: "fm", label: "Radio", count: 3 }]} value="tv" />
+        <Seg label="Relays" options={[{ value: "0", label: "None" }, { value: "1", label: "Live only" }, { value: "2", label: "Everything" }]} value="2" />
+        <p class="small" id="segOut" aria-live="polite">Pick one: the group fires <code>seg:change</code>.</p>
+      </div></Cell>
+      <Cell d={6} t={6}><Mh label="Sliders" meta=".cr" /><div class="cb stack">
+        <Slider id="kMin" label="At the minimum" min={0} max={300} step={5} value={0} shown="0 GB" />
+        <Slider id="kMid" label="In the middle" min={0} max={300} step={5} value={150} shown="150 GB" hint="A hint under the slider." />
+        <Slider id="kMax" label="At the maximum" min={0} max={300} step={5} value={300} shown="300 GB" />
+      </div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-tick"><Sheet>
+      <Cell d={12} class="sx-top"><Mh ix="06" label="Ticker" meta="pauses on hover or focus · still under reduced motion" /><h2 id="k-tick" class="sr">Ticker</h2>
+        <Ticker label="On the wire" items={ticker} />
+        <div class="cb"><p class="small">One item only, so it doesn't rotate:</p></div>
+        <Ticker label="On the wire" items={ticker.slice(0, 1)} />
+      </Cell>
+    </Sheet></section>
+
+    <section class="blk" id="faq" aria-labelledby="k-faq"><Sheet>
+      <Cell class="faq" d={7} t={6}><Mh ix="07" label="Questions" /><Mh label="FAQ" meta="3 answers" /><h2 id="k-faq" class="sr">FAQ</h2><Faq items={faq} open={1} /></Cell>
+      <Cell d={5} t={6}><Mh label="Steps" meta=".stps" /><div class="cb"><Steps color="#5B7BE0" steps={[{ b: "One", p: "A short step." }, { b: "Two", p: "Another." }, { b: "Three", p: "The last." }]} /></div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-brand"><Sheet>
+      <Cell d={12}><Mh ix="08" label="Brand files" meta="docs/reference/site/brand" /><div class="cb"><h2 id="k-brand" class="sr">Brand</h2>
+        <div class="br">{Object.entries(brand).map(([path, url]) => <figure><img src={url} alt="" class:list={{ lt: /night|wordmark\.svg/.test(path) }} /><figcaption>{path.split("/").pop()}</figcaption></figure>)}</div>
+      </div></Cell>
+    </Sheet></section>
+
+    <section class="blk" aria-labelledby="k-foot"><div class="wrap"><h2 id="k-foot" class="kh">Footer first rows: Run, Syndication, Spots, Network</h2></div></section>
+    {footers.map((F) => <section class="blk"><Sheet><F /></Sheet></section>)}
+  </main>
+  <Footer slot="footer"><FooterNetwork slot="first" /></Footer>
+</Base>
+<script>
+  if (new URLSearchParams(location.search).has("widths")) {
+    document.body.innerHTML = `<div class="kit-w">${[1440, 820, 390].map((w) => `<figure><figcaption>${w}</figcaption><iframe src="/_kit" width="${w}" height="2400" title="Kit at ${w}"></iframe></figure>`).join("")}</div>`;
+  }
+  document.addEventListener("seg:change", (e) => {
+    const out = document.getElementById("segOut");
+    if (out) out.textContent = `seg:change → ${(e as CustomEvent<{ value: string }>).detail.value}`;
+  });
+</script>
+<style is:global>
+  .kit-w{display:flex;gap:24px;padding:24px;align-items:flex-start;overflow-x:auto}
+  .kit-w figure{margin:0;flex:none}
+  .kit-w figcaption{font:400 22px var(--osd);color:var(--muted);margin-bottom:8px}
+  .kit-w iframe{border:1px solid var(--rule);background:var(--night);zoom:.42}
+</style>
+<style>
+  .kit .sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:18px}
+  .kit .sw figure{margin:0}
+  .kit .sw i{display:block;height:56px;border-radius:2px;box-shadow:inset 0 0 0 1px var(--rule)}
+  .kit .sw figcaption{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:13px;color:var(--muted)}
+  .kit .sw b{color:var(--glow);font-weight:600}
+  .kit .ty p{margin:0 0 6px}
+  .kit .ty .d{font-family:var(--display);font-size:40px;line-height:1;text-transform:uppercase}
+  .kit .ty .o{font:400 34px/1 var(--osd);color:#E9FFE8}
+  .kit .stack{display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+  .kit .acts{display:flex;gap:12px;flex-wrap:wrap}
+  .kit .stack > .cr{align-self:stretch}
+  .kit .small{font-size:13.5px;color:var(--muted)}
+  .kit code{font:400 16px var(--osd);color:#E9FFE8;word-break:break-all}
+  .kit .dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0;font-size:14px}
+  .kit .dl dt{color:var(--muted)}
+  .kit .dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+  .kit .br{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:18px}
+  .kit .br figure{margin:0}
+  .kit .br img{display:block;width:100%;height:72px;object-fit:contain;background:#0a0716;padding:10px;border-radius:2px}
+  .kit .br img.lt{background:#F3EAD9}
+  .kit .br figcaption{font-size:12px;color:var(--muted);margin-top:6px;word-break:break-all}
+  .kit .kh{font-size:clamp(28px,4vw,48px);text-transform:uppercase}
+  .kit h1{font-size:clamp(56px,8vw,128px);text-transform:uppercase}
+</style>

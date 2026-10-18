@@ -1,0 +1,23 @@
+---
+// The FAQ cell's question list (run.css `.faq`): native <details>, one per question. Answers may
+// hold simple inline HTML (links, <b>); FAQ content lives in each page's data file. The page adds
+// FAQPage structured data from the same list (Phase 4).
+export interface Qa {
+  q: string;
+  a: string;
+}
+interface Props {
+  items: Qa[];
+  /** Which question starts open, if any. */
+  open?: number;
+}
+const { items, open } = Astro.props;
+---
+<div class="qs">
+  {items.map((it, i) => (
+    <details open={i === open}>
+      <summary><span>{it.q}</span><i aria-hidden="true" /></summary>
+      <p set:html={it.a} />
+    </details>
+  ))}
+</div>

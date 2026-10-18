@@ -1,0 +1,17 @@
+---
+// /: the shell until Phase 2 ports Home from docs/reference/site/pages/home.html. The anchors
+// the footers link to (#guide, #stations, #breaks, #public) are held here until then.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/run.css";
+import Footer from "../components/Footer.astro";
+import FooterNetwork from "../components/footers/FooterNetwork.astro";
+---
+<Base page="home">
+  <main id="top" class="shell">
+    <h1 class="sr">Anyone can run a channel.</h1>
+    <span id="guide"></span><span id="stations"></span><span id="breaks"></span><span id="public"></span>
+  </main>
+  <Footer slot="footer" home><FooterNetwork slot="first" /></Footer>
+</Base>
+<style>.shell{min-height:60svh}</style>

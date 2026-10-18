@@ -1,0 +1,23 @@
+/* The site's tokens: every :root block from the reference's shared CSS, in its cascade order
+   (head.html, polish.css, grid.css, flat.css, shape.css), merged. The site's own system: nothing
+   here comes from packages/ui. */
+:root{
+  color-scheme:dark;
+  /* head.html. SITE-SPEC §3 calls Night #140F24; the reference ground is #0E0A1C and #140F24 is
+     the surface ink (buttons, chips): both kept as drawn (docs/site/open-questions.md Q4). */
+  --night:#0E0A1C; --night-2:#171030; --glow:#F3EAD9; --muted:#A79FBF;
+  --line:rgb(243 234 217 / .13); --tally:#FF4A3D; --st:#C04A9E;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --text:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  --osd:"VT323","Courier New",monospace;
+  --gut:clamp(16px,4vw,64px);
+  --ease:cubic-bezier(.2,.7,.1,1);
+  /* polish.css (its --r-key:14px is overridden by shape.css below) */
+  --s-1:8px;--s-2:16px;--s-3:24px;--s-4:40px;--s-5:64px;--s-6:clamp(112px,11vw,168px);
+  /* grid.css */
+  --cols:12;--rule:#2A2342;--panel:color-mix(in srgb,var(--st) 5%,#110C21);--panel-hi:color-mix(in srgb,var(--st) 9%,#161029);--pad:clamp(20px,2.2vw,34px);--mh:46px;
+  /* shape.css: only things you press are round */
+  --r-key:999px;
+}
+@media (max-width:1099px){:root{--cols:6}}
+@media (max-width:699px){:root{--cols:2;--mh:42px;--pad:var(--gut)}}

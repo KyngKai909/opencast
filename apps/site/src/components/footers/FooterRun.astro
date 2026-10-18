@@ -1,0 +1,20 @@
+---
+// Run's footer first row (chrome/footer-run.html): Claim a number, with the number picker and the
+// call-sign box. The picker and the check are wired in Phase 2 with the Run page.
+import Btn from "../Btn.astro";
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import { claim, contact } from "../../data/links";
+---
+<Cell class="claimc" id="claim" d={7} t={6}>
+  <Mh ix="07" label="Claim a number" meta="TV 2 to 69, FM 88 to 108" />
+  <div class="cb">
+    <h2>Pick a number.<br />Go on air tonight.</h2>
+    <p class="lede">Choose a free number and a call sign of three to five letters, point us at your library, and your first schedule can be on the dial in an evening.</p>
+    <div class="acts"><Btn cta={claim()} live="__.1" cur="Claim" id="claimBtn">Claim a number</Btn><Btn cta={contact("stations")} ghost>Talk to a person</Btn></div>
+  </div>
+</Cell>
+<Cell class="pickc" d={5} t={6}>
+  <Mh label="Open numbers near you" meta="Inland Empire" tab />
+  <div class="cb"><div class="pick" id="pick"></div><div class="cs-in"><label class="lb" for="csIn">Call sign</label><div class="cs-box"><input id="csIn" maxlength="5" value="" placeholder="YOUR" autocomplete="off" spellcheck="false" autocapitalize="characters" aria-describedby="csMsg" /><span class="cs-n tab" id="csN">44.1</span></div><small id="csMsg">Three to five letters.</small></div></div>
+</Cell>

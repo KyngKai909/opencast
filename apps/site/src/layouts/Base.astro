@@ -1,0 +1,81 @@
+---
+// Every page's frame: the head (title, description, canonical, Open Graph, favicons, fonts), the
+// room's tint, the grain and the cursor, the header and the main content. Pages put their footer
+// in the `footer` slot. Shared behaviour starts from src/lib/site.ts.
+import "@fontsource/big-shoulders-display/latin-500";
+import "@fontsource/big-shoulders-display/latin-700";
+import "@fontsource/big-shoulders-display/latin-800";
+import "@fontsource/big-shoulders-display/latin-900";
+import "@fontsource/instrument-sans/latin-400";
+import "@fontsource/instrument-sans/latin-500";
+import "@fontsource/instrument-sans/latin-600";
+import "@fontsource/instrument-sans/latin-700";
+import "@fontsource/vt323/latin-400.css";
+import "../styles/global.css";
+import display800 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-800-normal.woff2?url";
+import display900 from "@fontsource/big-shoulders-display/files/big-shoulders-display-latin-900-normal.woff2?url";
+import Header from "../components/Header.astro";
+import type { PageKey } from "../data/links";
+import { PAGES, pageUrl } from "../data/pages";
+
+interface Props {
+  /** A page from data/pages.ts; it marks the nav and supplies the title and description. */
+  page?: PageKey;
+  /** For pages outside the list (404, /_kit). */
+  title?: string;
+  description?: string;
+  noindex?: boolean;
+  /** The station colour that tints the room (`--st`). */
+  st?: string;
+}
+const { page, noindex = false, st } = Astro.props;
+const meta = page ? PAGES[page] : undefined;
+const title = Astro.props.title ?? meta?.title ?? "Dial";
+const description = Astro.props.description ?? meta?.description ?? "";
+const canonical = meta ? pageUrl(meta.path) : undefined;
+const og = page ? `https://usedial.com/og/${page}.png` : "https://usedial.com/og/home.png";
+---
+<!doctype html>
+<html lang="en" style={st ? `--st:${st}` : undefined}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta name="theme-color" content="#0E0A1C" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" href={display900} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={display800} as="font" type="font/woff2" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Dial" />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta property="og:image" content={og} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={meta ? `Dial. ${meta.og.filter(Boolean).join(" ")}` : "Dial"} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <slot name="head" />
+  </head>
+  <body>
+    <div class="room" aria-hidden="true"></div>
+    <div class="grain" id="grain" aria-hidden="true"></div>
+    <div class="cur" id="cur" aria-hidden="true"><div class="r"><span id="curL">Tune</span></div><div class="d"></div></div>
+    <Header current={page} />
+    <slot />
+    <slot name="footer" />
+    <script>
+      import { initSite } from "../lib/site";
+      import { initNav } from "../lib/nav";
+      initSite();
+      initNav();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+---
+// Spots' footer first row (chrome/footer-spots.html): Start a spot. In the reference both buttons
+// only scrolled; they now open the waitlist (SITE-SPEC §6, open-questions Q7).
+import Btn from "../Btn.astro";
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import Steps from "../Steps.astro";
+import { orderSpot, startSpot } from "../../data/links";
+---
+<Cell class="claimc" d={7} t={6}>
+  <Mh ix="08" label="Start a spot" meta="No minimum" />
+  <div class="cb">
+    <h2>Get in<br />the break.</h2>
+    <p class="lede">Upload a spot, say who it's for, set a rate and a budget. Stations near your customers start choosing it the same day.</p>
+    <div class="acts"><Btn cta={startSpot()} live=":15" cur="Plan" id="footStart">Start a spot</Btn><Btn cta={orderSpot()} ghost>Order one made</Btn></div>
+  </div>
+</Cell>
+<Cell d={5} t={6}>
+  <Mh label="What you'll need" meta="About 10 minutes" />
+  <div class="cb"><Steps color="#E0583A" steps={[
+    { b: "A spot, or a brief", p: "A finished :15, :30 or :60. Or tell a maker what you want and have it made." },
+    { b: "An offer", p: "Something worth a code: a free pastry, 10% off. Good for 7 or 30 days." },
+    { b: "A budget", p: "Any amount, by card or from a Clear wallet, with a most-per-day." }
+  ]} /></div>
+</Cell>

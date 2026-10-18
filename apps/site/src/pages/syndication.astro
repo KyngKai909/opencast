@@ -1,0 +1,13 @@
+---
+// /syndication: the shell until Phase 2 ports the page from docs/reference/site/pages/syndication.html.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/syndication.css";
+import Footer from "../components/Footer.astro";
+import FooterSyndication from "../components/footers/FooterSyndication.astro";
+---
+<Base page="syndication">
+  <main id="top" class="shell"><h1 class="sr">Make it once. Air it everywhere.</h1></main>
+  <Footer slot="footer"><FooterSyndication slot="first" /></Footer>
+</Base>
+<style>.shell{min-height:60svh}</style>

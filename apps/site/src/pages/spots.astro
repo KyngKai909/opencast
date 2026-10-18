@@ -1,0 +1,13 @@
+---
+// /spots: the shell until Phase 2 ports the page from docs/reference/site/pages/spots.html.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/spots.css";
+import Footer from "../components/Footer.astro";
+import FooterSpots from "../components/footers/FooterSpots.astro";
+---
+<Base page="spots">
+  <main id="top" class="shell"><h1 class="sr">Be in the break. Pay for who watched.</h1></main>
+  <Footer slot="footer"><FooterSpots slot="first" /></Footer>
+</Base>
+<style>.shell{min-height:60svh}</style>

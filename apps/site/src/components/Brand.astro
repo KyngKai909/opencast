@@ -1,0 +1,9 @@
+---
+// The header's logo link: the 48px icon drawing (brand/dial-icon-48.svg, used at 32px) and the
+// wordmark in currentColor with its red full stop (brand/dial-wordmark.svg). Never redrawn.
+import icon from "../assets/brand/dial-icon-48.svg?raw";
+import wordmark from "../assets/brand/dial-wordmark.svg?raw";
+
+const svg = (raw: string, cls: string) => raw.replace("<svg ", `<svg class="${cls}" aria-hidden="true" focusable="false" `);
+---
+<a class="brand" href="/" aria-label="Dial, home"><Fragment set:html={svg(icon, "bi")} /><Fragment set:html={svg(wordmark, "bw")} /></a>

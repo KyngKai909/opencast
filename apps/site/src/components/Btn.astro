@@ -1,0 +1,37 @@
+---
+// A pressable: primary is a cream pill with a dark inset "live" chip (a channel number, ":15",
+// "+1"); `ghost` is the outlined pill (polish.css, shape.css). Pass a `cta` from data/links.ts
+// for anything that leaves the page or opens the waitlist, or a plain `href` for an in-page
+// anchor. `cur` is the custom cursor's label.
+import type { Cta } from "../data/links";
+
+interface Props {
+  cta?: Cta;
+  href?: string;
+  /** Renders a <button> instead of a link. */
+  button?: boolean;
+  type?: "button" | "submit";
+  ghost?: boolean;
+  /** The live chip's text ("12.1", ":15", "+1"). Required on a primary; ghosts have none. */
+  live?: string;
+  cur?: string;
+  class?: string;
+  id?: string;
+  disabled?: boolean;
+  [attr: `data-${string}` | `aria-${string}`]: string | undefined;
+}
+const { cta, href, button, type = "button", ghost, live, cur, class: cls, id, disabled, ...rest } = Astro.props;
+// SITE-SPEC §3: a primary button always carries its live chip; only ghosts go without.
+if (!ghost && live === undefined) throw new Error(`Btn: a primary button needs its live chip (\`live\`), or use \`ghost\` (${Astro.url.pathname})`);
+const target = cta?.href ?? href ?? "#";
+const attrs = { ...(cta?.attrs ?? {}), ...rest, ...(cur ? { "data-cur": cur } : {}) };
+---
+{button ? (
+  <button class:list={["btn", { ghost }, cls]} id={id} type={type} disabled={disabled} {...attrs}>
+    {live !== undefined && <span class="live" aria-hidden="true"><i />{live}</span>}<slot />
+  </button>
+) : (
+  <a class:list={["btn", { ghost }, cls]} id={id} href={target} {...attrs}>
+    {live !== undefined && <span class="live" aria-hidden="true"><i />{live}</span>}<slot />
+  </a>
+)}

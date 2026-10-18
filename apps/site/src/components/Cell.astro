@@ -1,0 +1,20 @@
+---
+// One cell of a sheet. `d`, `t` and `m` are its column span on desktop (12), tablet (6) and phone
+// (2); left out, grid.css's defaults apply (12, 6, 2). A `t` over 6 fails the build.
+import type { HTMLTag } from "astro/types";
+import { spanStyle } from "../lib/grid";
+
+interface Props {
+  d?: number;
+  t?: number;
+  m?: number;
+  as?: HTMLTag;
+  class?: string;
+  style?: string;
+  [attr: string]: unknown;
+}
+const { d, t, m, as: Tag = "div", class: cls, style, ...rest } = Astro.props;
+const spans = spanStyle({ d, t, m }, `Cell${rest.id ? ` #${rest.id}` : ""} (${Astro.url.pathname})`);
+const css = [spans, style].filter(Boolean).join(";");
+---
+<Tag class:list={["cell", cls]} style={css || undefined} {...rest}><slot /></Tag>

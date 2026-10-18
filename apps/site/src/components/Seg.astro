@@ -1,0 +1,31 @@
+---
+// A segmented control (polish.css `.seg2`): one choice from a few, each a pill. The chosen button
+// is `.on` and `aria-pressed`; src/lib/seg.ts moves the choice and fires `seg:change` on the group.
+interface Option {
+  value: string;
+  label: string;
+  /** A count after the label ("All 9"). */
+  count?: string | number;
+}
+interface Props {
+  label: string;
+  options: Option[];
+  value?: string;
+  id?: string;
+  class?: string;
+  /** The data attribute each button carries its value in (`data-v` in most of the reference). */
+  key?: string;
+}
+const { label, options, value = options[0]?.value, id, class: cls, key = "v" } = Astro.props;
+---
+<div class:list={["seg2", cls]} id={id} role="group" aria-label={label} data-seg>
+  {options.map((o) => (
+    <button type="button" class:list={{ on: o.value === value }} aria-pressed={o.value === value ? "true" : "false"} {...{ [`data-${key}`]: o.value }}>
+      {o.label}{o.count !== undefined && <> <span>{o.count}</span></>}
+    </button>
+  ))}
+</div>
+<script>
+  import { initSegs } from "../lib/seg";
+  initSegs();
+</script>

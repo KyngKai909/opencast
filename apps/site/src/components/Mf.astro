@@ -1,0 +1,8 @@
+---
+// A cell's footer strip (grid.css `.mf`). Each child span is one item.
+interface Props {
+  class?: string;
+}
+const { class: cls } = Astro.props;
+---
+<div class:list={["mf", cls]}><slot /></div>

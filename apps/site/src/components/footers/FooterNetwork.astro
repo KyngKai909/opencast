@@ -1,0 +1,25 @@
+---
+// The Network's footer first row (chrome/footer-network.html): Find your number. Claim a number
+// went to /run in the reference; it now opens the waitlist (SITE-SPEC §6, open-questions Q7).
+import Btn from "../Btn.astro";
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import Steps from "../Steps.astro";
+import { claim, watch } from "../../data/links";
+---
+<Cell class="claimc" d={7} t={6}>
+  <Mh ix="08" label="Find your number" meta="Free to hold" />
+  <div class="cb">
+    <h2>There's room<br />on the dial.</h2>
+    <p class="lede">Hold a call sign and a number in your market while you get ready. Or just tune in: it's free, and there's no account.</p>
+    <div class="acts"><Btn cta={claim()} live="NEW" cur="Claim">Claim a number</Btn><Btn cta={watch()} ghost>Open the dial</Btn></div>
+  </div>
+</Cell>
+<Cell d={5} t={6}>
+  <Mh label="Three ways in" meta="Pick yours" />
+  <div class="cb"><Steps color="#5B7BE0" steps={[
+    { b: "Watch", p: "Flip the dial on a phone, a TV or a browser. Nothing to sign up for." },
+    { b: "Run a station", p: "A number, a call sign and master control. Being on the air is free." },
+    { b: "Advertise or make shows", p: "Be in the breaks, or get paid every time your show airs." }
+  ]} /></div>
+</Cell>

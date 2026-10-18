@@ -1,0 +1,37 @@
+---
+// The footer (chrome/footer-*.html): a first row that changes per page (the `first` slot: the
+// page's call to action and the cell beside it), then the same link columns, the big wordmark
+// and the sign-off line on every page. src/lib/site.ts adds `.go` when it scrolls into view.
+import Cell from "./Cell.astro";
+import Mf from "./Mf.astro";
+import Mh from "./Mh.astro";
+import { HOME_ANCHORS, ROUTES, watch } from "../data/links";
+
+interface Props {
+  /** On Home the Watch links are in-page anchors. */
+  home?: boolean;
+}
+const { home = false } = Astro.props;
+const at = (k: keyof typeof HOME_ANCHORS) => (home ? HOME_ANCHORS[k].slice(1) : HOME_ANCHORS[k]);
+const cols = [
+  { label: "Watch", links: [[watch().href, "Open the dial"], [at("guide"), "What's on"], [at("stations"), "Stations"]] },
+  { label: "Make", links: [[ROUTES.run, "Run a station"], [ROUTES.syndication, "Syndication"]] },
+  { label: "Advertise", links: [[ROUTES.spots, "Spot market"], [at("breaks"), "How breaks work"]] },
+  { label: "The network", links: [[ROUTES.network, "About"], [at("public"), "How it's run"], [ROUTES.contact, "Contact"]] }
+] as const;
+---
+<footer class="signoff" id="contact">
+  <div class="wrap">
+    <div class="sheet">
+      <slot name="first" />
+      {cols.map((c) => (
+        <Cell as="nav" class="lk" d={3} t={3} m={1} aria-label={c.label}>
+          <Mh label={c.label} />
+          <div class="cb">{c.links.map(([href, text]) => <a href={href}>{text}</a>)}</div>
+        </Cell>
+      ))}
+      <Cell class="wd" d={12}><div class="word" aria-hidden="true"><span>dial</span><b style="font-weight:inherit">dial</b></div><p class="wd-tag">Free to watch.<br />Flip it on.</p></Cell>
+      <Cell d={12}><Mf class="foot"><span>&copy; 2026 Dial.</span><span>Stations, programs and people on this page are examples.</span></Mf></Cell>
+    </div>
+  </div>
+</footer>

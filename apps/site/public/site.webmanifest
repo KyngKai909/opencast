@@ -1,0 +1,14 @@
+{
+  "name": "Dial",
+  "short_name": "Dial",
+  "description": "Anyone can run a channel.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#0E0A1C",
+  "theme_color": "#0E0A1C",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,24 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "astro/tsconfigs/strictest",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "vite/client"
-    ],
-    "noEmit": true
+    "baseUrl": ".",
+    "paths": { "@contracts/*": ["../../packages/contracts/src/*.ts"] },
+    "types": ["astro/client"],
+    "exactOptionalPropertyTypes": false
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.setup.ts"
-  ]
+  "include": [".astro/types.d.ts", "src/**/*", "scripts/**/*", "astro.config.mjs"],
+  "exclude": ["dist"]
 }

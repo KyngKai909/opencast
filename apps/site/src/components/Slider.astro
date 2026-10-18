@@ -1,0 +1,28 @@
+---
+// A labelled range (run.css `.cr` and its input[type=range]): the label with the live value on
+// the right, the track filled to the thumb (`--p`), and an optional hint below. The page's own
+// code formats the value; `aria-valuetext` should say it in words ("500 GB"), not the position.
+interface Props {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  /** The value as shown ("500 GB"). */
+  shown: string;
+  hint?: string;
+  class?: string;
+}
+const { id, label, min, max, step, value, shown, hint, class: cls } = Astro.props;
+const p = ((value - min) / (max - min)) * 100;
+---
+<div class:list={["cr", cls]}>
+  <label for={id}>{label}<b class="tab" id={`${id}-v`}>{shown}</b></label>
+  <input id={id} type="range" min={min} max={max} step={step} value={value} aria-valuetext={shown} style={`--p:${p}%`} data-slider />
+  {hint && <small class="crh">{hint}</small>}
+</div>
+<script>
+  import { initSliders } from "../lib/slider";
+  initSliders();
+</script>

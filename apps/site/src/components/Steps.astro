@@ -1,0 +1,17 @@
+---
+// A numbered list of three short steps (synd.css `.stps`), in a station colour.
+interface Step {
+  b: string;
+  p: string;
+}
+interface Props {
+  steps: Step[];
+  color: string;
+}
+const { steps, color } = Astro.props;
+---
+<ol class="stps" style={`--c:${color}`}>
+  {steps.map((s, i) => (
+    <li><i class="tab">{String(i + 1).padStart(2, "0")}</i><div><b>{s.b}</b><p>{s.p}</p></div></li>
+  ))}
+</ol>

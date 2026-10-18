@@ -1,0 +1,45 @@
+---
+// The header (chrome/header.html): the logo, the rail of pages with the current one marked, the
+// tuner button (now-playing LCD + Watch), and the menu for tablet and phone. Behaviour is in
+// src/lib/site.ts (now playing, solid on scroll, menu) and src/lib/nav.ts (the rail's indicator,
+// the LCD flip).
+import Brand from "./Brand.astro";
+import { NAV } from "../data/nav";
+import { watch, type PageKey } from "../data/links";
+import { NOW_PLAYING, STATIONS, slot } from "../data/stations";
+import { clock, nowMinutes } from "../lib/clock";
+
+interface Props {
+  current?: PageKey | undefined;
+}
+const { current } = Astro.props;
+const np = NOW_PLAYING;
+// The build's own clock fills the HTML; the page corrects it on load.
+const min = nowMinutes();
+const prog = slot(np, min).prog;
+const watchCta = watch(np.n);
+const AR = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+---
+<header class="nav" id="nav">
+  <Brand />
+  <nav class="nl nl2" aria-label="Main">
+    <span class="nl-ind" aria-hidden="true"></span>
+    {NAV.map((p) => (
+      <a href={p.href} class:list={{ "is-cur": p.key === current }} aria-current={p.key === current ? "page" : undefined}><i>{p.ix}</i>{p.label}</a>
+    ))}
+  </nav>
+  <a class="np" href={watchCta.href} data-watch aria-label="Watch what's on now">
+    <span class="tnb"><span class="tnb-lcd" aria-hidden="true"><i class="tnb-dot"></i><span class="tnb-roll"><span class="tnb-a"><span class="js-ch">{np.n}</span><span id="npCs">{np.cs}</span></span><span class="tnb-p"><small>Now</small><em id="npProg">{prog}</em></span></span></span><span class="tnb-go">Watch<b aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 5.5v9l7.5-4.5z" fill="currentColor"/></svg></b></span></span>
+  </a>
+  <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="mob" aria-label="Menu"><span class="hb" aria-hidden="true"><i></i><i></i></span><span class="ml">Menu</span></button>
+</header>
+<div class="mob" id="mob" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+  <div class="mob-h"><Brand /><button class="menu-btn x" id="menuX" type="button" aria-label="Close menu"><span class="hb on" aria-hidden="true"><i></i><i></i></span><span class="ml">Close</span></button></div>
+  <nav class="mob-l" aria-label="Menu">
+    <a href={watchCta.href} class="w" data-watch><i>00</i><span><b>Watch</b><small>Open the dial</small></span><Fragment set:html={AR} /></a>
+    {NAV.map((p) => (
+      <a href={p.href} aria-current={p.key === current ? "page" : undefined}><i>{p.ix}</i><span><b>{p.label}</b><small>{p.sub}</small></span><Fragment set:html={AR} /></a>
+    ))}
+  </nav>
+  <div class="mob-f"><span><i></i>{STATIONS.length} stations on now</span><span class="tab" id="mobClock">{clock(Math.floor(min))}</span></div>
+</div>

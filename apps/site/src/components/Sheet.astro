@@ -1,0 +1,15 @@
+---
+// A section's sheet of cells, split by hairline rules (grid.css `.sheet`, flat.css). `wrap` adds
+// the page gutter around it, as every section in the reference has.
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"div"> {
+  wrap?: boolean;
+}
+const { wrap = true, class: cls, ...rest } = Astro.props;
+---
+{wrap ? (
+  <div class="wrap"><div class:list={["sheet", cls]} {...rest}><slot /></div></div>
+) : (
+  <div class:list={["sheet", cls]} {...rest}><slot /></div>
+)}

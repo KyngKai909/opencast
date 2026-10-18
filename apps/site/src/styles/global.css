@@ -1,0 +1,22 @@
+/* The global layers, in the reference's cascade order (SITE-SPEC §2). Page and component styles
+   are scoped to their Astro components and load after these. */
+@import "./tokens.css";
+@import "./ref/head.css";
+@import "./ref/polish.css";
+@import "./ref/grid.css";
+@import "./ref/flat.css";
+@import "./ref/nav.css";
+@import "./ref/shape.css";
+@import "./ref/lt.css";
+
+/* SITE-SPEC §8: [hidden] always wins over a display rule. */
+[hidden]{display:none !important}
+
+/* Lenis (its own stylesheet, which the package doesn't export). */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-stopped{overflow:clip}
+.lenis [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-smooth iframe{pointer-events:none}
+
+/* A button that can't be pressed yet (a form still sending). The reference has no disabled state. */
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed;transform:none;filter:none}

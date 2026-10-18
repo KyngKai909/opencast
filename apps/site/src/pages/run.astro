@@ -1,0 +1,13 @@
+---
+// /run: the shell until Phase 2 ports the page from docs/reference/site/pages/run.html.
+import Base from "../layouts/Base.astro";
+// After Base, so the page's CSS follows the global layers (the reference's cascade).
+import "../styles/pages/run.css";
+import Footer from "../components/Footer.astro";
+import FooterRun from "../components/footers/FooterRun.astro";
+---
+<Base page="run">
+  <main id="top" class="shell"><h1 class="sr">Run it like a station. Not a loop.</h1></main>
+  <Footer slot="footer"><FooterRun slot="first" /></Footer>
+</Base>
+<style>.shell{min-height:60svh}</style>

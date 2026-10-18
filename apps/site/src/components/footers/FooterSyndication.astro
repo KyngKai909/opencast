@@ -1,0 +1,24 @@
+---
+// Syndication's footer first row (chrome/footer-syndication.html): Offer a show.
+import Btn from "../Btn.astro";
+import Cell from "../Cell.astro";
+import Mh from "../Mh.astro";
+import Steps from "../Steps.astro";
+import { offerShow } from "../../data/links";
+---
+<Cell class="claimc" d={7} t={6}>
+  <Mh ix="08" label="Offer a show" meta="Free to list" />
+  <div class="cb">
+    <h2>Put your show<br />on more dials.</h2>
+    <p class="lede">List a program, set your terms, and let stations across the network carry it. You get paid every time it airs.</p>
+    <div class="acts"><Btn cta={offerShow()} live="NEW" cur="Offer">Offer a show</Btn><Btn href="#fits" ghost>Browse the market</Btn></div>
+  </div>
+</Cell>
+<Cell d={5} t={6}>
+  <Mh label="What you'll need" meta="About 10 minutes" />
+  <div class="cb"><Steps color="#EBA03A" steps={[
+    { b: "The episodes", p: "Upload them, or point the library agent at the folder." },
+    { b: "Who owns what", p: "Music, footage and guests, for the rights record." },
+    { b: "Your terms", p: "A revenue share, cash, both, or free, and where it can air." }
+  ]} /></div>
+</Cell>
