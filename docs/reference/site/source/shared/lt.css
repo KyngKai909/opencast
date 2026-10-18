@@ -1,0 +1,48 @@
+/* =====================================================================
+   LOWER THIRD: a broadcast schedule strip. Square. Full-width station
+   bar, then NOW / progress / NEXT on a shared label column.
+   ===================================================================== */
+.hui .lower{grid-column:8/span 5;width:100%;max-width:640px;justify-self:end;display:block;filter:drop-shadow(0 30px 60px rgb(0 0 0 / .45))}
+.hui .lt-tag{display:flex;align-items:center;gap:12px;width:100%;height:54px;padding:0 20px;border-radius:0;flex-direction:row;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--st) 100%,#fff 6%),color-mix(in srgb,var(--st) 78%,#000 22%));box-shadow:inset 0 1px 0 rgb(255 255 255 / .2)}
+.hui .lt-num{font:400 26px/1 var(--osd);color:rgb(255 255 255 / .82)}
+.hui .lt-num::before{display:none}
+.hui .lt-cs{font:900 38px/1 var(--display);letter-spacing:.04em;color:#fff;transform:translateY(1px)}
+.hui .lt-tag .lt-air{display:inline-flex;margin-left:auto;height:auto;padding:0;background:none;box-shadow:none;border-radius:0;font:700 11px/1 var(--text);letter-spacing:.16em;text-transform:uppercase;color:#fff;gap:8px}
+.hui .lt-air i{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgb(255 74 61 / .9),0 0 12px var(--tally);animation:pulse 1.8s infinite}
+.hui .lt-body{display:block;padding:0;border-radius:0;background:rgb(10 7 20 / .78);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);box-shadow:inset 0 0 0 1px rgb(243 234 217 / .1)}
+.lt-r{display:grid;grid-template-columns:52px minmax(0,1fr) auto;column-gap:16px;align-items:baseline;padding:18px 20px 0}
+.lt-k{font:600 10.5px/1 var(--text);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);transform:translateY(-3px)}
+.hui .lt-prog{font:700 23px/1.15 var(--text);letter-spacing:-.012em;margin:0}
+.hui .lt-who{font-size:14px;color:var(--muted);margin-top:5px;display:block}
+.lt-left,.lt-t{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lt-left{color:var(--glow);font-weight:600}
+.hui .lt-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;margin:0;padding:16px 20px 18px 88px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.hui .lt-row>span:first-child{display:inline}
+.hui .lt-bar{height:3px;border-radius:0;background:rgb(243 234 217 / .14)}
+.hui .lt-bar i{border-radius:0;background:linear-gradient(90deg,color-mix(in srgb,var(--st) 60%,#fff 40%),#fff)}
+.lt-nx{padding:13px 20px 15px;border-top:1px solid rgb(243 234 217 / .1);align-items:center}
+.lt-nx .lt-k{transform:none}
+.lt-nx b{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.hui .lt-next{display:none}
+@media (max-width:1240px) and (min-width:1100px){ .hui .lower{grid-column:7/span 6} }
+
+/* tablet + phone: one compact strip */
+@media (max-width:1099px){
+  .hui .lower{grid-column:1/-1;max-width:none;display:grid;grid-template-columns:auto minmax(0,1fr);filter:none}
+  .hui .lt-tag{flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;height:auto;width:auto;padding:0 16px;background:color-mix(in srgb,var(--st) 92%,#000 8%)}
+  .hui .lt-tag .lt-air{display:none}
+  .hui .lt-num{font-size:20px}.hui .lt-cs{font-size:30px}
+  .lt-r{grid-template-columns:minmax(0,1fr) auto;padding:13px 16px 0}
+  .lt-now .lt-k,.hui .lt-who,.lt-nx{display:none}
+  .hui .lt-prog{font-size:17px}
+  .hui .lt-row{padding:10px 16px 13px}
+}
+@media (max-width:699px){
+  .hui .lt-tag{padding:0 12px}
+  .hui .lt-cs{font-size:26px}.hui .lt-num{font-size:18px}
+  .hui .lt-prog{font-size:15.5px}
+  .lt-r{padding:11px 14px 0}
+  .hui .lt-row{grid-template-columns:auto minmax(0,1fr) auto;padding:9px 14px 11px;font-size:11.5px}
+  .hui .lt-row>span:first-child{display:inline}
+}

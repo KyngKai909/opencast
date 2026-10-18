@@ -1,0 +1,115 @@
+<main id="top">
+<section class="blk rhero nt-hero" id="hero">
+  <div class="wrap"><div class="sheet">
+    <div class="cell hd rh" style="--d:6">
+      <div class="mh"><span>The network</span><span>About</span></div>
+      <div class="cb">
+        <h1 class="sy-h"><span>A network,</span><span class="dim">not a feed.</span></h1>
+        <p class="lede">Local TV used to work like this: a few stations in every town, each with a number on the dial, paid by the businesses down the street, carrying the best shows from everywhere else. We're rebuilding that for anyone with something worth airing.</p>
+        <div class="acts"><a class="btn" href="/" data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">12.1</span></span>Open the dial</a><a class="btn ghost" href="#money">How the money moves</a></div>
+      </div>
+      <div class="mf"><span>Free to watch. No account to tune in.</span><span class="nt-st"><i></i>Before launch</span></div>
+    </div>
+    <div class="cell tuner" style="--d:6" id="tuner">
+      <div class="mh"><span>The dial</span><span>Example stations</span></div>
+      <div class="tn-mk"><div class="seg2" id="tnMk" role="group" aria-label="Market"></div></div>
+      <div class="tn-read" aria-live="polite">
+        <div class="tn-num"><b class="tab" id="tnNum">12.1</b><small id="tnBand">TV</small></div>
+        <div class="tn-id"><b id="tnCs">BEAT</b><span id="tnName">Beat Tape TV</span><small id="tnWho">Run by a crate digger in Pomona</small></div>
+      </div>
+      <div class="tn-now"><span class="lb">Now</span><b id="tnNow">Late Crate</b><span class="tn-k" id="tnKind">Station</span></div>
+      <div class="nw-band" id="bTv" aria-hidden="true"><span class="nw-bl">TV</span><div class="bt"><div class="bk" id="bTvK"></div><div class="bs" id="bTvS"></div><i class="nd" id="ndTv"></i></div><span class="br">2&ndash;69</span></div>
+      <div class="nw-band" id="bFm" aria-hidden="true"><span class="nw-bl">FM</span><div class="bt"><div class="bk" id="bFmK"></div><div class="bs" id="bFmS"></div><i class="nd" id="ndFm"></i></div><span class="br">88&ndash;108</span></div>
+      <div class="tn-ctl"><button type="button" class="key" id="tnPrev" aria-label="Previous station"><svg viewBox="0 0 20 20"><path d="M15 10H5M9.5 5.5 5 10l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="tn-scan on" id="tnScan" aria-pressed="true"><i></i>Scanning</button><button type="button" class="key" id="tnNext" aria-label="Next station"><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+      <div class="mf"><span>Every number is unique in its market. Radio sits on even tenths, so no number matches a real FM station.</span></div>
+    </div>
+  </div></div>
+</section>
+<section class="blk" id="what"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:7"><div class="mh"><span><b class="ix">01</b>What it is</span><span>Then and now</span></div><div class="cb"><h2>Old TV's best idea.<br>Open to everyone.</h2></div></div>
+  <div class="cell hd" style="--d:5"><div class="mh"><span>Why a network</span></div><div class="cb end"><p class="lede">Broadcast TV had a schedule, a dial, local ads and shows that travelled. Then the internet gave everyone a channel and took all of that away. We kept what worked and dropped the licence.</p></div></div>
+  <div class="cell nw-cmp" style="--d:12">
+    <div class="cm-r hd3"><span></span><span>Broadcast TV</span><span>Streaming platforms</span><span class="nw-us">The network</span></div>
+    <div class="cm-r"><b>Who can start a channel</b><span>A few licence holders per town</span><span>Anyone, but it's a feed, not a channel</span><span class="nw-us">Anyone, with a number and a call sign</span></div><div class="cm-r"><b>How you find it</b><span>Flip the dial</span><span>An algorithm picks for you</span><span class="nw-us">Flip the dial, in your market</span></div><div class="cm-r"><b>What's on at 9 pm</b><span>A schedule</span><span>Whatever you search for</span><span class="nw-us">A schedule, live and recorded</span></div><div class="cm-r"><b>Who pays for it</b><span>Local businesses, in the breaks</span><span>Ads the platform sells, its cut first</span><span class="nw-us">Local businesses and pledges, to the station</span></div><div class="cm-r"><b>How shows travel</b><span>Syndication, to affiliates</span><span>They don't; you build your own audience</span><span class="nw-us">Syndication, paid every airing</span></div>
+  </div>
+</div></div></section>
+<section class="blk" id="dial"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:5;--t:6"><div class="mh"><span><b class="ix">02</b>The dial</span><span>Numbers and call signs</span></div><div class="cb"><h2>Every station<br>gets a number.</h2><p class="lede">A number you can remember and a call sign you can say out loud. It's how people find you again tomorrow.</p>
+    <div class="nw-cs" id="cs">
+      <label for="csIn" class="lb">Try a call sign</label>
+      <div class="nw-csin"><input id="csIn" type="text" maxlength="5" autocomplete="off" spellcheck="false" value="TACO" aria-describedby="csOut"><span class="nw-csch">12.4</span></div>
+      <ul class="nw-csck" id="csCk"></ul>
+      <p class="nw-csout" id="csOut" aria-live="polite"></p>
+    </div></div></div>
+  <div class="cell rgl" style="--d:7;--t:6"><div class="mh"><span>How numbers work</span><span>Five rules</span></div><ol class="rg"><li><i class="tab">01</i><div><b>A number in your market</b><p>TV from 2.1 to 69.9, radio from 88.2 to 107.8. Each number belongs to one station in each market.</p></div></li><li><i class="tab">02</i><div><b>A call sign that's yours</b><p>Three to five letters, unique across the whole network. Pick it once: it can't change after you sign on.</p></div></li><li><i class="tab">03</i><div><b>Nothing that looks official</b><p>No four-letter signs starting with K or W, which look like real FCC stations, and no network or brand names.</p></div></li><li><i class="tab">04</i><div><b>Hold one before you're ready</b><p>Reserve a call sign and a number on the waitlist. It's held for 120 days, with a reminder before it lapses.</p></div></li><li><i class="tab">05</i><div><b>Sign off for good, and it's kept</b><p>Your call sign stays yours for a year. The number goes back to the market after 90 days.</p></div></li></ol></div>
+</div></div></section>
+<section class="blk" id="kinds"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:7"><div class="mh"><span><b class="ix">03</b>On the dial</span><span>Who's who</span></div><div class="cb"><h2>Five kinds<br>of station.</h2></div></div>
+  <div class="cell hd" style="--d:5"><div class="mh"><span>Kinds</span></div><div class="cb end"><p class="lede">They share the dial, the guide and the remote. What differs is who runs them and where the money goes.</p></div></div>
+  <div class="cell knd" style="--c:#C04A9E;--d:4;--t:3;--m:2"><div class="mh"><span><i class="sq"></i>Stations</span><span>Run by an operator</span></div><div class="cb"><p>A person, a club, a school or a business runs the schedule, sells the breaks and keeps what they earn.</p></div><div class="mf"><span class="tab">12.1 BEAT, 24.1 REEL</span></div></div><div class="cell knd" style="--c:#EBA03A;--d:4;--t:3;--m:2"><div class="mh"><span><i class="sq"></i>Studios</span><span>Make shows, no channel</span></div><div class="cb"><p>Offer programs to every station through the syndication market and get paid when they air.</p></div><div class="mf"><span class="tab">Pomona Vinyl Club</span></div></div><div class="cell knd" style="--c:#5B7BE0;--d:4;--t:6;--m:2"><div class="mh"><span><i class="sq"></i>Claimable</span><span>We run it until you claim it</span></div><div class="cb"><p>For creators whose work already airs with their permission. Earnings wait in escrow until they claim the station.</p></div><div class="mf"><span class="tab">18.1 SAZN</span></div></div><div class="cell knd" style="--c:#9A9CAB;--d:6;--t:3;--m:2"><div class="mh"><span><i class="sq"></i>The catalog</span><span>Public domain, checked twice</span></div><div class="cb"><p>Films and recordings the public owns, each cleared by two different people, free for any station to carry.</p></div><div class="mf"><span class="tab">60.1 OCAT</span></div></div><div class="cell knd" style="--c:#2F9A72;--d:6;--t:3;--m:2"><div class="mh"><span><i class="sq"></i>Listed</span><span>A public source, as it is</span></div><div class="cb"><p>City meetings and public access, played from the source's own stream with their permission. No ads, ever.</p></div><div class="mf"><span class="tab">7.1 CIVC</span></div></div>
+</div></div></section>
+<section class="blk" id="money"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:7"><div class="mh"><span><b class="ix">04</b>Money</span><span>How it moves</span></div><div class="cb"><h2>Follow<br>the dollar.</h2></div></div>
+  <div class="cell hd" style="--d:5"><div class="mh"><span>What we keep</span></div><div class="cb end"><p class="lede">We earn two ways: a small share of what stations earn, and what stations pay for the storage and relays they use. Being on the air is free. Here's where a hundred dollars goes.</p></div></div>
+  <div class="cell nw-fd" style="--d:8;--t:6;--m:2">
+    <div class="mh"><span>Per $100</span><span>Pick a kind of money</span></div>
+    <div class="fd-seg"><div class="seg2" id="fdSeg" role="group" aria-label="Kind of money"><button data-i="0" class="on">A spot it booked</button><button data-i="1">A spot we brought</button><button data-i="2">A pledge</button><button data-i="3">Cash carriage</button></div></div>
+    <div class="cb">
+      <div class="fd-bar" id="fdBar" aria-hidden="true"><i class="fa"><span></span></i><i class="fb"><span></span></i><i class="fc"><span></span></i></div>
+      <div class="fd-rows">
+        <div class="fd-r"><i style="--k:#5B7BE0"></i><span id="fdA">To the station</span><b class="tab" id="fdAv">$90.00</b></div>
+        <div class="fd-r"><i style="--k:#EBA03A"></i><span>To the network, to run the dial</span><b class="tab" id="fdBv">$10.00</b></div>
+        <div class="fd-r"><i class="pl"></i><span>Part of ours, back to stations through the pool</span><b class="tab">Shared monthly</b></div>
+      </div>
+      <p class="fd-note" id="fdNote"></p>
+    </div>
+  </div>
+  <div class="cell use" style="--d:4;--t:6;--m:2">
+    <div class="mh"><span>What stations pay</span><span>Pay as you go</span></div>
+    <div class="cb"><div class="us-r us-big"><span>Being on the air</span><b>Free</b></div><div class="us-r"><span>Storage, after 10 GB</span><b class="tab">$0.04 a GB a month</b></div><div class="us-r"><span>Relays to YouTube and the rest</span><b class="tab">$0.05 an hour, $25 most</b></div><div class="us-r"><span>Live hours, after 5</span><b class="tab">$0.75 an hour</b></div><p class="us-n">Paid from earnings first. Run short and the channel stays on the air; relays pause after a 14-day grace.</p></div>
+  </div>
+  <div class="cell pool" style="--d:12">
+    <div class="mh"><span>The pool</span><span>On the 1st, for last month</span></div>
+    <div class="pl3">
+      <div style="--c:#5B7BE0"><small class="tab">01</small><b>An equal share</b><p>Split evenly between every station that aired last month. The smallest station gets what the biggest gets.</p></div>
+      <div style="--c:#EBA03A"><small class="tab">02</small><b>A watch-time share</b><p>Split by the minutes people spent watching each station. Good programming is paid for twice.</p></div>
+      <div style="--c:#C04A9E"><small class="tab">03</small><b>The creator fund</b><p>Grants for makers, approved in public by people who can't pay themselves or us.</p></div>
+    </div>
+  </div>
+</div></div></section>
+<section class="blk" id="locks"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:7"><div class="mh"><span><b class="ix">05</b>Escrow and the fund</span><span>On-chain</span></div><div class="cb"><h2>Money we<br>can't touch.</h2></div></div>
+  <div class="cell hd" style="--d:5"><div class="mh"><span>Why it's built this way</span></div><div class="cb end"><p class="lede">Earnings for creators who haven't joined yet, and the creator fund, sit in public contracts. They can pay a creator or a grant. There is no way for them to pay us.</p></div></div>
+  <div class="cell lk2" style="--d:6;--t:6;--m:2">
+    <div class="mh"><span>Paying a creator or a grant</span><span>2 of 3 keys</span></div>
+    <div class="cb"><div class="tl3" data-run aria-hidden="true">
+      <div class="t3 t3-keys"><b>Approve</b><span><i></i><i></i><i class="x"></i></span><small>Two of three people, held separately</small></div>
+      <div class="t3 t3-wait"><b>72 hours in public</b><span class="t3-tb"><i></i></span><small>Anyone can see it. Any one key can stop it</small></div>
+      <div class="t3 t3-done"><b>Paid</b><span class="t3-ok"></span><small>Only to the creator, or as a grant</small></div>
+    </div></div>
+  </div>
+  <div class="cell lk2" style="--d:6;--t:6;--m:2">
+    <div class="mh"><span>Changing the contracts</span><span>7-day lock</span></div>
+    <div class="cb"><div class="tl3" data-run aria-hidden="true">
+      <div class="t3 t3-keys"><b>Proposed</b><span><i></i></span><small>By the network</small></div>
+      <div class="t3 t3-wait"><b>7 days in public</b><span class="t3-tb"><i></i></span><small>Every key holder can cancel it</small></div>
+      <div class="t3 t3-done"><b>Live</b><span class="t3-ok"></span><small>One honest key is enough to stop it</small></div>
+    </div></div>
+  </div>
+  <div class="cell" style="--d:12"><div class="nw-facts">
+    <div><small>Unclaimed after</small><b class="tab">3 years</b><span>then it becomes grants</span></div>
+    <div><small>Can pay the network</small><b class="tab">Never</b><span>not a code path that exists</span></div>
+    <div><small>Paid into escrow</small><b class="tab">Weekly</b><span>after the same shares as any station</span></div>
+    <div><small>Anyone can read it</small><b class="tab">Always</b><span>every payment, on chain</span></div>
+  </div></div>
+</div></div></section>
+<section class="blk" id="standards"><div class="wrap"><div class="sheet">
+  <div class="cell hd" style="--d:5;--t:6"><div class="mh"><span><b class="ix">06</b>Standards</span><span>Seven of them</span></div><div class="cb"><h2>Rules every<br>station keeps.</h2><p class="lede">Few of them, written plainly, the same for the biggest station and the smallest.</p>
+    <div class="rrec" aria-hidden="true"><div class="rr-h"><b>A rule change</b><span class="rr-ok"><i></i>Dated</span></div><div class="rr-l"><span>Takes effect</span><b>From a date, never before today</b></div><div class="rr-l"><span>Backdated</span><b>Never</b></div><div class="rr-l"><span>The old value</span><b>Kept, with who changed it</b></div><div class="rr-l"><span>Past statements</span><b>Read exactly as they did</b></div></div></div></div>
+  <div class="cell rgl" style="--d:7;--t:6"><div class="mh"><span>On every station</span><span>For everyone</span></div><ol class="rg"><li><i class="tab">01</i><div><b>Every break has a station ID</b><p>Viewers always know what they're watching. A station can choose how often, never "never".</p></div></li><li><i class="tab">02</i><div><b>Every program has a rights record</b><p>Who made it, who owns the music and footage, and the licence it airs under. No record, no air.</p></div></li><li><i class="tab">03</i><div><b>A claim stops a program everywhere</b><p>Anyone can file one. The program comes off every station at once while the station answers. The channel keeps running.</p></div></li><li><i class="tab">04</i><div><b>Repeat claims pause carriage</b><p>Three upheld claims in a year and a station can't offer shows to others until it's sorted.</p></div></li><li><i class="tab">05</i><div><b>Ratings and advisories on every show</b><p>From TV-Y to TV-MA, with language and mature flags. Children's programs never get personalized ads.</p></div></li><li><i class="tab">06</i><div><b>Breaks stay short</b><p>Each station sets its own breaks, starting from three minutes of spots an hour, and can turn whole categories of ads away.</p></div></li><li><i class="tab">07</i><div><b>A bill never takes a channel dark</b><p>Run short and you stay on the air. Relays and live hours pause after a 14-day grace; the dial never does.</p></div></li></ol></div>
+</div></div></section>
+<section class="blk" id="faq"><div class="wrap"><div class="sheet">
+  <div class="cell where" style="--d:5;--t:6"><div class="mh"><span><b class="ix">07</b>Where</span><span>Markets we're filling first</span></div><div class="cb"><div class="mk-l" id="mkList"></div></div><div class="mf"><span>Markets are sets of ZIP codes. Your market decides which stations come first on your dial.</span></div></div>
+  <div class="cell faq" style="--d:7;--t:6"><div class="mh"><span>Questions people ask</span><span>7 answers</span></div><div class="qs"><details><summary><span>Who runs the network?</span><i aria-hidden="true"></i></summary><p>A small team in Southern California. We run the network desk: rights checks, the catalog, markets and the rules on this page. Stations run themselves.</p></details><details><summary><span>Where are you starting?</span><i aria-hidden="true"></i></summary><p>The Inland Empire first, then Los Angeles and Orange County. Anyone anywhere can sign on; those are the markets we're filling first.</p></details><details><summary><span>Is it really free to watch?</span><i aria-hidden="true"></i></summary><p>Yes. No account, no subscription. Spots, sponsors and pledges pay for the stations, and stations pay for the storage they use.</p></details><details><summary><span>Can I watch on my TV?</span><i aria-hidden="true"></i></summary><p>On Android TV, Google TV and Fire TV in the browser, or cast from your phone and use the phone as the remote.</p></details><details><summary><span>Do I own my station?</span><i aria-hidden="true"></i></summary><p>Your number, call sign, schedule and earnings are yours. You decide what airs and who can carry it.</p></details><details><summary><span>Can my city or school be on the dial?</span><i aria-hidden="true"></i></summary><p>Yes. Public meetings and public access can be listed from their own stream, with no ads, or run as a full station.</p></details><details><summary><span>Is the software open?</span><i aria-hidden="true"></i></summary><p>That's the plan: the apps and the code, open for anyone to read and improve. When the money contracts go live, every payment they make can be read by anyone.</p></details></div></div>
+</div></div></section>
+</main>

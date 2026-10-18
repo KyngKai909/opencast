@@ -1,0 +1,81 @@
+/* =====================================================================
+   HERO LAYOUT: the overlay is a grid, not absolutely placed pieces.
+   rows: [stage spacer] [copy + lower third] [hint] [dial]
+   ===================================================================== */
+.hui{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;justify-content:flex-end;gap:clamp(14px,2.2svh,26px);padding:calc(var(--mh) + 96px) var(--gut) calc(18px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.hrow{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:clamp(16px,2vw,32px);align-items:end;pointer-events:none}
+.hrow>*,.hui>.hint,.hui>.dial{pointer-events:auto}
+.hui .hero-copy{position:relative;left:auto;bottom:auto;top:auto;right:auto;grid-column:1/span 7;max-width:none}
+.hui .hero-copy h1{font-size:clamp(52px,min(10vw,15svh),164px)}
+.hui .lower{position:relative;left:auto;right:auto;bottom:auto;grid-column:9/span 4;width:auto;max-width:440px;justify-self:end}
+.hui .hint{position:relative;right:auto;bottom:auto;align-self:flex-end}
+.hui .dial{position:relative;left:auto;right:auto;bottom:auto;padding:0}
+@media (max-width:1099px){
+  .hrow{row-gap:clamp(16px,2.4svh,26px)}
+  .hui .hero-copy{grid-column:1/-1}
+  .hui .hero-copy h1{font-size:clamp(50px,min(11vw,11svh),120px)}
+  .hui .hero-copy p{max-width:52ch}
+  /* lower third becomes a compact strip: tag left, programme right */
+  .hui .lower{grid-column:1/-1;justify-self:stretch;max-width:none;display:grid;grid-template-columns:auto minmax(0,1fr)}
+  .hui .lt-tag{height:auto;border-radius:12px 0 0 12px;padding:0 14px;flex-direction:column;justify-content:center;align-items:flex-start;gap:4px}
+  .hui .lt-tag .lt-air{margin:0;height:20px;font-size:10px}
+  .hui .lt-body{border-radius:0 12px 12px 0;padding:12px 16px;display:flex;flex-direction:column;justify-content:center}
+  .hui .lt-who,.hui .lt-next{display:none}
+  .hui .lt-row{margin-top:8px}
+  .hui .hint{display:none}
+}
+@media (max-width:699px){
+  .hui{padding-top:150px;gap:14px}
+  .hui .hero-copy h1{font-size:clamp(46px,min(14vw,9.5svh),84px)}
+  .hui .hero-copy p{font-size:15.5px;margin-top:14px}
+  .hui .hero-copy .acts{margin-top:18px}
+  .hui .hero-copy .acts .btn{flex:1 1 auto;justify-content:center}
+  .hui .lt-tag{padding:0 12px}
+  .hui .lt-cs{font-size:30px}.hui .lt-num{font-size:19px}
+  .hui .lt-prog{font-size:16px}
+  .hui .lt-row{grid-template-columns:minmax(0,1fr) auto}
+  .hui .lt-row>span:first-child{display:none}
+}
+@media (max-height:620px) and (max-width:1099px){ .hui .hero-copy p{display:none} }
+
+/* =====================================================================
+   FLAT GRID: no cards. Cells sit on the page; the grid is only rules.
+   Vertical rules between columns, horizontal rules between rows.
+   The sheet bleeds out by one cell-pad so text lines up with the logo.
+   ===================================================================== */
+.sheet{background:none;border:0;border-top:1px solid var(--rule);border-radius:0;box-shadow:none;gap:0;overflow:visible;margin-inline:calc(var(--pad) * -1);clip-path:inset(-1px 1px -1px 0)}
+.cell{background:transparent;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+a.cell:hover{background:rgb(243 234 217 / .025)}
+.mh,.mf{padding-inline:var(--pad)}
+.mh{border-bottom-color:rgb(243 234 217 / .07)}
+.mf{border-top-color:rgb(243 234 217 / .07)}
+.cb{padding:var(--pad)}
+#guide .g-bar{padding-inline:var(--pad)}
+#guide .g-in{padding:0 calc(var(--pad) - 10px) 10px}
+.stn .cv{margin-inline:var(--pad)}
+.stn .key{right:var(--pad)}
+.rul{margin-inline:0}
+.wd .word{padding-inline:var(--pad)}
+.wd .word span{left:var(--pad)}
+.foot.mf{padding-inline:var(--pad)}
+.btv .cb{padding:var(--pad)}
+.btv .brk-tv{box-shadow:0 0 0 1px var(--rule),0 50px 110px -50px var(--pc)}
+.blk{padding-block:clamp(56px,7vw,112px)}
+.signoff{padding-top:clamp(56px,7vw,112px)}
+@media (max-width:699px){
+  :root{--pad:var(--gut)}
+}
+.hui .dial{margin-top:clamp(10px,1.6svh,18px)}
+@media (max-width:1099px){
+  .hui .lt-tag .lt-air{display:none}
+  .hui .lt-tag{gap:2px}
+  .hui .lt-num::before{content:"";display:inline-block;width:7px;height:7px;margin:0 6px 2px 0;border-radius:50%;background:var(--tally);box-shadow:0 0 8px var(--tally);animation:pulse 1.8s infinite}
+}
+@media (max-width:1099px){ .hui .dial{margin-top:34px} }
+@media (max-width:699px){ .hui .dial{margin-top:28px} }
+/* guide runs edge to edge inside its cell, like the rules above it */
+#guide .g-in{padding:0}
+#guide .g-row{border-radius:0}
+#guide .g-st,#guide .g-corner{padding-left:var(--pad)}
+/* the "now" line sits over the programs */
+#guide .g-now{z-index:6}

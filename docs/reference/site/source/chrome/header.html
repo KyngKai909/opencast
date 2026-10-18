@@ -1,0 +1,36 @@
+
+<div class="room" aria-hidden="true"></div>
+<div class="grain" id="grain" aria-hidden="true"></div>
+<div class="cur" id="cur" aria-hidden="true"><div class="r"><span id="curL">Tune</span></div><div class="d"></div></div>
+
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Dial, home"><svg class="bi" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="27" fill="#1D1735"/><rect x=".75" y=".75" width="118.5" height="118.5" rx="26.25" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.5"/><g stroke="#F3EAD9" stroke-width="6" stroke-linecap="round"><path d="M26 86V77" stroke-opacity=".6"/><path d="M40 86V70" stroke-opacity=".85"/><path d="M80 86V70" stroke-opacity=".85"/><path d="M94 86V77" stroke-opacity=".6"/></g><rect x="52" y="43" width="16" height="56" rx="8" fill="#FF4A3D"/><circle cx="60" cy="26" r="9" fill="#FF4A3D"/></svg><svg class="bw" viewBox="0 0 201 100" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M20 34H34A20 20 0 0 1 54 54V80A20 20 0 0 1 34 100H20A20 20 0 0 1 0 80V54A20 20 0 0 1 20 34ZM25 53H29A6 6 0 0 1 35 59V75A6 6 0 0 1 29 81H25A6 6 0 0 1 19 75V59A6 6 0 0 1 25 53Z"/><rect x="35" width="19" height="100"/><rect x="65" y="34" width="19" height="66"/><circle cx="74.5" cy="12" r="9.5"/><path fill-rule="evenodd" d="M114 34H128A20 20 0 0 1 148 54V80A20 20 0 0 1 128 100H114A20 20 0 0 1 94 80V54A20 20 0 0 1 114 34ZM119 53H123A6 6 0 0 1 129 59V75A6 6 0 0 1 123 81H119A6 6 0 0 1 113 75V59A6 6 0 0 1 119 53Z"/><rect x="129" y="34" width="19" height="66"/><rect x="159" width="19" height="100"/></g><circle cx="191.5" cy="90.5" r="9.5" fill="#FF4A3D"/></svg></a>
+  <nav class="nl nl2" aria-label="Main"><span class="nl-ind" aria-hidden="true"></span><a href="#run"><i>01</i>Run a station</a><a href="#syndication"><i>02</i>Syndication</a><a href="#spots"><i>03</i>Spot market</a><a href="#network"><i>04</i>The network</a><a href="#contact"><i>05</i>Contact</a></nav>
+  <a class="np" href="#top" aria-label="Watch what's on now">
+    <span class="tnb"><span class="tnb-lcd" aria-hidden="true"><i class="tnb-dot"></i><span class="tnb-roll"><span class="tnb-a"><span class="js-ch">12.1</span><span id="npCs">BEAT</span></span><span class="tnb-p"><small>Now</small><em id="npProg">Overnight Crates</em></span></span></span><span class="tnb-go">Watch<b aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 5.5v9l7.5-4.5z" fill="currentColor"/></svg></b></span></span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mob" aria-label="Menu"><span class="hb" aria-hidden="true"><i></i><i></i></span><span class="ml">Menu</span></button>
+</header>
+<script>
+(function(){ var n=document.querySelector('.nl2'); if(n){ var ind=n.querySelector('.nl-ind'), cur=n.querySelector('.is-cur');
+  function to(a){ if(!a){ ind.classList.remove('on'); return; } ind.style.left=a.offsetLeft+'px'; ind.style.width=a.offsetWidth+'px'; ind.classList.add('on'); }
+  function rest(){ to(cur); }
+  n.querySelectorAll('a').forEach(function(a){ a.addEventListener('mouseenter',function(){ to(a); }); a.addEventListener('focus',function(){ to(a); }); });
+  n.addEventListener('mouseleave',rest); addEventListener('load',rest); addEventListener('resize',rest); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(rest); rest(); }
+  var t=document.querySelector('.tnb'); if(t&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)) setInterval(function(){ if(!document.hidden) t.classList.toggle('flip'); },3400);
+})();
+</script>
+<div class="mob" id="mob" hidden>
+  <div class="mob-h"><a class="brand" href="#top" aria-label="Dial, home"><svg class="bi" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="27" fill="#1D1735"/><rect x=".75" y=".75" width="118.5" height="118.5" rx="26.25" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.5"/><g stroke="#F3EAD9" stroke-width="6" stroke-linecap="round"><path d="M26 86V77" stroke-opacity=".6"/><path d="M40 86V70" stroke-opacity=".85"/><path d="M80 86V70" stroke-opacity=".85"/><path d="M94 86V77" stroke-opacity=".6"/></g><rect x="52" y="43" width="16" height="56" rx="8" fill="#FF4A3D"/><circle cx="60" cy="26" r="9" fill="#FF4A3D"/></svg><svg class="bw" viewBox="0 0 201 100" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M20 34H34A20 20 0 0 1 54 54V80A20 20 0 0 1 34 100H20A20 20 0 0 1 0 80V54A20 20 0 0 1 20 34ZM25 53H29A6 6 0 0 1 35 59V75A6 6 0 0 1 29 81H25A6 6 0 0 1 19 75V59A6 6 0 0 1 25 53Z"/><rect x="35" width="19" height="100"/><rect x="65" y="34" width="19" height="66"/><circle cx="74.5" cy="12" r="9.5"/><path fill-rule="evenodd" d="M114 34H128A20 20 0 0 1 148 54V80A20 20 0 0 1 128 100H114A20 20 0 0 1 94 80V54A20 20 0 0 1 114 34ZM119 53H123A6 6 0 0 1 129 59V75A6 6 0 0 1 123 81H119A6 6 0 0 1 113 75V59A6 6 0 0 1 119 53Z"/><rect x="129" y="34" width="19" height="66"/><rect x="159" width="19" height="100"/></g><circle cx="191.5" cy="90.5" r="9.5" fill="#FF4A3D"/></svg></a><button class="menu-btn x" id="menuX" aria-label="Close menu"><span class="hb on" aria-hidden="true"><i></i><i></i></span><span class="ml">Close</span></button></div>
+  <nav class="mob-l" aria-label="Menu">
+    <a href="#top" class="w"><i>00</i><span><b>Watch</b><small>Open the dial</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#run"><i>01</i><span><b>Run a station</b><small>For creators and groups</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#syndication"><i>02</i><span><b>Syndication</b><small>Carry shows, or offer yours</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#spots"><i>03</i><span><b>Spot market</b><small>For advertisers, near and far</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#network"><i>04</i><span><b>The network</b><small>How it's run</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#contact"><i>05</i><span><b>Contact</b><small>A person answers</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  </nav>
+  <div class="mob-f"><span><i></i>9 stations on now</span><span class="tab" id="mobClock">3:22 pm</span></div>
+</div>
+

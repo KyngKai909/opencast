@@ -1,0 +1,236 @@
+
+<div class="room" aria-hidden="true"></div>
+<div class="grain" id="grain" aria-hidden="true"></div>
+<div class="cur" id="cur" aria-hidden="true"><div class="r"><span id="curL">Tune</span></div><div class="d"></div></div>
+<div class="power" id="power" aria-hidden="true"><i></i></div>
+<div class="peek" id="peek" aria-hidden="true"><div class="scr"><canvas width="260" height="195"></canvas><span class="ch"></span><span class="lb"></span></div></div>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Dial, home"><svg class="bi" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="27" fill="#1D1735"/><rect x=".75" y=".75" width="118.5" height="118.5" rx="26.25" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.5"/><g stroke="#F3EAD9" stroke-width="6" stroke-linecap="round"><path d="M26 86V77" stroke-opacity=".6"/><path d="M40 86V70" stroke-opacity=".85"/><path d="M80 86V70" stroke-opacity=".85"/><path d="M94 86V77" stroke-opacity=".6"/></g><rect x="52" y="43" width="16" height="56" rx="8" fill="#FF4A3D"/><circle cx="60" cy="26" r="9" fill="#FF4A3D"/></svg><svg class="bw" viewBox="0 0 201 100" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M20 34H34A20 20 0 0 1 54 54V80A20 20 0 0 1 34 100H20A20 20 0 0 1 0 80V54A20 20 0 0 1 20 34ZM25 53H29A6 6 0 0 1 35 59V75A6 6 0 0 1 29 81H25A6 6 0 0 1 19 75V59A6 6 0 0 1 25 53Z"/><rect x="35" width="19" height="100"/><rect x="65" y="34" width="19" height="66"/><circle cx="74.5" cy="12" r="9.5"/><path fill-rule="evenodd" d="M114 34H128A20 20 0 0 1 148 54V80A20 20 0 0 1 128 100H114A20 20 0 0 1 94 80V54A20 20 0 0 1 114 34ZM119 53H123A6 6 0 0 1 129 59V75A6 6 0 0 1 123 81H119A6 6 0 0 1 113 75V59A6 6 0 0 1 119 53Z"/><rect x="129" y="34" width="19" height="66"/><rect x="159" width="19" height="100"/></g><circle cx="191.5" cy="90.5" r="9.5" fill="#FF4A3D"/></svg></a>
+  <nav class="nl nl2" aria-label="Main"><span class="nl-ind" aria-hidden="true"></span><a href="#run"><i>01</i>Run a station</a><a href="#syndication"><i>02</i>Syndication</a><a href="#spots"><i>03</i>Spot market</a><a href="#network"><i>04</i>The network</a><a href="#contact"><i>05</i>Contact</a></nav>
+  <a class="np" href="#top" aria-label="Watch what's on now">
+    <span class="tnb"><span class="tnb-lcd" aria-hidden="true"><i class="tnb-dot"></i><span class="tnb-roll"><span class="tnb-a"><span class="js-ch">12.1</span><span id="npCs">BEAT</span></span><span class="tnb-p"><small>Now</small><em id="npProg">Overnight Crates</em></span></span></span><span class="tnb-go">Watch<b aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 5.5v9l7.5-4.5z" fill="currentColor"/></svg></b></span></span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mob" aria-label="Menu"><span class="hb" aria-hidden="true"><i></i><i></i></span><span class="ml">Menu</span></button>
+</header>
+<script>
+(function(){ var n=document.querySelector('.nl2'); if(n){ var ind=n.querySelector('.nl-ind'), cur=n.querySelector('.is-cur');
+  function to(a){ if(!a){ ind.classList.remove('on'); return; } ind.style.left=a.offsetLeft+'px'; ind.style.width=a.offsetWidth+'px'; ind.classList.add('on'); }
+  function rest(){ to(cur); }
+  n.querySelectorAll('a').forEach(function(a){ a.addEventListener('mouseenter',function(){ to(a); }); a.addEventListener('focus',function(){ to(a); }); });
+  n.addEventListener('mouseleave',rest); addEventListener('load',rest); addEventListener('resize',rest); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(rest); rest(); }
+  var t=document.querySelector('.tnb'); if(t&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)) setInterval(function(){ if(!document.hidden) t.classList.toggle('flip'); },3400);
+})();
+</script>
+<div class="mob" id="mob" hidden>
+  <div class="mob-h"><a class="brand" href="#top" aria-label="Dial, home"><svg class="bi" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="27" fill="#1D1735"/><rect x=".75" y=".75" width="118.5" height="118.5" rx="26.25" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.5"/><g stroke="#F3EAD9" stroke-width="6" stroke-linecap="round"><path d="M26 86V77" stroke-opacity=".6"/><path d="M40 86V70" stroke-opacity=".85"/><path d="M80 86V70" stroke-opacity=".85"/><path d="M94 86V77" stroke-opacity=".6"/></g><rect x="52" y="43" width="16" height="56" rx="8" fill="#FF4A3D"/><circle cx="60" cy="26" r="9" fill="#FF4A3D"/></svg><svg class="bw" viewBox="0 0 201 100" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M20 34H34A20 20 0 0 1 54 54V80A20 20 0 0 1 34 100H20A20 20 0 0 1 0 80V54A20 20 0 0 1 20 34ZM25 53H29A6 6 0 0 1 35 59V75A6 6 0 0 1 29 81H25A6 6 0 0 1 19 75V59A6 6 0 0 1 25 53Z"/><rect x="35" width="19" height="100"/><rect x="65" y="34" width="19" height="66"/><circle cx="74.5" cy="12" r="9.5"/><path fill-rule="evenodd" d="M114 34H128A20 20 0 0 1 148 54V80A20 20 0 0 1 128 100H114A20 20 0 0 1 94 80V54A20 20 0 0 1 114 34ZM119 53H123A6 6 0 0 1 129 59V75A6 6 0 0 1 123 81H119A6 6 0 0 1 113 75V59A6 6 0 0 1 119 53Z"/><rect x="129" y="34" width="19" height="66"/><rect x="159" width="19" height="100"/></g><circle cx="191.5" cy="90.5" r="9.5" fill="#FF4A3D"/></svg></a><button class="menu-btn x" id="menuX" aria-label="Close menu"><span class="hb on" aria-hidden="true"><i></i><i></i></span><span class="ml">Close</span></button></div>
+  <nav class="mob-l" aria-label="Menu">
+    <a href="#top" class="w"><i>00</i><span><b>Watch</b><small>Open the dial</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#run"><i>01</i><span><b>Run a station</b><small>For creators and groups</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#syndication"><i>02</i><span><b>Syndication</b><small>Carry shows, or offer yours</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#spots"><i>03</i><span><b>Spot market</b><small>For advertisers, near and far</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#network"><i>04</i><span><b>The network</b><small>How it's run</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <a href="#contact"><i>05</i><span><b>Contact</b><small>A person answers</small></span><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  </nav>
+  <div class="mob-f"><span><i></i>9 stations on now</span><span class="tab" id="mobClock">3:22 pm</span></div>
+</div>
+
+<main id="top">
+<!-- ================= HERO ================= -->
+<section class="hero" id="hero">
+  <div class="pin" id="pin">
+    <div class="halo" id="halo" aria-hidden="true"></div>
+    <div class="screen" id="screen" aria-label="Live channels. Use the left and right arrow keys or type a channel number to change stations." data-cur="Flip">
+      <canvas id="pic" aria-hidden="true"></canvas>
+      <canvas id="noise" aria-hidden="true"></canvas>
+      <div class="scan"></div><div class="vig"></div>
+      <div class="osd" aria-hidden="true"><span id="osdNum">12.1</span><small id="osdCs">BEAT</small><span class="tun">TUNING IN</span></div>
+      <div class="kbuf" id="kbuf" aria-hidden="true"></div>
+    </div>
+
+    <div class="hui">
+    <div class="hrow">
+    <div class="hero-copy fade" id="copy">
+      <h1><span class="ln"><span>Anyone</span></span><span class="ln"><span>can run</span></span><span class="ln"><span>a channel.</span></span></h1>
+      <p>A dial of 24/7 stations made by people near you: crate diggers, film clubs, family kitchens, city hall. Flip through what's on right now.</p>
+      <div class="acts"><a class="btn" href="#top" data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">12.1</span></span>Open the dial</a><a class="btn ghost" href="#run">Run a station</a></div>
+    </div>
+
+    <div class="lower fade" id="lower" aria-live="polite">
+      <div class="lt-tag"><span class="lt-num" id="lNum">12.1</span><span class="lt-cs" id="lCs">BEAT</span><span class="lt-air"><i></i>On air</span></div>
+      <div class="lt-body">
+        <div class="lt-r lt-now"><span class="lt-k">Now</span><div class="lt-v"><div class="lt-prog" id="lProg">Late Crate</div><div class="lt-who" id="lWho">Run by a crate digger in Pomona</div></div><span class="lt-left" id="lLeft">24 min left</span></div>
+        <div class="lt-row"><span id="lStart">2 pm</span><div class="lt-bar"><i id="lBar"></i></div><span id="lEnd">3 pm</span></div>
+        <div class="lt-r lt-nx"><span class="lt-k">Next</span><div class="lt-v"><b id="lNext">Crate Session</b></div><span class="lt-t" id="lNextT">3 pm</span></div>
+      </div>
+    </div>
+
+    </div>
+    <div class="hint fade" id="hint"><span><kbd>←</kbd> <kbd>→</kbd> flip</span><span><kbd>0–9</kbd> type a number</span><button class="snd" id="snd" aria-pressed="false"><i><b></b><b></b><b></b></i><span>Sound off</span></button></div>
+
+    <div class="dial fade" id="dial">
+      <div class="row">
+        <button class="arrow" id="prev" aria-label="Previous station"><svg viewBox="0 0 20 20"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="band" id="band" data-cur="Drag">
+          <div class="seg tv-s" id="segTv"><span class="lab">TV 2–69</span></div>
+          <div class="seg fm-s" id="segFm"><span class="lab">FM 88–108</span></div>
+          <div class="needle" id="needle"></div>
+        </div>
+        <button class="arrow" id="next" aria-label="Next station"><svg viewBox="0 0 20 20"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
+
+    </div>
+    <div class="wall" id="wall" aria-label="Every station, live"></div>
+    <div class="after" id="after"><div class="af-l"><div class="dots" id="afterDots"></div><p class="af-k">The wall, live</p><b id="afterB">Nine stations on tonight</b></div><a class="af-r" href="#guide" id="afterGo"><span>See the full guide</span><i><svg viewBox="0 0 20 20"><path d="M10 4v12M5 11l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></i></a></div>
+  </div>
+</section>
+
+<div class="crawl" aria-label="On now across the network"><span class="tag"><i></i>On now</span><div class="track" id="crawl"></div></div>
+
+<!-- ================= GUIDE ================= -->
+<section class="blk" id="guide">
+  <div class="wrap">
+    <div class="sheet">
+      <div class="cell hd" style="--d:7">
+        <div class="mh"><span><b class="ix">01</b>The guide</span><span class="lv"><i></i>Live</span></div>
+        <div class="cb"><h2>No feed.<br>Just what's on.</h2></div>
+      </div>
+      <div class="cell hd" style="--d:5">
+        <div class="mh"><span>How it works</span><span class="tab" id="gClock">2:46 pm</span></div>
+        <div class="cb end"><p class="lede">Every station keeps a schedule, so there's always something playing and you can see what's next. Nothing is picked for you.</p></div>
+      </div>
+      <div class="cell" style="--d:12">
+        <div class="g-bar">
+          <div class="seg2" role="group" aria-label="Show stations"><button class="on" data-f="all">All <span>9</span></button><button data-f="tv">TV <span>6</span></button><button data-f="fm">Radio <span>3</span></button></div>
+          <span class="g-help">Hover a station to peek. Select it to tune in.</span>
+        </div>
+        <div class="guide"><div class="g-in" id="gIn"></div></div>
+        <div class="mf">
+          <div class="lgd"><span><i class="k-now"></i>On now</span><span><i class="k-up"></i>Coming up</span><span><i class="k-past"></i>Ended</span></div>
+          <span class="tab">Times in your time zone</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= STATIONS ================= -->
+<section class="blk" id="stations">
+  <div class="wrap">
+    <div class="sheet" id="signs">
+      <div class="cell hd" style="--d:7">
+        <div class="mh"><span><b class="ix">02</b>Stations</span><span>9 on the dial</span></div>
+        <div class="cb"><h2>Every number<br>is somebody.</h2></div>
+      </div>
+      <div class="cell hd" style="--d:5">
+        <div class="mh"><span>Who's on</span><span>6 TV · 3 radio</span></div>
+        <div class="cb end"><p class="lede">A station is a person or a group with a call sign, a number in their market and a schedule they built. Some are one person and a crate of records. One is a whole city council.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= THE BREAK ================= -->
+<section class="brkw" id="breaks" aria-label="How a break works, played as you scroll">
+  <div class="brk-pin" id="brkPin" style="--pc:#C04A9E">
+    <div class="wrap">
+      <div class="sheet">
+        <div class="cell bcap" style="--d:5">
+          <div class="mh"><span><b class="ix">03</b>The break</span><span class="pre"><i></i><span id="capPre">A break on 12.1 BEAT</span></span></div>
+          <div class="cb"><h2 id="capH"><span>The breaks are part of the show.</span></h2><p id="capP">Scroll to play one. Every station builds its own: short, local, and paying the people who make the channel.</p></div>
+          <div class="mf"><span>Scroll to play</span><span class="tab" id="tlT">0:00 of 1:45</span></div>
+        </div>
+        <div class="cell btv" style="--d:7">
+          <div class="mh"><span id="tlNow"><b>Late Crate</b></span><span>12.1 BEAT</span></div>
+          <div class="cb"><div class="brk-tv"><canvas id="brkC" width="800" height="500" aria-hidden="true"></canvas></div></div>
+          <div class="mf col"><div class="tl" id="tl" aria-hidden="true"></div><div class="tl-names" id="tlNames" aria-hidden="true"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DOORS ================= -->
+<section class="blk" id="doors">
+  <div class="wrap">
+    <div class="sheet">
+      <div class="cell hd" style="--d:7">
+        <div class="mh"><span><b class="ix">04</b>Get on the dial</span><span>Four ways in</span></div>
+        <div class="cb"><h2>Make it. Carry it.<br>Sponsor it.</h2></div>
+      </div>
+      <div class="cell hd" style="--d:5">
+        <div class="mh"><span>Who it's for</span></div>
+        <div class="cb end"><p class="lede">Everything on the dial is made, carried or paid for by someone nearby. Here's where each of them starts.</p></div>
+      </div>
+      <a class="cell dr big" id="run" href="#run" style="--c:#F3EAD9;--d:6" data-peek="1" data-cur="Open">
+        <div class="mh"><span><b class="ix">A</b>For creators and groups</span><span>Free to start</span></div>
+        <div class="cb">
+          <div class="claim" aria-hidden="true"><span class="cn">__.1</span><span class="cc">YOURS</span></div>
+          <div class="rul" id="rul" aria-hidden="true"></div>
+          <h3>Run a station</h3><p>Get a call sign and a number, build a schedule, and air it around the clock.</p>
+        </div>
+        <div class="mf"><span>Claim a number</span><span class="key"><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </a>
+      <a class="cell dr" id="syndication" href="#syndication" style="--c:#EBA03A;--d:6" data-peek="3" data-cur="Open">
+        <div class="mh"><span><b class="ix">B</b>For stations and makers</span><span>Paid when it airs</span></div>
+        <div class="cb"><h3>Syndication</h3><p>Carry shows from other stations, or offer yours to the whole network and get paid when it airs.</p></div>
+        <div class="mf"><span>Browse the market</span><span class="key"><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </a>
+      <a class="cell dr" id="spots" href="#spots" style="--c:#E0583A;--d:3;--t:3;--m:2" data-peek="2" data-cur="Open">
+        <div class="mh"><span><b class="ix">C</b>For advertisers</span></div>
+        <div class="cb"><h3>Spot market</h3><p>Buy short spots on the stations your customers already watch, down the street or online.</p></div>
+        <div class="mf"><span>Buy a spot</span><span class="key"><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </a>
+      <a class="cell dr" id="network" href="#network" style="--c:#5B7BE0;--d:3;--t:3;--m:2" data-peek="0" data-cur="Open">
+        <div class="mh"><span><b class="ix">D</b>For everyone</span></div>
+        <div class="cb"><h3>The network</h3><p>Who runs this, how the money moves, and the rules every station follows.</p></div>
+        <div class="mf"><span>How it's run</span><span class="key"><svg viewBox="0 0 20 20"><path d="M5 10h10M10.5 5.5 15 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PUBLIC BY DESIGN ================= -->
+<section class="blk" id="public">
+  <div class="wrap">
+    <div class="sheet">
+      <div class="cell" style="--d:12">
+        <div class="mh"><span><b class="ix">05</b>Public by design</span><span>Five promises</span></div>
+        <div class="cb"><p class="mani" id="mani" data-text="Free to watch, every station *earns*, creators get *paid*, *rights* come first and the software stays *open*."></p></div>
+      </div>
+      <div class="cell pf" style="--c:#5B7BE0;--d:4;--t:2;--m:1"><div class="mh"><span><i class="sq"></i>Free to watch</span><span class="ix">01</span></div><div class="cb"><p>No account to tune in, on a phone, a TV or a browser.</p></div></div>
+      <div class="cell pf" style="--c:#E0583A;--d:4;--t:2;--m:1"><div class="mh"><span><i class="sq"></i>Earned by the station</span><span class="ix">02</span></div><div class="cb"><p>Spots, sponsors and members' pledges go to the station that aired them.</p></div></div>
+      <div class="cell pf" style="--c:#C04A9E;--d:4;--t:2;--m:1"><div class="mh"><span><i class="sq"></i>Paid before joining</span><span class="ix">03</span></div><div class="cb"><p>Shows aired with a creator's permission earn from day one. The money waits in escrow.</p></div></div>
+      <div class="cell pf" style="--c:#2F9A72;--d:6;--t:3;--m:1"><div class="mh"><span><i class="sq"></i>Rights first</span><span class="ix">04</span></div><div class="cb"><p>A claim takes a program off the air everywhere at once while it's sorted out.</p></div></div>
+      <div class="cell pf" style="--c:#EBA03A;--d:6;--t:3;--m:2"><div class="mh"><span><i class="sq"></i>Open source</span><span class="ix">05</span></div><div class="cb"><p>Anyone can see how the dial works and help make it better.</p></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="signoff" id="contact">
+  <div class="wrap">
+    <div class="sheet">
+      <div class="cell" style="--d:8">
+        <div class="mh"><span><b class="ix">06</b>Sign-off</span><span>A person answers</span></div>
+        <div class="cb">
+          <h2>Turn it off whenever. We'll keep it on.</h2>
+          <p class="lede">Questions, a station you'd like to see on the dial, or a business that wants to be in the breaks: write to us and a person answers.</p>
+          <div class="acts"><a class="btn" href="#top" data-cur="Watch"><span class="live" aria-hidden="true"><i></i><span class="js-ch">12.1</span></span>Open the dial</a><a class="btn ghost" href="#contact">Contact us</a></div>
+        </div>
+      </div>
+      <div class="cell offc" style="--d:4">
+        <div class="mh"><span>Off air</span><span class="tab">Good night</span></div>
+        <div class="cb"><div class="offtv" aria-hidden="true"><div class="img"><canvas id="offC" width="320" height="240"></canvas></div><span class="dot"></span></div></div>
+      </div>
+      <nav class="cell lk" style="--d:3;--t:3;--m:1" aria-label="Watch"><div class="mh"><span>Watch</span></div><div class="cb"><a href="#top">Open the dial</a><a href="#guide">What's on</a><a href="#stations">Stations</a></div></nav>
+      <nav class="cell lk" style="--d:3;--t:3;--m:1" aria-label="Make"><div class="mh"><span>Make</span></div><div class="cb"><a href="#run">Run a station</a><a href="#syndication">Syndication</a></div></nav>
+      <nav class="cell lk" style="--d:3;--t:3;--m:1" aria-label="Advertise"><div class="mh"><span>Advertise</span></div><div class="cb"><a href="#spots">Spot market</a><a href="#breaks">How breaks work</a></div></nav>
+      <nav class="cell lk" style="--d:3;--t:3;--m:1" aria-label="The network"><div class="mh"><span>The network</span></div><div class="cb"><a href="#network">About</a><a href="#public">How it's run</a><a href="#contact">Contact</a></div></nav>
+      <div class="cell wd" style="--d:12"><div class="word" aria-hidden="true"><span data-brand>dial</span><b data-brand style="font-weight:inherit">dial</b></div><p class="wd-tag">Free to watch.<br>Flip it on.</p></div>
+      <div class="cell" style="--d:12"><div class="mf foot"><span>&copy; 2026 Dial.</span><span>Stations, programs and people on this page are examples.</span></div></div>
+    </div>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
