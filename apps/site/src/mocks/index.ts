@@ -4,6 +4,7 @@
 import type { EndpointDef } from "@contracts/core";
 import type { MockReply } from "../lib/api";
 import * as waitlist from "./waitlist";
+import { contactApi } from "../api/contact";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -11,5 +12,10 @@ export async function answer(endpoint: EndpointDef, path: string, body: unknown)
   await wait(endpoint.method === "GET" ? 150 : 450);
   if (endpoint.method === "POST" && endpoint.path === "/waitlist") return waitlist.join(body);
   if (endpoint.method === "GET" && endpoint.path === "/call-signs/:callSign") return waitlist.checkCallSign(decodeURIComponent(path.split("/").pop() ?? ""));
+  if (endpoint.method === "POST" && endpoint.path === "/contact") {
+    const parsed = contactApi.send.body.safeParse(body);
+    if (!parsed.success) return { status: 400, json: { error: { code: "bad_request", message: "Check the form.", fields: Object.fromEntries(parsed.error.issues.map((i) => [i.path.join(".") || "body", i.message])) } } };
+    return { status: 201, json: { desk: parsed.data.desk, receivedAt: new Date().toISOString() } };
+  }
   return { status: 404, json: { error: { code: "not_found", message: `No mock for ${endpoint.method} ${endpoint.path}.` } } };
 }

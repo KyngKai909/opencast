@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_APP_URL?: string;
   readonly PUBLIC_BUSINESS_URL?: string;
   readonly PUBLIC_API_URL?: string;
+  readonly PUBLIC_CONTACT_DOMAIN?: string;
 }
 
 interface ImportMeta {

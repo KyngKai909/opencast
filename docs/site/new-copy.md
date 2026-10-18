@@ -94,3 +94,35 @@ Every visitor-facing string the references don't have, and every change to refer
 | Network, tuner | after a change: "66.1 ROUT, Route 66 Reel. Now: Midnight Reel." |
 | Network, checker rows | each row read with "Yes: " or "No: " before it |
 | Network, the two lock timelines | "Two of three people, held separately, approve it. It waits 72 hours in public, where any one key can stop it. Then it's paid, only to the creator or as a grant." / "The network proposes it. It waits 7 days in public, where every key holder can cancel it. Then it's live; one honest key is enough to stop it." |
+
+### Contact (`/contact`, SITE-SPEC §7)
+
+The spec's own words are kept as written: "Talk to a person." / "We pick up.", the six jack labels, "Stations desk · usually within a day", "● Open", "Closed till 9 am", "For a formal takedown, use the takedown form." and "Patched through. We'll write back to <email>."
+
+| Where | Copy |
+|---|---|
+| Hero strip | "Contact" · "Six desks" |
+| Hero lede | Six desks, each run by people who know that part of the dial. Pick one on the switchboard and say what you need. |
+| Switchboard strip, before a desk | "Pick a desk" |
+| Switchboard foot | "Six desks. A person on each." → after a choice, "Patched to stations@usedial.com" |
+| Form strip | "Your message" · "Pick a desk" → "To the Stations desk" |
+| Form, before a desk | Pick a desk on the switchboard, and the form asks for what that desk needs. |
+| Fields | Name · Email · Message. Stations: Number ("The number you picked, if you have one") · Call sign. Makers: Link to a show or channel. Advertisers: Business name · Website · Area served ("A town, a county, or online"). Public channels: City, county, district or library · Your channel today ("A cable channel, a stream, or none yet"). Press: Outlet. Rights: Program or station · Link to the work · You're writing because: I hold the rights / I'm reporting a problem |
+| Button | "Send it" (+1 chip) |
+| Errors | "Tell us your name." · "Enter an email address" (the waitlist's) · "Write a message." · "Pick a desk on the switchboard." |
+| Sent | "Patched through." / "We'll write back to <email>." · button "Write another" |
+| Sent by email (the API can't take it yet) | "Over to your email." / "We couldn't send it from here, so your email app has it, addressed to <desk address>. Send it from there and a person writes back." |
+| Desks: what each handles | Stations: Claiming a number, master control, relays and your bill. · Makers: Offering a show, carriage terms and getting paid when it airs. · Advertisers: Spots, sponsorships and spots made for you. · Public channels: City meetings, public access, schools and libraries on the dial. · Press: Interviews, pictures and the facts behind a story. · Rights: Music, film and footage on the air, and claims. |
+| Desks: how fast | Stations, Makers, Rights: usually within a day · Advertisers: usually within a few hours · Public channels: usually within two days · Press: usually the same day |
+| Where we are | Strip "01 Where we are" · "Southern California"; headline "Where / we are."; lede "Southern California. We're filling the Inland Empire first, then Los Angeles and Orange County. Anyone anywhere can sign on; those are just the markets we're filling first." |
+| The map | Strip "First markets" · "Example map"; labels Inland Empire "First", Los Angeles "Next", Orange County "Next"; foot "Markets are sets of ZIP codes. The map is a sketch, not to scale."; for screen readers "A map of Southern California: the Inland Empire, first, east of Los Angeles and Orange County, which are next." |
+| FAQ heading | Strip "02 Questions"; headline "Before / you write."; strip "Questions people ask" · "4 answers" |
+| FAQ | How soon does someone answer? — Each desk says how long it usually takes. A message that lands between 9 am and 6 pm Pacific is read that day; one that lands overnight is read first thing in the morning. · Can I call instead? — Not yet. Every desk answers in writing, and the person who reads your message is the one who writes back. · How do I report a program? — Write to the Rights desk with what aired, on which station and when. A claim takes the program off every station while it's sorted out, and the channel keeps running. For a formal takedown, use the takedown form. · Do I need to write before I start a station? — No. Claim a number on Run a station and your first schedule can be on the dial in an evening. Write to the Stations desk if you get stuck. |
+
+### 404
+
+| Where | Copy |
+|---|---|
+| Strip | "No signal" · "--.-" |
+| Screen | "Off the air." / "There's nothing on this channel." (spec) · bug "--.-" (spec) |
+| Buttons | "Open the dial" (12.1 chip) · "Back to the start" (spec) |
